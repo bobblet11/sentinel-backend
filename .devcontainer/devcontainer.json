@@ -1,0 +1,19 @@
+{
+        "name": "Sentinel (Anaconda) Dev Environment",
+        "build": {
+                "dockerfile": "Dockerfile"
+        },
+        "mounts": ["source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"],
+        "customizations": {
+                "vscode": {
+                        "settings": {
+                                "python.defaultInterpreterPath": "/opt/conda/envs/sentinel-env/bin/python",
+                                "python.linting.pylintEnabled": true,
+                                "python.linting.enabled": true
+                        },
+                        "extensions": ["ms-python.python", "ms-python.vscode-pylance", "ms-azuretools.vscode-docker", "eamodio.gitlens"]
+                }
+        },
+        "remoteUser": "vscode",
+        "postCreateCommand": "sleep infinity"
+}

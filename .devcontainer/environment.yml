@@ -1,0 +1,12 @@
+name: sentinel-env # The name of your conda environment
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # --- Core Python ---
+  - python=3.9
+
+  # --- Your Project's PIP Dependencies ---
+  # Conda will use pip to install these
+  - pip:
+    - fastapi
