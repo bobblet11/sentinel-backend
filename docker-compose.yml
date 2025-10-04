@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  # --- INFRASTRUCTURE ---
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data: {}

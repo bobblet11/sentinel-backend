@@ -10,3 +10,5 @@ dependencies:
   # Conda will use pip to install these
   - pip:
     - fastapi
+    - redis
+    - pydantic
