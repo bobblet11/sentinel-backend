@@ -105,6 +105,5 @@ class RedisConnection:
             # We don't destroy the singleton instance, just the connection
             RedisConnection._instance = None 
 
-
-# Create a single, globally accessible instance of the connection manager
+# Create a single, globally accessible singleton instance of the connection manager
 redis_connection = RedisConnection()
