@@ -1,0 +1,6 @@
+# To connect to Redis and use our shared library
+redis
+# The best library for parsing RSS and Atom feeds
+feedparser
+# To load environment variables from a .env file for local testing
+python-dotenv
