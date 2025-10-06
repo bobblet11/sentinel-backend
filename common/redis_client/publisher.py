@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
-from redis_client.connection import redis_connection
-from models.redis_models import Message
+from .connection import redis_connection
+from common.models.redis_models import Message
 import json
 
 class RedisPublisher:    
