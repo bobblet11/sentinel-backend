@@ -1,0 +1,11 @@
+{
+    "terminal.integrated.env.linux": {
+        "BUILDKIT_PROGRESS": "plain"
+    },
+    "terminal.integrated.env.osx": {
+        "BUILDKIT_PROGRESS": "plain"
+    },
+    "terminal.integrated.env.windows": {
+        "BUILDKIT_PROGRESS": "plain"
+    }
+}
