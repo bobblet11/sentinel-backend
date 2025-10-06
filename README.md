@@ -70,9 +70,7 @@ The process is nearly identical for both macOS and Windows.
 3.  **Initial Config:**
     *   Duplicate the .env.template file, rename it to .env, and edit values.
     *   You should have .env.template and .env files at project root now
-    *   Go to .devcontainer/devcontainer.json
-    *   Find the remoteEnv block
-    *   Replace the github credentials with your own
+    *   Add your git credentials to the .env
 
 4.  **Reopen in Container:**
     * 	Open the container by,
