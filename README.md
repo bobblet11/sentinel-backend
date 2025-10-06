@@ -68,8 +68,11 @@ The process is nearly identical for both macOS and Windows.
         ```
 
 3.  **Initial Config:**
-    *   Duplicate the .env.template file, rename it to .env, and type in your github credentials.
+    *   Duplicate the .env.template file, rename it to .env, and edit values.
     *   You should have .env.template and .env files at project root now
+    *   Go to .devcontainer/devcontainer.json
+    *   Find the remoteEnv block
+    *   Replace the github credentials with your own
 
 4.  **Reopen in Container:**
     * 	Open the container by,
