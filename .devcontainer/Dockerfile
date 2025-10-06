@@ -30,9 +30,15 @@ RUN curl -SL "https://github.com/docker/compose/releases/download/v2.17.2/docker
 
 # --- Install Miniconda and Create Environment ---
 ARG CONDA_DIR=/opt/conda
+ARG TARGETPLATFORM
 ENV PATH=$CONDA_DIR/bin:$PATH
 
-RUN curl -sSL "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh" -o /tmp/miniconda.sh \
+RUN case "$TARGETPLATFORM" in \
+      linux/amd64) MINICONDA=Miniconda3-latest-Linux-x86_64.sh ;; \
+      linux/arm64) MINICONDA=Miniconda3-latest-Linux-aarch64.sh ;; \
+      *) echo "Unsupported TARGETPLATFORM: $TARGETPLATFORM" && exit 1 ;; \
+    esac \
+    && curl -sSL "https://repo.anaconda.com/miniconda/${MINICONDA}" -o /tmp/miniconda.sh \
     && /bin/bash /tmp/miniconda.sh -b -p $CONDA_DIR \
     && rm /tmp/miniconda.sh \
     && conda clean -afy

@@ -12,3 +12,4 @@ dependencies:
     - fastapi
     - redis
     - pydantic
+    - feedparser
