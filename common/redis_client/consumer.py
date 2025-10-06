@@ -1,5 +1,5 @@
 from typing import Any, Dict, Optional
-from .connection import redis_connection
+from common.redis_client.connection import redis_connection
 from common.models.redis_models import Message
 import json	
 
