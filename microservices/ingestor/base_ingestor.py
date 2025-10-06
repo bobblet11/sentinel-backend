@@ -65,12 +65,12 @@ class BaseIngestor:
 			total_processed += len(batch)
 
 			batch_links = [article.get("link") for article in batch if article.get("link")]
+			
 			if not batch_links:
 				continue
 
 			try:
 				# 1. Efficiently find which links are new.
-    
 				new_links=self.duplicate_filter.has_many(batch_links)
 				if not new_links:
 					print(f"Processed batch {i//batch_size + 1}: All {len(batch)} articles already seen.")
