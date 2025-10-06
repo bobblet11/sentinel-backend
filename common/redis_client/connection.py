@@ -2,13 +2,13 @@
 import redis
 import os
 import threading
+import time
 
 """
     These env variables are injected in the docker-compose.yml file.
 """
 redis_host = os.getenv("REDIS_HOST", "redis")
-redis_port = os.getenv("REDIS_PORT", 6379)
-
+redis_port = int(os.getenv("REDIS_PORT", 6379))
 
 class RedisConnection:
     """
@@ -21,6 +21,10 @@ class RedisConnection:
     # class instances
     _instance = None
     _lock = threading.Lock() 
+    
+    # Configuration for connection retries
+    MAX_RETRIES = 5
+    RETRY_DELAY_SECONDS = 3
 
     def __new__(cls):
         """
@@ -48,11 +52,14 @@ class RedisConnection:
         """
         Establishes the connection to the Redis server.
         This method is idempotent; it will only connect if not already connected.
-        """
-        # _client is a class instance from the RedisConnection object
-        if self._client is None:
+        """ 
+        
+        if self._client:
+            return
+        
+        for attempt in range(1, self.MAX_RETRIES + 1):
             try:
-                print(f"Attempting to connect to Redis at {redis_host}...")
+                print(f"Connecting to Redis at {redis_host}:{redis_port} (Attempt {attempt}/{self.MAX_RETRIES})...")
                 
                 pool = redis.ConnectionPool(
                     host=redis_host, 
@@ -60,23 +67,37 @@ class RedisConnection:
                     db=0, 
                     decode_responses=True
                 )
-                self._client = redis.Redis(connection_pool=pool)
-                self.ping()
-                print("Successfully connected to Redis.")
+                client = redis.Redis(connection_pool=pool)
                 
+                if client.ping():
+                    print("Successfully connected and pinged Redis.")
+                    self._client = client
+                    return
+                else:
+                    raise redis.exceptions.ConnectionError("Redis ping returned False.")
+            
             except redis.exceptions.ConnectionError as e:
-                print(f"FATAL: Could not connect to Redis: {e}")
-                self._client = None
-                raise
+                print(f"Connection attempt {attempt} failed: {e}")
+                if attempt == self.MAX_RETRIES:
+                    print("FATAL: Could not connect to Redis after all retries. Exiting.")
+                    raise 
+                print(f"Retrying in {self.RETRY_DELAY_SECONDS} seconds...\n")
+                time.sleep(self.RETRY_DELAY_SECONDS)
 
     def get_client(self):
         """
         Returns the active Redis client. Connects if not already connected.
-        This provides a "lazy connection" behavior.
+        This is the primary method other parts of the app should use.
         """
+        # This check is not strictly necessary with the lock, but it's a fast path
         if self._client is None:
-            self.connect()
+            # Use the lock to ensure connect() is only called by one thread
+            with self._lock:
+                # Double-check if another thread connected while we waited for the lock
+                if self._client is None:
+                    self.connect()
         return self._client
+
 
     def ping(self) -> bool:
         """
@@ -102,8 +123,5 @@ class RedisConnection:
             print("Closing Redis connection...")
             self._client.connection_pool.disconnect()
             self._client = None
-            # We don't destroy the singleton instance, just the connection
-            RedisConnection._instance = None 
 
-# Create a single, globally accessible singleton instance of the connection manager
 redis_connection = RedisConnection()
