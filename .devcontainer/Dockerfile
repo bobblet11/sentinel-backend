@@ -2,6 +2,8 @@
 # This image already includes a non-root user 'vscode' and other common tools.
 FROM mcr.microsoft.com/devcontainers/base:ubuntu
 
+
+
 # --- Install System-Level Prerequisite Packages ---
 # We still need to do this to get the Docker CLI, etc.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
