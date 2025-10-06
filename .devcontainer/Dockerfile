@@ -2,7 +2,14 @@
 # This image already includes a non-root user 'vscode' and other common tools.
 FROM mcr.microsoft.com/devcontainers/base:ubuntu
 
+# --- Set Default Arguments for Git Config ---
+# These will be overridden by environment variables passed from devcontainer.json or .env
+ARG GITHUB_USER
+ARG GITHUB_EMAIL
 
+# Propagate args as environment variables
+ENV GITHUB_USER=${GITHUB_USER}
+ENV GITHUB_EMAIL=${GITHUB_EMAIL}
 
 # --- Install System-Level Prerequisite Packages ---
 # We still need to do this to get the Docker CLI, etc.
@@ -60,11 +67,18 @@ RUN conda env create -f /tmp/environment.yml && rm /tmp/environment.yml
 RUN echo "source $CONDA_DIR/bin/activate sentinel-env" >> /etc/bash.bashrc
 ENV BASH_ENV=/etc/bash.bashrc
 
-# We use a fixed GID (Group ID) which is common for the docker group
-RUN groupadd --gid 999 docker
+# --- Docker group setup for vscode user ---
+RUN groupadd --gid 999 docker && \
+    usermod -aG docker vscode && \
+    chown -R vscode:vscode $CONDA_DIR
 
-# Add the vscode user to the docker group so they can run docker commands without sudo
-RUN usermod -aG docker vscode
+# --- Auto-configure Git if env vars available ---
+RUN if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_EMAIL" ]; then \
+        git config --global user.name "$GITHUB_USER" && \
+        git config --global user.email "$GITHUB_EMAIL" && \
+        echo "Configured git with $GITHUB_USER <$GITHUB_EMAIL>"; \
+    else \
+        echo "GITHUB_USER or GITHUB_EMAIL not provided; skipping git config."; \
+    fi
 
-# Give the vscode user ownership of the conda directory so they can install packages
-RUN chown -R vscode:vscode $CONDA_DIR
+USER vscode

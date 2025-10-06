@@ -3,10 +3,6 @@
         "build": {
                 "dockerfile": "Dockerfile"
         },
-        "remoteEnv": {
-                "GITHUB_USER": "bobblet11",
-                "GITHUB_EMAIL": "u3596276@connect.hku.hk"
-        },
         "mounts": ["source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"],
         "customizations": {
                 "vscode": {
@@ -18,6 +14,5 @@
                         "extensions": ["ms-python.python", "ms-python.vscode-pylance", "ms-azuretools.vscode-docker", "eamodio.gitlens"]
                 }
         },
-        "remoteUser": "vscode",
-        "postCreateCommand": "git config --global user.name \"$GITHUB_USER\" && git config --global user.email \"$GITHUB_EMAIL\""
+        "remoteUser": "vscode"
 }
