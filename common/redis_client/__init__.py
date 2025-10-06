@@ -1,17 +1,18 @@
-# # Define a variable called version
-# version = "0.0.1"
 
-# # Print a welcome message
-# print(f"Welcome to the Redis Client package version {version}. This package contains the following packages\nRedisQueue class: create queue objects to interact with queues stored in the Redis DB\nredis_connection: Singleton connection object that maintains a connection to the Redis DB")
+version = "0.0.2"
 
-# from .consumer import RedisQueue
-# from .connection import redis_connection 
+from .consumer import RedisConsumer
+from .publisher import RedisPublisher
+from .duplicate_filter import RedisDuplicateFilter
+from .object_cache import RedisObjectCache
+from .connection import redis_connection 
 
-# __all__ = [
-#     'RedisQueue',
-#     'redis_connection', 
-# ]
+__all__ = [
+    'RedisConsumer',
+    'RedisPublisher',
+    'RedisDuplicateFilter',
+    'RedisObjectCache',
+    'redis_connection', 
+]
 
-print("Welcome to the Redis Client package version 0.0.1. This package contains the following packages")
-print("RedisQueue class: create queue objects to interact with queues stored in the Redis DB") 
-print("redis_connection: Singleton connection object that maintains a connection to the Redis DB")
+print(f"Welcome to the Redis Client package version {version}.")
