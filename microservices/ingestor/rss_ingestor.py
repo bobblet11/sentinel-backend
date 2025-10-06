@@ -1,56 +1,89 @@
+
 import sys
 import os
-sys.path.append('/workspaces/Sentinel')
-
-from base_ingestor import BaseIngestor
 import feedparser
-
+import concurrent.futures
+from typing import List, Dict, Iterator
+from .base_ingestor import BaseIngestor
 class RssIngestor(BaseIngestor):    
     """
-    An implementation of the BaseIngestor class tailored towards fetching from RSS feeds
+    An implementation of the BaseIngestor class tailored towards fetching 
+    and parsing multiple RSS feeds concurrently.
     """
     
-    def __init__(self, feeds_path: str):
-        super().__init__()  # Important: call parent constructor
-        self.feeds_path = feeds_path
+    def __init__(self, feed_urls: List[str]):
+        """
+        Initializes the ingestor with a list of RSS feed URLs.
+
+        Args:
+            feed_urls (List[str]): A list of URLs for the RSS feeds to be processed.
+        """
+        
+        super().__init__() 
+        if not isinstance(feed_urls, list) or not feed_urls:
+            raise ValueError("feed_urls must be a non-empty list of strings.")
+        
+        self.feed_urls = feed_urls
     
-    def fetch_articles(self):
+    def _fetch_and_parse_feed(self, url: str) -> feedparser.FeedParserDict | None:
+        """
+        Fetches and parses a single RSS feed.
+        Includes error handling to prevent one bad feed from stopping the process.
+
+        Args:
+            url (str): The URL of the RSS feed to fetch.
+
+        Returns:
+            A parsed feed object from feedparser, or None if an error occurs.
+        """
+        try:
+            print(f"Fetching feed: {url}")
+            feed = feedparser.parse(url)
+            
+            if feed.bozo:
+                # bozo is set to 1 if the feed is not well-formed
+                raise feed.bozo_exception
+            return feed
+        
+        except Exception as e:
+            print(f"Error fetching or parsing feed {url}: {e}")
+            return None
+        
+        
+    def fetch_articles(self) -> Iterator[Dict[str, str]]:
+        
         """
         Implementation of the abstract method from BaseIngestor.
-        This should be a generator that yields article dictionaries.
+
+        Concurrently fetches all RSS feeds using a thread pool and yields
+        article dictionaries in a standardized format.
         """
-        # For testing, let's use a sample RSS feed
-        rss_url = "https://www.nasa.gov/rss/dyn/breaking_news.rss"
-        feed = feedparser.parse(rss_url)
+        
+        # Use a ThreadPoolExecutor to fetch feeds in parallel.
+        # This is ideal for I/O-bound tasks like waiting for network responses.
+        
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            # map() applies the function to every item in self.feed_urls
+            # and returns an iterator for the results.
+            future_to_feed = executor.map(self._fetch_and_parse_feed, self.feed_urls)
 
-        print(f"Feed Title: {feed.feed.title}")
-        print(f"Feed Link: {feed.feed.link}\n")
+            for feed in future_to_feed:
+                # If a feed failed to fetch/parse, it will be None. Skip it.
+                if not feed:
+                    continue
 
-        for entry in feed.entries:
-            print(f"Entry Title: {entry.title}")
-            print(f"Entry Link: {entry.link}")
-            if hasattr(entry, 'summary'):
-                print(f"Entry Summary: {entry.summary}")
-            print("-" * 20)
-            
-            # Yield article data in the format expected by BaseIngestor
-            yield {
-                "link": entry.link,
-                "source": rss_url,
-                "title": entry.title,
-                "summary": entry.summary if hasattr(entry, 'summary') else ""
-            }
+                print(f"Processing entries from: {feed.feed.get('title', 'Unknown Title')}")
+                
+                # Process each entry in the successfully parsed feed
+                for entry in feed.entries:
+                    # Ensure the entry has a link, otherwise it's not useful
+                    if not hasattr(entry, 'link'):
+                        continue
 
-# Test the RSS ingestor
-if __name__ == "__main__":
-    # Create an instance and test it
-    ingestor = RssIngestor("path/to/feeds.json")  # You can pass a dummy path for testing
-    
-    # Test fetching articles
-    print("=== Testing RSS Ingestion ===")
-    articles = list(ingestor.fetch_articles())
-    print(f"Fetched {len(articles)} articles")
-    
-    # Test the full ingestion cycle
-    print("\n=== Testing Full Ingestion Cycle ===")
-    ingestor.run()
+                    # Yield article data in the format expected by BaseIngestor
+                    yield {
+                        "link": entry.link,
+                        "source": feed.href, # The original URL of the feed
+                        "title": entry.title,
+                        "summary": entry.summary if hasattr(entry, 'summary') else ""
+                    }
