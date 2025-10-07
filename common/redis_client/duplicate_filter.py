@@ -1,5 +1,4 @@
-from redis_client.connection import redis_connection
-
+from common.redis_client.connection import redis_connection
 class RedisDuplicateFilter:    
 	"""
 	A high-level, reliable wrapper for Redis set-based string caches.
