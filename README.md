@@ -67,16 +67,17 @@ The process is nearly identical for both macOS and Windows.
         code .
         ```
 
-3.  **Reopen in Container:**
-    *   VS Code will open and automatically detect the `.devcontainer` configuration.
-    *   A pop-up will appear in the bottom-right corner saying: **"Folder contains a Dev Container configuration file. Reopen in Container."**
-    *   Click this button.
+3.  **Initial Config:**
+    *   Duplicate the .env.template file, rename it to .env, and edit values.
+    *   You should have .env.template and .env files at project root now
+    *   Add your git credentials to the .env
 
-    * 	Otherwise you can open the container by 
+4.  **Reopen in Container:**
+    * 	Open the container by,
     *   Ctrl + Shift + P
-    *   Dev Containers: Rebuild Container
-
-4.  **Initial Build:**
+    *   Dev Containers: Rebuild Container & Reopen
+    
+5.  **Initial Build:**
     *   VS Code will now build the Docker image for the development environment. This will take a significant amount of time (15-30 minutes) as it downloads Docker images, system packages, and all our Python dependencies.
     *   **This is a one-time cost.** Subsequent launches will be much faster.
     *   Once the build is complete, your VS Code window will reload, and you will be inside the fully configured Dev Container. Check the bottom-left corner; it should say **"Dev Container: Sentinel..."**.
