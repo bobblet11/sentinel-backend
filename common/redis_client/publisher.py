@@ -8,13 +8,6 @@ class RedisPublisher:
 	"""
 	A high-level, reliable wrapper for Redis stream-based FIFO queues.
 
-	This class provides a simple interface to treat a Redis stream like a job
-	queue. It handles JSON serialization/deserialization, connection management,
-	and basic error handling.
-
-	It is designed to be used with a producer-consumer pattern, where producers
-	`push` jobs and consumers `pop` jobs.
-
 	Attributes:
 		stream_name (str): The name of the Redis stream used as the queue.
 		client: The connected redis-py client instance, managed by the
@@ -24,13 +17,8 @@ class RedisPublisher:
 	
 	def __init__(self, stream_name: str):
 		"""
-		Initializes the RedisPublisher instance.
-
 		Args:
-		stream_name (str): The name of the Redis stream to use as a queue.
-
-		Raises:
-		ValueError: If the stream_name is empty.
+		stream_name (str): The name of the Redis stream to publish to.
 		"""
   
 		if not isinstance(stream_name, str) or not stream_name:
@@ -39,21 +27,26 @@ class RedisPublisher:
 		self.stream_name = stream_name
 		self.max_len = 100
 		self.client = redis_connection.get_client()
-		print(f"Redis publisher initialised for {stream_name}")
+  
+		print(f"Redis publisher initialised and publishing to {stream_name}")
   
   
 	def publish_one(self, message: Dict[str, Any]):
 		"""
-		Serializes a data dictionary to JSON and adds it to the stream.
+		Serializes a dictionary to JSON and adds it to the stream.
 
 		Args:
-		message: a message object that has been deserialised into a dictionary, that is waiting to be published
+			message: a message object that has been deserialised into a dictionary, that is waiting to be published
   
 		Returns:
-		str: The unique message ID if successful, otherwise None.
+			str: The unique message ID if successful, otherwise None.
 		"""
-  
+
 		try:
+			if not message or message == {}:
+				print("No message to publish")
+				raise Exception("No message to publish")
+
 			payload = {'payload': json.dumps(message)}
 			redis_message_id = self.client.xadd(
 				self.stream_name,
@@ -85,11 +78,14 @@ class RedisPublisher:
 			if successful, otherwise None.
 		"""
   
-		if not messages:
-			return []
-
 		try:
+			if not messages or len(messages) == 0:
+				print("No messages to publish")
+				raise Exception("No messages to publish")
+
+          
 			pipe = self.client.pipeline()
+   
 			for message_data in messages:
 				payload = {'payload': json.dumps(message_data)}
 				pipe.xadd(
