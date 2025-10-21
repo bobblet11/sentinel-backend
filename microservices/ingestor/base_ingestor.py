@@ -1,7 +1,6 @@
 from common.redis_client.publisher import RedisPublisher
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.models.redis_models import Message, MessageHeader, MessageURLPayload
-from common.requests.batches import Batch, multithreaded_batch_action
 import datetime
 import hashlib
 
@@ -30,18 +29,15 @@ class BaseIngestor:
 		raise NotImplementedError("Please Implement this method")
 
   
-	def run(self, batch_size: int = 100):
+	def run(self):
 		"""
 		Main cycle of ingestor service. Fetches, Filters, and Publishes articles from RSS list.
-  
-		Args:
-			batch_size (int): The number of articles to process per batch.
 		"""
   
 		print(f"--- Starting new ingestion cycle for {self.__class__.__name__} ---")
   
 		valid_articles = [article for article in self.fetch_articles() if article.get("link") and article.get("source")]
-		filtered_articles = list(set(all_articles))
+		filtered_articles = list(set(valid_articles))
   
 		if not filtered_articles or len(filtered_articles) == 0 :
 			print("--- Ingestion cycle finished. No articles found. ---")
@@ -68,7 +64,7 @@ class BaseIngestor:
 
 			payload = MessageURLPayload(
 				url=link,
-				source_rss=source
+				source_rss=src
 			)
 
 			message = Message(
@@ -91,7 +87,7 @@ class BaseIngestor:
 			print("--- Ingestion cycle finished. Could not publish to queue. ---")
 			return
 
-		self.duplicate_filter.add_many(new_links)
+		self.duplicate_filter.add_many(unique_article_links)
 		print(f"--- Ingestion cycle finished.\n\tNew: {len(messages_to_publish)}\n\tSeen: {len(filtered_articles) - len(messages_to_publish)}\n\tTotal: {len(filtered_articles)}---")
 		
 

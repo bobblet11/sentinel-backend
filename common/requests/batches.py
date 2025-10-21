@@ -12,7 +12,7 @@ class Batch:
 		self.completed = False
 		self.result = None
 
-	def set_completed(result):
+	def set_completed(self, result):
 		self.completed = True
 		self.result = result
 
@@ -23,8 +23,8 @@ def split_into_batches(items, batch_size):
 #wrapper
 def batch_action(items, batch_size, action):
         for batch in split_into_batches(items, batch_size):
-		output_batch = action(batch)
-		yield output_batch
+                output_batch = action(batch)
+                yield output_batch
   
 #wrapper
 #action must take a batch as sole argument. other args can be filled in at defintion time.

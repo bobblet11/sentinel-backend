@@ -1,6 +1,3 @@
-
-import sys
-import os
 import feedparser
 import concurrent.futures
 from typing import List, Dict, Iterator
@@ -75,5 +72,5 @@ class RssIngestor(BaseIngestor):
                         "link": entry.link,
                         "source": feed.href, 
                         "title": entry.title,
-                        "summary": entry.summary if hasattr(entry, 'summary') else ""
+                        "summary": entry.summary if hasattr(entry, 'summary') else None
                     }
