@@ -1,6 +1,7 @@
 from common.redis_client.publisher import RedisPublisher
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.models.redis_models import Message, MessageHeader, MessageURLPayload
+from common.requests.batches import Batch, multithreaded_batch_action
 import datetime
 import hashlib
 
@@ -8,36 +9,30 @@ class BaseIngestor:
 	"""
 	A base class that defines the template for an ingestion workflow.
 
-	It handles the core, unchanging algorithm: fetching articles, checking for
-	duplicates against Redis, and publishing new articles to a stream.
-
 	Subclasses must implement the `_fetch_articles` generator method.
 	"""
 	
 	def __init__(self):
-		"""
-			Initializes the Redis publisher and the Redis cache for duplicate checking.
-		"""
 		self.duplicate_filter = RedisDuplicateFilter("ingestor")
 		self.publisher = RedisPublisher("ingested_articles")
 
 	def fetch_articles(self):
 		"""
-  
-		Abstract method to be implemented by subclasses.
+		Generator that fetches URLs from the RSS list.
 
 		This method MUST be a generator that yields dictionaries, where each
 		dictionary represents a single fetched article and must contain at least
 		a "link" and "source" key.
 
 		Example: yield {"link": "http://a.com", "source": "rss.xml"}
-  
 		"""
+  
 		raise NotImplementedError("Please Implement this method")
 
+  
 	def run(self, batch_size: int = 100):
 		"""
-		The main public template method that executes the entire ingestion cycle.
+		Main cycle of ingestor service. Fetches, Filters, and Publishes articles from RSS list.
   
 		Args:
 			batch_size (int): The number of articles to process per batch.
@@ -45,75 +40,59 @@ class BaseIngestor:
   
 		print(f"--- Starting new ingestion cycle for {self.__class__.__name__} ---")
   
-		total_new = 0
-		total_processed = 0
+		valid_articles = [article for article in self.fetch_articles() if article.get("link") and article.get("source")]
+		filtered_articles = list(set(all_articles))
   
-		try:
-			all_articles = list(self.fetch_articles())
-		except Exception as e:
-			print(f"Failed to fetch articles: {e}")
-			return
-
-		if not all_articles:
+		if not filtered_articles or len(filtered_articles) == 0 :
 			print("--- Ingestion cycle finished. No articles found. ---")
 			return
 
-		print(f"Fetched a total of {len(all_articles)} articles from sources.")
+		print(f"Fetched a total of {len(filtered_articles)} articles from sources.")
+		article_links = [article.get("link") for article in filtered_articles]
+		unique_article_links = self.duplicate_filter.has_many(article_links)
   
-		for i in range(0, len(all_articles), batch_size):
-			batch = all_articles[i:i + batch_size]
-			total_processed += len(batch)
+		if not unique_article_links or len(unique_article_links) == 0:
+			print("--- Ingestion cycle finished. No articles found. ---")
+			return
 
-			batch_links = [article.get("link") for article in batch if article.get("link")]
-			
-			if not batch_links:
+		print(f"Found {len(unique_article_links)} new articles out of {len(filtered_articles)}.")
+  
+		messages_to_publish = []
+  
+		for article in filtered_articles:
+			link = article.get("link")
+			src = article.get("source")
+
+			if link not in set(unique_article_links):
 				continue
 
-			try:
-				# 1. Efficiently find which links are new.
-				new_links=self.duplicate_filter.has_many(batch_links)
-				if not new_links:
-					print(f"Processed batch {i//batch_size + 1}: All {len(batch)} articles already seen.")
-					continue
-				print(f"Processed batch {i//batch_size + 1}: Found {len(new_links)} new articles out of {len(batch)}.")
+			payload = MessageURLPayload(
+				url=link,
+				source_rss=source
+			)
 
+			message = Message(
+				header=MessageHeader(
+					message_id=hashlib.md5(link.encode()).hexdigest(),
+					timestamp=datetime.datetime.now().isoformat()
+				),
+				data=payload
+			)
 
-				# 2. Prepare all the new messages for publishing.
-				new_links_set = set(new_links)
-				messages_to_publish = []
-				for article in batch:
-					if article.get("link") in new_links_set:
-						article_link = article.get("link")
-	
-						payload = MessageURLPayload(
-							url=article_link,
-							source_rss=article.get("source", "unknown")
-						)
-	
-						message = Message(
-							header=MessageHeader(
-								message_id=hashlib.md5(article_link.encode()).hexdigest(),
-								timestamp=datetime.datetime.now().isoformat()
-							),
-							data=payload
-						)
-	
-						messages_to_publish.append(message.model_dump())
-      
-				# 3. Atomically publish the batch and mark them as seen.
-				if messages_to_publish:
-					published_ids = self.publisher.publish_many(messages_to_publish) 
-					
-					# no need to deal with partial failure. THe entire batch will fail if even a single redis command fails, this is because its an atomic transaction
-					if published_ids:
-						self.duplicate_filter.add_many(new_links)
-						total_new += len(published_ids)
-					else:
-						print("Failed to publish a batch of new articles. These will be retried next cycle.")
-			except Exception as e:
-				print(f"Failed to process a batch due to a Redis error: {e}. Skipping batch.")
-	
-		print(f"--- Ingestion cycle finished. New: {total_new}, Seen: {total_processed} ---")
+			messages_to_publish.append(message.model_dump())
+		
+		if not messages_to_publish or len(messages_to_publish) == 0:
+			print("--- Ingestion cycle finished. No articles found. ---")
+			return
+
+		published_ids = self.publisher.publish_many(messages_to_publish) 
+  
+		if not published_ids or len(published_ids) == 0:
+			print("--- Ingestion cycle finished. Could not publish to queue. ---")
+			return
+
+		self.duplicate_filter.add_many(new_links)
+		print(f"--- Ingestion cycle finished.\n\tNew: {len(messages_to_publish)}\n\tSeen: {len(filtered_articles) - len(messages_to_publish)}\n\tTotal: {len(filtered_articles)}---")
 		
 
 
