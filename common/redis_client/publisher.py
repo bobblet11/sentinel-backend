@@ -68,7 +68,7 @@ class RedisPublisher:
 	
 	def publish_many(self, messages: List[Dict[str, Any]]) -> Optional[List[str]]:
 		"""
-		Serializes a batch of dictionaries to JSON and adds all to the stream.
+		Serializes messages dictionaries to JSON and adds all to the stream.
 
 		Args:
 			messages: A list of JSON-serializable dictionaries, where each
