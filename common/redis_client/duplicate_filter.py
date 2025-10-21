@@ -34,7 +34,7 @@ class RedisDuplicateFilter:
 
 		try:
 		
-			if item not item or item == "":
+			if not item or item == "":
 				print("no item to check")
 				raise Exception("no item to check")
           

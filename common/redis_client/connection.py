@@ -15,7 +15,7 @@ class RedisConnection:
     _instance = None
     _lock = threading.Lock() 
     MAX_RETRIES = 5
-    INITIAL_DELAY = 500 #ms
+    INITIAL_DELAY = 1 #s
   
   
     def __new__(cls):
@@ -42,7 +42,7 @@ class RedisConnection:
             return cls._instance
 
 
-    @exponential_retry(max_attempts = MAX_RETRIES, initial_delay_ms = INITIAL_DELAY)
+    @exponential_retry(max_attempts = MAX_RETRIES, initial_delay_s = INITIAL_DELAY)
     def connect(self):
         """
         Idempotently attempts to establish a connection to the Redis server.
