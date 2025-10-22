@@ -2,8 +2,6 @@ import json
 from typing import Any, Dict, List, Optional
 from common.redis_client.connection import redis_connection
 
-
-
 class RedisPublisher:    
 	"""
 	A high-level, reliable wrapper for Redis stream-based FIFO queues.
