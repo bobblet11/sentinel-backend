@@ -28,26 +28,7 @@ services:
       
     <<: *common-env 
     restart: unless-stopped
-
-  # --- API GATEWAY ---
-  api_gateway:
-    build:
-      context: ./microservices/api_gateway
-      dockerfile: Dockerfile
-    container_name: sentinel-backend-api-gateway
-    env_file:
-      - .env
-    depends_on:
-      - redis
-    ports:
-      - "8000:8000"
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    networks:
-      - sentinel-net
-    restart: unless-stopped
-
+    
 volumes:
   redis_data: {}
 
