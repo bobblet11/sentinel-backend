@@ -1,5 +1,5 @@
 
-from .rss_ingestor import RssIngestor
+from microservices.ingestor.rss_ingestor import RssIngestor
 
 if __name__ == "__main__":
 	rss_feeds = ["https://www.nasa.gov/rss/dyn/breaking_news.rss"]
