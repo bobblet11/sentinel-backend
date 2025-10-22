@@ -8,6 +8,16 @@ import sys
 import time
 import re
 import os
+import subprocess
+
+def get_local_conda_env():
+    """Get current local conda environment name"""
+    try:
+        # Get current conda env name from environment variable
+        env_name = os.environ.get('CONDA_DEFAULT_ENV', 'base')
+        return env_name if env_name else 'base'
+    except:
+        return 'base'
 
 def launch_gpu_jupyter(portal_id="farhan", gateway="gpu2gate1.cs.hku.hk"):
     print("HKU GPU Farm - Session Keeper")
@@ -43,17 +53,23 @@ def launch_gpu_jupyter(portal_id="farhan", gateway="gpu2gate1.cs.hku.hk"):
         # Give a moment for the shell to stabilize
         time.sleep(2)
         
+        # Get local conda environment info first
+        env_name = get_local_conda_env()
+        print(f"   Local environment: {env_name}")
+        
         # Step 2: Setup Jupyter config
         print("2. Setting up Jupyter config...")
         child.sendline('mkdir -p ~/.jupyter')
         index = child.expect(['\\$ ', '~\\$ ', ':\\~\\$'], timeout=10)
         print("   Directory created")
         
-        config_cmd = '''cat > ~/.jupyter/jupyter_server_config.py << 'EOF'
+        config_cmd = f'''cat > ~/.jupyter/jupyter_server_config.py << 'EOF'
 c = get_config()
 c.ServerApp.token = 'your-jupyter-token-here'
 c.ServerApp.password = ''
 c.ServerApp.open_browser = False
+# Use the synced conda environment as default kernel
+c.MappingKernelManager.default_kernel_name = '{env_name}'
 EOF'''
         
         child.sendline(config_cmd)
@@ -61,8 +77,39 @@ EOF'''
         print("✅ Config created")
         print()
         
-        # Step 3: Start gpu-interactive
-        print("3. Starting GPU session...")
+        # Step 3: Robust conda environment setup
+        print("3. Setting up conda environment...")
+        
+        if env_name and env_name != 'base':
+            print(f"   Target environment: {env_name}")
+            
+            # First check if environment exists
+            child.sendline(f'conda info --envs | grep "^{env_name} "')
+            index = child.expect(['\\$ ', '~\\$ ', ':\\~\\$'], timeout=10)
+            output = child.before.decode()
+            
+            env_exists = env_name in output
+            print(f"   Environment exists: {env_exists}")
+            
+            if not env_exists:
+                print(f"   Creating environment {env_name}...")
+                child.sendline(f'conda create -n {env_name} python=3.9 jupyter jupyterlab ipykernel -y')
+                index = child.expect(['\\$ ', '~\\$ ', ':\\~\\$'], timeout=60)  # Longer timeout for creation
+                print(f"   ✅ Environment {env_name} created")
+            
+            # Install kernel for Jupyter
+            print(f"   Setting up Jupyter kernel...")
+            child.sendline(f'conda run -n {env_name} python -m ipykernel install --user --name {env_name}')
+            index = child.expect(['\\$ ', '~\\$ ', ':\\~\\$'], timeout=30)
+            print(f"   ✅ Kernel {env_name} installed")
+            
+        else:
+            print("   Using base environment")
+            env_name = 'base'
+        print()
+        
+        # Step 4: Start gpu-interactive
+        print("4. Starting GPU session...")
         print("   This will allocate a GPU and keep the session alive")
         print()
         print("   Running: gpu-interactive")
@@ -77,8 +124,8 @@ EOF'''
             print("✅ GPU allocated!")
             print()
             
-            # Step 4: Get GPU IP
-            print("4. Getting GPU IP...")
+            # Step 5: Get GPU IP
+            print("5. Getting GPU IP...")
             child.sendline('hostname -I | awk \'{print $1}\'')
             child.expect(['\\$ ', '~\\$ '], timeout=10)
             
@@ -95,10 +142,47 @@ EOF'''
                 with open('current_gpu_ip.txt', 'w') as f:
                     f.write(gpu_ip)
                 
-                # Step 5: Start Jupyter
+                # Step 6: Start Jupyter
                 print()
-                print("5. Starting Jupyter...")
-                child.sendline('nohup jupyter-lab --no-browser > ~/jupyter.log 2>&1 &')
+                print("6. Starting Jupyter...")
+                if env_name and env_name != 'base':
+                    # Use conda run to start Jupyter in the specific environment
+                    jupyter_cmd = f'nohup conda run -n {env_name} jupyter-lab --no-browser --ip=0.0.0.0 > ~/jupyter.log 2>&1 &'
+                else:
+                    jupyter_cmd = 'nohup jupyter-lab --no-browser --ip=0.0.0.0 > ~/jupyter.log 2>&1 &'
+                
+                print(f"   Command: {jupyter_cmd}")
+                child.sendline(jupyter_cmd)
+                child.expect(['\\$ ', '~\\$ '], timeout=10)
+                
+                # Wait a bit for Jupyter to start, then check if it's running
+                time.sleep(5)  # Give more time for startup
+                print("   Checking if Jupyter started...")
+                child.sendline('ps aux | grep jupyter-lab | grep -v grep')
+                child.expect(['\\$ ', '~\\$ '], timeout=10)
+                output = child.before.decode()
+                
+                if 'jupyter-lab' in output:
+                    print("✅ Jupyter started successfully")
+                    
+                    # Also check the log for any errors
+                    child.sendline('tail -3 ~/jupyter.log')
+                    child.expect(['\\$ ', '~\\$ '], timeout=5)
+                    log_output = child.before.decode()
+                    if 'running at:' in log_output.lower():
+                        print("   Jupyter server is running and accessible")
+                    else:
+                        print("⚠️  Jupyter may have issues - check ~/jupyter.log")
+                else:
+                    print("❌ Jupyter failed to start")
+                    child.sendline('cat ~/jupyter.log')
+                    child.expect(['\\$ ', '~\\$ '], timeout=5)
+                    error_log = child.before.decode()
+                    print(f"Error log: {error_log}")
+                    return False
+                
+                # Check if Jupyter is accessible
+                child.sendline('curl -I http://localhost:8888 2>/dev/null | head -1')
                 child.expect(['\\$ ', '~\\$ '], timeout=10)
                 
                 print("✅ Jupyter started in background")
@@ -109,6 +193,7 @@ EOF'''
                 print("="*50)
                 print()
                 print(f"GPU IP: {gpu_ip}")
+                print(f"Conda Environment: {env_name}")
                 print()
                 print("In a NEW terminal, run this command:")
                 print()
@@ -117,6 +202,8 @@ EOF'''
                 print("Then open this URL in browser or VS Code:")
                 print()
                 print("http://localhost:8888/lab?token=your-jupyter-token-here")
+                print()
+                print(f"💡 The '{env_name}' kernel should be available in Jupyter!")
                 print()
                 print("="*50)
                 print("⚠️  IMPORTANT: Keep THIS terminal open!")
