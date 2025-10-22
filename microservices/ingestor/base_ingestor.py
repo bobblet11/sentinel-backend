@@ -12,8 +12,8 @@ class BaseIngestor:
 	"""
 	
 	def __init__(self):
-		self.duplicate_filter = RedisDuplicateFilter("ingestor")
-		self.publisher = RedisPublisher("ingested_articles")
+		self.duplicate_filter = RedisDuplicateFilter("ingestor:seen.articles")
+		self.publisher = RedisPublisher("ingestor:to.be.scraped")
 
 	def fetch_articles(self):
 		"""
@@ -33,63 +33,62 @@ class BaseIngestor:
 		"""
 		Main cycle of ingestor service. Fetches, Filters, and Publishes articles from RSS list.
 		"""
-  
+
+		# Step 1: Fetch and filter articles from RSS 
 		print(f"--- Starting new ingestion cycle for {self.__class__.__name__} ---")
-  
-		valid_articles = [article for article in self.fetch_articles() if article.get("link") and article.get("source")]
-		filtered_articles = list(set(valid_articles))
-  
-		if not filtered_articles or len(filtered_articles) == 0 :
-			print("--- Ingestion cycle finished. No articles found. ---")
-			return
-
-		print(f"Fetched a total of {len(filtered_articles)} articles from sources.")
-		article_links = [article.get("link") for article in filtered_articles]
-		unique_article_links = self.duplicate_filter.has_many(article_links)
-  
-		if not unique_article_links or len(unique_article_links) == 0:
-			print("--- Ingestion cycle finished. No articles found. ---")
-			return
-
-		print(f"Found {len(unique_article_links)} new articles out of {len(filtered_articles)}.")
-  
-		messages_to_publish = []
-  
-		for article in filtered_articles:
+		unique_articles_map = {}
+		for article in self.fetch_articles():
 			link = article.get("link")
-			src = article.get("source")
+			if link and link not in unique_articles_map:
+				unique_articles_map[link] = article
+		if not unique_articles_map:
+			print("--- Ingestion cycle finished. No articles found. ---")
+			return
+		total_fetched = len(unique_articles_map)
+		print(f"Fetched a total of {total_fetched} unique articles from sources.")
+  
 
-			if link not in set(unique_article_links):
-				continue
+		# Step 2: Check if article has already been seen
+		all_links = list(unique_articles_map.keys())
+		unseen_article_links = self.duplicate_filter.has_many(all_links)
+		if not unseen_article_links :
+			print("--- Ingestion cycle finished. Seen all articles already. ---")
+			return
 
+		unseen = len(unseen_article_links)
+		print(f"Found {unseen} new articles out of {total_fetched}.")
+
+	
+		messages_to_publish = []
+		for link in unseen_article_links:
+			article = unique_articles_map[link]
+		
 			payload = MessageURLPayload(
 				url=link,
-				source_rss=src
+				source_rss=article.get("source")
 			)
 
 			message = Message(
 				header=MessageHeader(
-					message_id=hashlib.md5(link.encode()).hexdigest(),
-					timestamp=datetime.datetime.now().isoformat()
+				message_id=hashlib.md5(link.encode()).hexdigest(),
+				timestamp=datetime.datetime.now().isoformat()
 				),
 				data=payload
 			)
 
 			messages_to_publish.append(message.model_dump())
-		
-		if not messages_to_publish or len(messages_to_publish) == 0:
-			print("--- Ingestion cycle finished. No articles found. ---")
+
+		if not messages_to_publish:
+			print("--- Ingestion cycle finished. Cannot publish for some reason. ---")
 			return
 
 		published_ids = self.publisher.publish_many(messages_to_publish) 
-  
-		if not published_ids or len(published_ids) == 0:
+
+		if not published_ids:
 			print("--- Ingestion cycle finished. Could not publish to queue. ---")
 			return
-
-		self.duplicate_filter.add_many(unique_article_links)
-		print(f"--- Ingestion cycle finished.\n\tNew: {len(messages_to_publish)}\n\tSeen: {len(filtered_articles) - len(messages_to_publish)}\n\tTotal: {len(filtered_articles)}---")
 		
-
+		self.duplicate_filter.add_many(unseen_article_links)
+		print(f"--- Ingestion cycle finished.\n\tNew: {unseen}\n\tSeen: {total_fetched - unseen}\n\tTotal: {total_fetched}---")
 
 
