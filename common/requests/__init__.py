@@ -11,5 +11,3 @@ __all__ = [
     'retry',
     'exponential_retry', 
 ]
-
-print(f"Welcome to the Requests package version {version}.")
