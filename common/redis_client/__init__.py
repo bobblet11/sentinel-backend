@@ -14,5 +14,3 @@ __all__ = [
     'RedisObjectCache',
     'redis_connection', 
 ]
-
-print(f"Welcome to the Redis Client package version {version}.")
