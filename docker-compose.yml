@@ -1,5 +1,9 @@
 version: '3.8'
 
+x-common-env: &common-env
+  env_file:
+    - ./.env
+
 services:
   # --- INFRASTRUCTURE ---
   redis:
@@ -8,6 +12,22 @@ services:
       - "${REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
+    restart: unless-stopped
+
+  ingestor:
+    build: 
+      context: .
+      dockerfile: ./microservices/ingestor/Dockerfile
+    # ensures the 'redis' service is started before the 'ingestor' starts.
+    depends_on:
+      - redis
+      
+    environment:
+      - REDIS_HOST=redis  # Use the service name 'redis' as the hostname.
+      - REDIS_PORT=6379   # This is the internal port Redis listens on.
+      
+    <<: *common-env 
+    restart: unless-stopped
 
   # --- API GATEWAY ---
   api_gateway:
