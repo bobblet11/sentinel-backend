@@ -56,7 +56,7 @@ class RssIngestor(BaseIngestor):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_to_feed = executor.map(self._fetch_and_parse_feed, self.feed_urls)
             for feed in future_to_feed:
-                
+
                 if not feed:
                     continue
 
@@ -65,7 +65,7 @@ class RssIngestor(BaseIngestor):
                 
                 for entry in feed.entries:
                 
-                    if not hasattr(entry, 'link') or not hasattr(entry, 'source'):
+                    if not hasattr(entry, 'link'):
                         continue
                     
                     yield {
