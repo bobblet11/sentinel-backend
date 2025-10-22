@@ -22,6 +22,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     lsb-release \
     redis-tools \
     postgresql-client \
+    jq \
     expect
 
 # --- Add Docker's Official GPG Key and Set Up The Repository ---
