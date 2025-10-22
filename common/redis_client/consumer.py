@@ -1,8 +1,6 @@
 from typing import Any, Dict, Optional
-from common.redis_client.connection import redis_connection
-from common.models.redis_models import Message
 import json	
-
+from common.redis_client.connection import redis_connection
 class RedisConsumer:    
 	"""
 	A high-level, reliable wrapper for Redis stream-based FIFO queues.

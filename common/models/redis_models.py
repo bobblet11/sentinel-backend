@@ -1,6 +1,5 @@
 from typing import Union, Any
 from pydantic import BaseModel
-from datetime import datetime
 
 class MessageHeader(BaseModel):
     """

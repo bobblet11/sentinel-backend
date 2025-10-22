@@ -1,7 +1,6 @@
 import redis
 import os
 import threading
-import time
 from common.requests.retry_request import exponential_retry
 
 REDIS_HOST = str(os.getenv("REDIS_HOST", "redis"))
