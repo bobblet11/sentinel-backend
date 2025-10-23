@@ -1,0 +1,1 @@
+* * * * * PYTHONPATH=/app /usr/local/bin/python3 -m microservices.ingestor.main >> /var/log/cron.log 2>&1
