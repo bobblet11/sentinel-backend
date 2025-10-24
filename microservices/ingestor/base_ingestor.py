@@ -42,21 +42,21 @@ class BaseIngestor:
 			if link and link not in unique_articles_map:
 				unique_articles_map[link] = article
 		if not unique_articles_map:
-			print("--- Ingestion cycle finished. No articles found. ---")
+			print("--- Ingestion cycle finished. No articles found. ---\n\n")
 			return
 		total_fetched = len(unique_articles_map)
-		print(f"Fetched a total of {total_fetched} unique articles from sources.")
+		# print(f"Fetched a total of {total_fetched} unique articles from sources.")
   
 
 		# Step 2: Check if article has already been seen
 		all_links = list(unique_articles_map.keys())
 		unseen_article_links = self.duplicate_filter.has_many(all_links)
 		if not unseen_article_links :
-			print("--- Ingestion cycle finished. Seen all articles already. ---")
+			print("--- Ingestion cycle finished. Seen all articles already. ---\n\n")
 			return
 
 		unseen = len(unseen_article_links)
-		print(f"Found {unseen} new articles out of {total_fetched}.")
+		# print(f"Found {unseen} new articles out of {total_fetched}.")
 
 	
 		messages_to_publish = []
@@ -79,16 +79,16 @@ class BaseIngestor:
 			messages_to_publish.append(message.model_dump())
 
 		if not messages_to_publish:
-			print("--- Ingestion cycle finished. Cannot publish for some reason. ---")
+			print("--- Ingestion cycle finished. Cannot publish for some reason. ---\n\n")
 			return
 
 		published_ids = self.publisher.publish_many(messages_to_publish) 
 
 		if not published_ids:
-			print("--- Ingestion cycle finished. Could not publish to queue. ---")
+			print("--- Ingestion cycle finished. Could not publish to queue. ---\n\n")
 			return
 		
 		self.duplicate_filter.add_many(unseen_article_links)
-		print(f"--- Ingestion cycle finished.\n\tNew: {unseen}\n\tSeen: {total_fetched - unseen}\n\tTotal: {total_fetched}---")
+		print(f"--- Ingestion cycle finished --- \n\tNew: {unseen}\n\tSeen: {total_fetched - unseen}\n\tTotal: {total_fetched}\n{"-"*10}\n\n")
 
 

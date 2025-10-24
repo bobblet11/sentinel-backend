@@ -34,7 +34,7 @@ class RssIngestor(BaseIngestor):
             A parsed feed object from feedparser
         """
         try:
-            print(f"\tFetching RSS feed: {url}")
+            # print(f"\tFetching RSS feed: {url}")
             feed = feedparser.parse(url)
             
             if feed.bozo:
@@ -60,7 +60,7 @@ class RssIngestor(BaseIngestor):
                 if not feed:
                     continue
 
-                print(f"\tProcessing entries from: {feed.feed.get('title', 'Unknown Title')}")
+                # print(f"\tProcessing entries from: {feed.feed.get('title', 'Unknown Title')}")
                 
                 
                 for entry in feed.entries:

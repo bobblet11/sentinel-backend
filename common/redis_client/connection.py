@@ -16,7 +16,6 @@ class RedisConnection:
     MAX_RETRIES = 5
     INITIAL_DELAY = 1 #s
   
-  
     def __new__(cls):
         """
         before __init__, make sure no other class instance already exists with a connection pool. Enforces Singleton rule.
@@ -37,7 +36,7 @@ class RedisConnection:
             cls._instance = super(RedisConnection, cls).__new__(cls)
             cls._instance._client = None
             
-            print("RedisConnection Singleton created.")
+            # print("RedisConnection Singleton created.")
             return cls._instance
 
 
