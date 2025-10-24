@@ -25,12 +25,14 @@ services:
     environment:
       - REDIS_HOST=redis  # Use the service name 'redis' as the hostname.
       - REDIS_PORT=6379   # This is the internal port Redis listens on.
-      
+    volumes:
+      - ingestor_logs:/var/log
     <<: *common-env 
     restart: unless-stopped
     
 volumes:
   redis_data: {}
+  ingestor_logs: {}
 
 networks:
   sentinel-net:
