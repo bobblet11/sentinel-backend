@@ -14,25 +14,22 @@ services:
       - redis_data:/data
     restart: unless-stopped
 
-  ingestor:
+  web-scraper:
     build: 
       context: .
-      dockerfile: ./microservices/ingestor/Dockerfile
-    # ensures the 'redis' service is started before the 'ingestor' starts.
+      dockerfile: ./microservices/web-scraper/Dockerfile
+
     depends_on:
       - redis
-      
-    environment:
-      - REDIS_HOST=redis  # Use the service name 'redis' as the hostname.
-      - REDIS_PORT=6379   # This is the internal port Redis listens on.
+    
     volumes:
-      - ingestor_logs:/var/log
+      - web-scraper_logs:/var/log
     <<: *common-env 
     restart: unless-stopped
     
 volumes:
   redis_data: {}
-  ingestor_logs: {}
+  web-scraper_logs: {}
 
 networks:
   sentinel-net:
