@@ -22,4 +22,3 @@ starlette==0.48.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 psutil==7.1.2
-colorama==0.4.6
