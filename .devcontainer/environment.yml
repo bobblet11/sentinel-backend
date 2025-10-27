@@ -1,10 +1,23 @@
 name: sentinel-env # The name of your conda environment
 channels:
+  - pytorch
+  - nvidia
   - conda-forge
   - defaults
 dependencies:
   # --- Core Python ---
-  - python=3.13
+  - python=3.11
+  
+  # --- PyTorch with CUDA ---
+  - pytorch
+  - torchvision 
+  - torchaudio
+  - pytorch-cuda=12.4
+
+  # --- Development Tools ---
+  - ipython
+  - jupyter
+  - ipykernel
 
   # --- Your Project's PIP Dependencies ---
   # Conda will use pip to install these
