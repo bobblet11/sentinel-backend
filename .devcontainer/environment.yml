@@ -13,3 +13,4 @@ dependencies:
     - redis
     - pydantic
     - feedparser
+    - psutil
