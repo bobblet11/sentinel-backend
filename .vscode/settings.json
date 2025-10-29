@@ -7,8 +7,5 @@
     },
     "terminal.integrated.env.windows": {
         "BUILDKIT_PROGRESS": "plain"
-    },
-    "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda",
-    "python-envs.pythonProjects": []
+    }
 }
