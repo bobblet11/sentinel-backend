@@ -5,6 +5,8 @@
         },
         "mounts": ["source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"],
         "runArgs": ["--gpus", "all"],
+        "postCreateCommand": "chmod 666 /var/run/docker.sock && cp .env.template .env 2>/dev/null || true && docker compose up postgres -d",
+        "postStartCommand": "docker compose up postgres -d 2>/dev/null || true",
         "customizations": {
                 "vscode": {
                         "settings": {

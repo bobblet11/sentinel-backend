@@ -18,6 +18,7 @@ dependencies:
   - ipython
   - jupyter
   - ipykernel
+  - psycopg2
 
   # --- Your Project's PIP Dependencies ---
   # Conda will use pip to install these
