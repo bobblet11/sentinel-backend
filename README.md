@@ -71,6 +71,13 @@ The process is nearly identical for both macOS and Windows.
     *   Duplicate the .env.template file, rename it to .env, and edit values.
     *   You should have .env.template and .env files at project root now
     *   Add your git credentials to the .env
+    *   **Configure PostgreSQL credentials** in your .env file:
+        ```bash
+        # PostgreSQL Configuration (update these values)
+        POSTGRES_DB=sentinel_db
+        POSTGRES_USER=sentinel_user
+        POSTGRES_PASSWORD=your_secure_password_here
+        ```
 
 4.  **Reopen in Container:**
     * 	Open the container by,
@@ -81,10 +88,65 @@ The process is nearly identical for both macOS and Windows.
     *   VS Code will now build the Docker image for the development environment. This will take a significant amount of time (15-30 minutes) as it downloads Docker images, system packages, and all our Python dependencies.
     *   **This is a one-time cost.** Subsequent launches will be much faster.
     *   Once the build is complete, your VS Code window will reload, and you will be inside the fully configured Dev Container. Check the bottom-left corner; it should say **"Dev Container: Sentinel..."**.
+    *   **PostgreSQL will start automatically** when the dev container is ready.
 
 
+## Database Services
 
+This project includes PostgreSQL with pgvector support for storing and querying vector embeddings.
 
+### PostgreSQL Setup
+
+The database is automatically configured when you start the dev container:
+
+*   **Database Service**: Available at `http://localhost:8001`
+*   **PostgreSQL Database**: Available at `localhost:15432`
+*   **Database Name**: `sentinel_db` (configurable in .env)
+*   **Username**: `sentinel_user` (configurable in .env)
+
+### Accessing the Database
+
+1.  **From the dev container terminal:**
+    ```bash
+    # Connect to PostgreSQL
+    docker compose exec postgres psql -U sentinel_user -d sentinel_db
+    
+    # Check database service health
+    curl http://localhost:8001/health
+    ```
+
+2.  **From external tools** (like pgAdmin, DBeaver):
+    ```
+    Host: localhost
+    Port: 15432
+    Database: sentinel_db
+    Username: sentinel_user
+    Password: (as set in your .env file)
+    ```
+
+### Available Services
+
+*   **PostgreSQL Container**: Runs PostgreSQL 15 with pgvector extension
+*   **Database Service**: FastAPI service for database operations
+*   **pgvector Support**: Ready for vector embeddings and semantic search
+
+### Manual Database Management
+
+If you need to manage the database manually:
+
+```bash
+# Start only PostgreSQL
+docker compose up postgres -d
+
+# Start database service
+docker compose up db-service -d
+
+# Stop database services
+docker compose stop postgres db-service
+
+# View database logs
+docker compose logs postgres
+```
 
 ## Daily Workflow
 
@@ -99,6 +161,14 @@ The process is nearly identical for both macOS and Windows.
         docker-compose up --build
         ```
     *   You will see the logs from all the microservices streaming in this terminal.
+    *   **Note**: PostgreSQL starts automatically with the dev container, but you can also run individual services:
+        ```bash
+        # Start specific services
+        docker compose up postgres db-service -d
+        
+        # Start all services
+        docker compose up --build
+        ```
 
 3.  **Stopping the Services:**
     *   Press `Ctrl+C` in the terminal where `docker-compose` is running.
@@ -106,10 +176,6 @@ The process is nearly identical for both macOS and Windows.
         ```bash
         docker-compose down
         ```
-
-
-
-
 
 
 ## Managing Python Dependencies
@@ -124,3 +190,30 @@ To add a new Python package:
 4.  Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac).
 5.  Run the command: **"Dev Containers: Rebuild and Reopen in Container"**.
 6.  This will rebuild the environment with your new package installed, ensuring everyone on the team gets it automatically.
+
+
+## Microservices Architecture
+
+The Sentinel backend consists of several microservices that work together:
+
+### Core Services
+
+*   **API Gateway** (`microservices/api_gateway/`): Main entry point for external requests
+*   **Database Service** (`microservices/db/`): PostgreSQL operations and data management
+*   **Ingestor** (`microservices/ingestor/`): RSS feed processing and content ingestion
+*   **Web Scraper** (`microservices/web-scraper/`): Content extraction from URLs
+*   **NLP Service** (`microservices/nlp/`): Natural language processing and analysis
+
+### Infrastructure Services
+
+*   **PostgreSQL**: Primary database with pgvector for semantic search
+*   **Redis**: Message queuing and caching
+
+### Service Communication
+
+Services communicate via:
+*   **Docker network**: `sentinel-net` for internal communication
+*   **REST APIs**: HTTP endpoints for service-to-service calls
+*   **Message queues**: Redis streams for asynchronous processing
+
+All services are designed to be stateless and scalable, following microservices best practices.
