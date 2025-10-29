@@ -1,10 +1,11 @@
+import hashlib
+import logging
+
+from config import CACHE_TTL, NLP_URL, WEB_SCRAPER_URL
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from utils.cache import get_cache, set_cache
 from utils.requests import fetch_json
-from config import WEB_SCRAPER_URL, NLP_URL, CACHE_TTL
-import logging
-import hashlib
 
 app = FastAPI(title="Sentinel API Gateway", version="0.1")
 
@@ -58,4 +59,5 @@ async def analyze(url: str = Query(..., description="URL of article to analyze")
 # small helper to urlencode manually (avoid importing heavy libs)
 def httpx_encode(u: str) -> str:
     import urllib.parse
+
     return urllib.parse.quote_plus(u)
