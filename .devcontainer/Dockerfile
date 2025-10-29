@@ -1,9 +1,7 @@
 # Start from Microsoft's recommended base image for Ubuntu.
-# This image already includes a non-root user 'vscode' and other common tools.
 FROM mcr.microsoft.com/devcontainers/base:ubuntu
 
 # --- Set Default Arguments for Git Config ---
-# These will be overridden by environment variables passed from devcontainer.json or .env
 ARG GITHUB_USER
 ARG GITHUB_EMAIL
 
@@ -12,7 +10,6 @@ ENV GITHUB_USER=${GITHUB_USER}
 ENV GITHUB_EMAIL=${GITHUB_EMAIL}
 
 # --- Install System-Level Prerequisite Packages ---
-# We still need to do this to get the Docker CLI, etc.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
     apt-transport-https \
@@ -63,8 +60,12 @@ RUN conda config --set auto_activate_base false \
     && conda tos accept
 
 # Create the Conda Environment
-COPY environment.yml /tmp/environment.yml
-RUN conda env create -f /tmp/environment.yml && rm /tmp/environment.yml
+COPY core-environment.yml /tmp/core-environment.yml
+RUN conda env create -f /tmp/core-environment.yml && rm /tmp/core-environment.yml
+
+COPY dev-environment.yml /tmp/dev-environment.yml
+RUN conda env update --name sentinel-env --file /tmp/dev-environment.yml --prune && rm /tmp/dev-environment.yml
+
 
 # Set up shell to automatically activate our new environment
 RUN echo "source $CONDA_DIR/bin/activate sentinel-env" >> /etc/bash.bashrc
