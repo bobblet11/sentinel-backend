@@ -4,9 +4,12 @@ channels:
   - defaults
 dependencies:
   # --- Core Python ---
-  - python=3.12
+  - python=3.13
 
   # --- Your Project's PIP Dependencies ---
   # Conda will use pip to install these
   - pip:
     - fastapi
+    - redis
+    - pydantic
+    - feedparser
