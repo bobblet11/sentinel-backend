@@ -89,6 +89,10 @@ class BaseIngestor:
 			return
 		
 		self.duplicate_filter.add_many(unseen_article_links)
-		print(f"--- Ingestion cycle finished --- \n\tNew: {unseen}\n\tSeen: {total_fetched - unseen}\n\tTotal: {total_fetched}\n{"-"*10}\n\n")
+		print(f"--- Ingestion cycle finished ---")
+		print(f"\tNew: {unseen}")
+		print(f"\tSeen: {total_fetched - unseen}")
+		print(f"\tTotal: {total_fetched}")
+		print("-"*10)
 
 
