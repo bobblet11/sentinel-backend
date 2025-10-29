@@ -1,8 +1,11 @@
-from common.redis_client.publisher import RedisPublisher
-from common.redis_client.duplicate_filter import RedisDuplicateFilter
-from common.models.redis_models import Message, MessageHeader, MessageURLPayload
 import datetime
 import hashlib
+
+from common.models.redis_models import (Message, MessageHeader,
+                                        MessageURLPayload)
+from common.redis_client.duplicate_filter import RedisDuplicateFilter
+from common.redis_client.publisher import RedisPublisher
+
 
 class BaseIngestor:    
 	"""
@@ -89,6 +92,6 @@ class BaseIngestor:
 			return
 		
 		self.duplicate_filter.add_many(unseen_article_links)
-		print(f"--- Ingestion cycle finished --- \n\tNew: {unseen}\n\tSeen: {total_fetched - unseen}\n\tTotal: {total_fetched}\n{"-"*10}\n\n")
+		print(f"--- Ingestion cycle finished --- \n\tNew: {unseen} \n\tSeen: {total_fetched - unseen} \n\tTotal: {total_fetched} \n{"-"*10} \n\n")
 
 
