@@ -1,5 +1,5 @@
 # Step 1: Start from an official Python base image.
-FROM python:3.13-slim
+FROM sentinel/base-image:1.0
 
 # Step 2: Set a working directory inside the container.
 WORKDIR /app

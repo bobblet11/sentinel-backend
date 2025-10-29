@@ -1,0 +1,14 @@
+name: sentinel-env # The name of your conda environment
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  # --- Core Python ---
+  - python=3.11
+
+  # --- Your Project's Conda Dependencies ---
+    # --- Core Data Science Libraries ---
+  - numpy
+  - pandas
