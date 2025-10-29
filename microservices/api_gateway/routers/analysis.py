@@ -8,24 +8,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.cache import get_cache, set_cache
 from utils.requests import fetch_json
+from utils.helpers import url_key, httpx_encode
 from config import WEB_SCRAPER_URL, NLP_URL, CACHE_TTL
 import logging
-import hashlib
-import urllib.parse
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 logger = logging.getLogger("api_gateway.analysis")
-
-
-def url_key(u: str) -> str:
-    """Generate deterministic cache key for URL"""
-    h = hashlib.sha256(u.encode("utf-8")).hexdigest()
-    return f"analysis:{h}"
-
-
-def httpx_encode(u: str) -> str:
-    """URL encode helper"""
-    return urllib.parse.quote_plus(u)
 
 
 @router.get("/analyze")
