@@ -77,6 +77,8 @@ The process is nearly identical for both macOS and Windows.
         POSTGRES_DB=sentinel_db
         POSTGRES_USER=sentinel_user
         POSTGRES_PASSWORD=your_secure_password_here
+        POSTGRES_PORT=15432
+        DB_SERVICE_PORT=8001
         ```
 
 4.  **Reopen in Container:**
@@ -99,10 +101,11 @@ This project includes PostgreSQL with pgvector support for storing and querying 
 
 The database is automatically configured when you start the dev container:
 
-*   **Database Service**: Available at `http://localhost:8001`
+*   **Database Service**: Health monitoring at `http://localhost:8001`
 *   **PostgreSQL Database**: Available at `localhost:15432`
 *   **Database Name**: `sentinel_db` (configurable in .env)
 *   **Username**: `sentinel_user` (configurable in .env)
+*   **Extensions**: pgvector for semantic search capabilities
 
 ### Accessing the Database
 
@@ -113,6 +116,9 @@ The database is automatically configured when you start the dev container:
     
     # Check database service health
     curl http://localhost:8001/health
+    
+    # Check database status via API Gateway
+    curl http://localhost:8000/database/status
     ```
 
 2.  **From external tools** (like pgAdmin, DBeaver):
@@ -127,8 +133,9 @@ The database is automatically configured when you start the dev container:
 ### Available Services
 
 *   **PostgreSQL Container**: Runs PostgreSQL 15 with pgvector extension
-*   **Database Service**: FastAPI service for database operations
+*   **Database Service**: Minimal FastAPI service for health monitoring
 *   **pgvector Support**: Ready for vector embeddings and semantic search
+*   **Development Guide**: See DATABASE_OPERATIONS_GUIDE.md for implementation details
 
 ### Manual Database Management
 
