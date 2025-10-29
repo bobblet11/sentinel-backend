@@ -1,0 +1,28 @@
+dependencies:
+  # --- Application Runtime Dependencies ---
+  - fastapi
+  - pydantic
+  - redis-py 
+  - feedparser
+  - uvicorn 
+  - python-dotenv 
+
+  # --- Your Project's PIP Dependencies ---
+  - pip
+  - pip:
+    # Testing
+    - pytest
+    - pytest-cov
+    - httpx      
+
+    # Code Quality & Formatting
+    - black       # The uncompromising code formatter
+    - isort       # Sorts imports automatically
+    - flake8      # A great linter for catching errors
+    - mypy        # For static type checking
+
+    # Debugging & IDE Integration
+    - debugpy   
+
+    # Pre-commit hooks to automate code quality checks
+    - pre-commit

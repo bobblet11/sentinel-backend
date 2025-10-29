@@ -1,6 +1,6 @@
 x-common-env: &common-env
   env_file:
-    - ./.env
+    - ../../.env
 
 services:
   # --- INFRASTRUCTURE ---
@@ -57,11 +57,15 @@ services:
 
   ingestor:
     build: 
-      context: .
+      context: ../../
       dockerfile: ./microservices/ingestor/Dockerfile
+    
+    image: sentinel/ingestor:1.0
+    
     depends_on:
       - redis
       - db-service
+    
     volumes:
       - ingestor_logs:/var/log
     <<: *common-env 
