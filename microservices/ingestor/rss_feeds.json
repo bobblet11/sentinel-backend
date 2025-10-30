@@ -16,8 +16,7 @@
 	"https://rss.nytimes.com/services/xml/rss/nyt/MostShared.xml",
 	"https://rss.nytimes.com/services/xml/rss/nyt/recent.xml",
 
-
-	"https://www.washingtonpost.com/arcio/rss/category/politics/",
+	
 	"http://feeds.washingtonpost.com/rss/rss_the-fix",
 	"https://feeds.washingtonpost.com/rss/business/technology",
 	"http://feeds.washingtonpost.com/rss/national",
