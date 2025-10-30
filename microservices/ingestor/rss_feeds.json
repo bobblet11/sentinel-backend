@@ -32,14 +32,6 @@
 	"https://feeds.content.dowjones.io/public/rss/RSSUSnews",
 	"https://feeds.content.dowjones.io/public/rss/socialpoliticsfeed",
 	"https://feeds.content.dowjones.io/public/rss/socialeconomyfeed",
-	"https://feeds.content.dowjones.io/public/rss/socialhealth",
-
-
-	"https://www.usnews.com/rss/education",
-	"https://www.usnews.com/rss/health",
-	"https://www.usnews.com/rss/money",
-	"https://www.usnews.com/rss/news",
-	"https://www.usnews.com/rss/opinion",
-	"https://www.usnews.com/rss/travel-editorial"
+	"https://feeds.content.dowjones.io/public/rss/socialhealth"
 
 ]
