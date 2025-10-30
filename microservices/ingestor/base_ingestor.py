@@ -1,7 +1,7 @@
 import datetime
 import hashlib
 
-from common.models.redis_models import Message, MessageHeader, MessageURLPayload
+from common.models.api.redis_models import Message, MessageHeader, MessageURLPayload
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 
