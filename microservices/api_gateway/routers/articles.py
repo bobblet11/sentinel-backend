@@ -5,7 +5,7 @@ router = APIRouter(prefix="/articles", tags=["articles"])
 
 # Future endpoints will be added here following the DATABASE_OPERATIONS_GUIDE.md
 # Examples (DO NOT IMPLEMENT YET):
-# 
+#
 # @router.get("/", response_model=List[ArticleResponse])
 # async def list_articles(limit: int = 10, offset: int = 0, status: Optional[str] = None):
 #     """List articles with pagination and filtering"""

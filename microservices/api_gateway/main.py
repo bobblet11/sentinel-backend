@@ -3,10 +3,10 @@ import logging
 from config import CACHE_TTL, NLP_URL, WEB_SCRAPER_URL
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
-from routers import health, database, analysis, articles, sources
+from routers import analysis, articles, database, health, sources
 from utils.cache import get_cache, set_cache
+from utils.helpers import httpx_encode, url_key
 from utils.requests import fetch_json
-from utils.helpers import url_key, httpx_encode
 
 app = FastAPI(title="Sentinel API Gateway", version="0.1")
 
@@ -28,11 +28,11 @@ async def healthz():
     return {"status": "ok"}
 
 
-# Legacy analyze endpoint for backward compatibility  
+# Legacy analyze endpoint for backward compatibility
 @app.get("/analyze")
 async def analyze(url: str = Query(..., description="URL of article to analyze")):
     """Legacy analyze endpoint - maintained for backward compatibility
-    
+
     Note: New analyze logic is in /analysis/analyze router.
     This endpoint maintains the original implementation for existing clients.
     """
@@ -53,7 +53,9 @@ async def analyze(url: str = Query(..., description="URL of article to analyze")
 
         # call NLP
         nlp_req = {"url": url, "content": scraped}
-        analysis_result = await fetch_json(f"{NLP_URL}/analyze", method="POST", json=nlp_req)
+        analysis_result = await fetch_json(
+            f"{NLP_URL}/analyze", method="POST", json=nlp_req
+        )
 
         # store cache
         await set_cache(key, analysis_result, ttl=CACHE_TTL)

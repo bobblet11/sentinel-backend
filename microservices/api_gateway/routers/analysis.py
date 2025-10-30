@@ -1,16 +1,18 @@
+import os
+import sys
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
-import sys
-import os
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils.cache import get_cache, set_cache
-from utils.requests import fetch_json
-from utils.helpers import url_key, httpx_encode
-from config import WEB_SCRAPER_URL, NLP_URL, CACHE_TTL
 import logging
+
+from config import CACHE_TTL, NLP_URL, WEB_SCRAPER_URL
+from utils.cache import get_cache, set_cache
+from utils.helpers import httpx_encode, url_key
+from utils.requests import fetch_json
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 logger = logging.getLogger("api_gateway.analysis")
