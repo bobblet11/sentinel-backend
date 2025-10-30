@@ -17,6 +17,7 @@ dependencies:
 
     # Code Quality & Formatting
     - black       # The uncompromising code formatter
+    - black[jupyter]
     - isort       # Sorts imports automatically
     - flake8      # A great linter for catching errors
     - mypy        # For static type checking
