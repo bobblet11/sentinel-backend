@@ -20,9 +20,11 @@ COPY microservices/ingestor/cronjob /tmp/app-cronjob
 
 # Step 7: Give correct permissions and create log file.
 RUN sed -i 's/\r$//' /tmp/app-cronjob && \
+    echo "" >> /tmp/app-cronjob && \
     crontab /tmp/app-cronjob && \
     rm /tmp/app-cronjob && \
     touch /var/log/cron.log
 
 # Step 8: Define the command to run your application.
+
 CMD ["/bin/sh", "-c", "cron && tail -f /var/log/cron.log"]
