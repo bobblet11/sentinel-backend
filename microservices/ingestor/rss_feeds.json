@@ -1,14 +1,45 @@
 [
-	"https://www.nasa.gov/rss/dyn/breaking_news.rss",
-	
-	"https://feeds.bbci.co.uk/news/world/rss.xml",				
-	"https://feeds.bbci.co.uk/news/rss.xml",
-	"https://feeds.bbci.co.uk/news/uk/rss.xml",
-	"https://feeds.bbci.co.uk/news/business/rss.xml",
-	"https://feeds.bbci.co.uk/news/politics/rss.xml",
-	"https://feeds.bbci.co.uk/news/health/rss.xml",
-	"https://feeds.bbci.co.uk/news/education/rss.xml",
-	"https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
-	"https://feeds.bbci.co.uk/news/technology/rss.xml",
-	"https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml"
+	"https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/Africa.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/Americas.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/AsiaPacific.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/Europe.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/MiddleEast.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/US.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/Education.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/Upshot.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/EnergyEnvironment.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/MostViewed.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/MostShared.xml",
+	"https://rss.nytimes.com/services/xml/rss/nyt/recent.xml",
+
+
+	"https://www.washingtonpost.com/arcio/rss/category/politics/",
+	"http://feeds.washingtonpost.com/rss/rss_the-fix",
+	"https://feeds.washingtonpost.com/rss/business/technology",
+	"http://feeds.washingtonpost.com/rss/national",
+	"https://feeds.washingtonpost.com/rss/world",
+	"http://feeds.washingtonpost.com/rss/business",
+
+
+	"https://feeds.content.dowjones.io/public/rss/RSSWorldNews",
+	"https://feeds.content.dowjones.io/public/rss/WSJcomUSBusiness",
+	"https://feeds.content.dowjones.io/public/rss/RSSMarketsMain",
+	"https://feeds.content.dowjones.io/public/rss/RSSWSJD",
+	"https://feeds.content.dowjones.io/public/rss/RSSUSnews",
+	"https://feeds.content.dowjones.io/public/rss/socialpoliticsfeed",
+	"https://feeds.content.dowjones.io/public/rss/socialeconomyfeed",
+	"https://feeds.content.dowjones.io/public/rss/socialhealth",
+
+
+	"https://www.usnews.com/rss/education",
+	"https://www.usnews.com/rss/health",
+	"https://www.usnews.com/rss/money",
+	"https://www.usnews.com/rss/news",
+	"https://www.usnews.com/rss/opinion",
+	"https://www.usnews.com/rss/travel-editorial"
+
 ]
