@@ -25,7 +25,7 @@ class RedisPublisher:
             raise ValueError("Stream name must be a non-empty string.")
 
         self.stream_name = stream_name
-        self.max_len = 100
+        self.max_len = 100000
         self.client = redis_connection.get_client()
 
         print(f"Redis publisher initialised and publishing to {stream_name}")
