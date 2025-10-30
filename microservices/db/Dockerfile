@@ -1,13 +1,17 @@
-FROM python:3.11-slim
+# Step 1: Start from our base image
+FROM sentinel/base-image:1.0
 
+# Step 2: Set a working directory inside the container.
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
+# Step 3: Copy the dependencies file first.
 COPY microservices/db/requirements.txt .
+
+# Step 4: Install python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY microservices/db/ /app/
+# Step 5: Copy the rest of your application's source code.
+COPY microservices/db/ /app/microservices/db
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -16,4 +20,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8001
 
 # Run the application
-CMD ["python", "main.py"]
+CMD ["python", "-m", "microservices.db.main"]

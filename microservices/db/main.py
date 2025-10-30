@@ -1,10 +1,11 @@
 from fastapi import FastAPI
-import logging
-from config import SERVICE_PORT
+from logging import basicConfig, INFO, getLogger
+from .config import SERVICE_PORT
+import uvicorn
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("db_service")
+basicConfig(level=INFO)
+logger = getLogger("db_service")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -23,5 +24,4 @@ async def root():
     return {"service": "Sentinel Database Service", "version": "0.1.0"}
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=SERVICE_PORT)
+    uvicorn.run("microservices.db.main:app", host="0.0.0.0", port=SERVICE_PORT)

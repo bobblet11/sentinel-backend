@@ -9,7 +9,10 @@ echo "==> Project root identified as: $PROJECT_ROOT"
 cd "$PROJECT_ROOT"
 echo "==> Changed directory to project root"
 
-echo "==> Building microserivce images..."
-sudo -E docker-compose up
+echo "==> Spinning down containers"
+sudo -E docker-compose down
 
-echo "==> Deploy complete."
+echo "==> Removing all unused images..."
+sudo -E docker image prune -a -f
+
+echo "==> Clean complete."

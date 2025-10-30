@@ -11,9 +11,9 @@ cd "$PROJECT_ROOT"
 echo "==> Changed directory to project root"
 
 echo "==> Building base image..."
-sudo docker build -t sentinel/base-image:1.0 -f docker/base/Dockerfile .
+sudo -E docker build -t sentinel/base-image:1.0 -f docker/base/Dockerfile .
 
 echo "==> Building microserivce images..."
-sudo docker-compose build
+sudo -E docker-compose build
 
 echo "==> Build complete."
