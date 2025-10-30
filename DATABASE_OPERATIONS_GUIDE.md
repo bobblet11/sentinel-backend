@@ -17,15 +17,15 @@ This guide details how to proceed with database operations, scaling, and integra
 
 ### Running the Database
 
-#### **Current Setup:**
+#### **Just the database:**
 ```bash
 # Start PostgreSQL container
 docker compose up postgres -d
 
-# Start database service (health check only)
+# Start database service
 docker compose up db-service -d
 
-# Check status via API Gateway
+# Check status by calling the database service's API
 curl http://localhost:8000/database/status
 ```
 
@@ -39,18 +39,6 @@ curl http://localhost:8000/database/status
    # Change database service port (currently 8001)
    DB_SERVICE_PORT=8002
    ```
-
-2. **Update docker-compose.yml if needed:**
-   ```yaml
-   postgres:
-     ports:
-       - "${POSTGRES_PORT}:5432"  # External:Internal mapping
-   ```
-
-#### **Database Configuration:**
-- **Config Location**: `common/db_client/__init__.py`
-- **Service Config**: `microservices/db/config.py`
-
 ---
 
 ## 🏗️ Defining Models
@@ -59,7 +47,7 @@ curl http://localhost:8000/database/status
 
 #### **1. Create Database Models (SQLAlchemy/Raw SQL)**
 
-**Location**: `common/db_client/models.py`
+**Location**: `common/models/db_models.py`
 
 ```python
 # Example structure - DO NOT IMPLEMENT YET
@@ -92,6 +80,9 @@ class Article(Base):
     analysis_status = Column(String(50), default='pending')
     created_at = Column(DateTime, server_default=func.now())
 ```
+
+
+
 
 #### **2. Create API Models (Pydantic)**
 
@@ -131,6 +122,8 @@ class ArticleResponse(BaseModel):
     analysis_status: str
     created_at: datetime
 ```
+
+
 
 #### **3. Database Schema Migrations**
 

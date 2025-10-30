@@ -70,15 +70,26 @@ The process is nearly identical for both macOS and Windows.
 3.  **Initial Config:**
     *   Duplicate the .env.template file, rename it to .env, and edit values.
     *   You should have .env.template and .env files at project root now
-    *   Add your git credentials to the .env
-    *   **Configure PostgreSQL credentials** in your .env file:
+    *   **Configure PostgreSQL** in your .env file:
         ```bash
-        # PostgreSQL Configuration (update these values)
+        # PostgreSQL Configuration
         POSTGRES_DB=sentinel_db
         POSTGRES_USER=sentinel_user
         POSTGRES_PASSWORD=your_secure_password_here
         POSTGRES_PORT=15432
         DB_SERVICE_PORT=8001
+        ```
+    *   **Configure PostgreSQL credentials** in your .env file:
+        ```bash
+        # --- Github Credentials ---
+        GITHUB_USER=your_github_username
+        GITHUB_EMAIL=your_github_email
+        ```
+    *   **Configure Redis credentials** in your .env file:
+        ```bash
+        # --- Redis Configuration ---
+        REDIS_HOST=redis
+        REDIS_PORT=6379
         ```
 
 4.  **Reopen in Container:**
@@ -92,69 +103,6 @@ The process is nearly identical for both macOS and Windows.
     *   Once the build is complete, your VS Code window will reload, and you will be inside the fully configured Dev Container. Check the bottom-left corner; it should say **"Dev Container: Sentinel..."**.
     *   **PostgreSQL will start automatically** when the dev container is ready.
 
-
-## Database Services
-
-This project includes PostgreSQL with pgvector support for storing and querying vector embeddings.
-
-### PostgreSQL Setup
-
-The database is automatically configured when you start the dev container:
-
-*   **Database Service**: Health monitoring at `http://localhost:8001`
-*   **PostgreSQL Database**: Available at `localhost:15432`
-*   **Database Name**: `sentinel_db` (configurable in .env)
-*   **Username**: `sentinel_user` (configurable in .env)
-*   **Extensions**: pgvector for semantic search capabilities
-
-### Accessing the Database
-
-1.  **From the dev container terminal:**
-    ```bash
-    # Connect to PostgreSQL
-    docker compose exec postgres psql -U sentinel_user -d sentinel_db
-    
-    # Check database service health
-    curl http://localhost:8001/health
-    
-    # Check database status via API Gateway
-    curl http://localhost:8000/database/status
-    ```
-
-2.  **From external tools** (like pgAdmin, DBeaver):
-    ```
-    Host: localhost
-    Port: 15432
-    Database: sentinel_db
-    Username: sentinel_user
-    Password: (as set in your .env file)
-    ```
-
-### Available Services
-
-*   **PostgreSQL Container**: Runs PostgreSQL 15 with pgvector extension
-*   **Database Service**: Minimal FastAPI service for health monitoring
-*   **pgvector Support**: Ready for vector embeddings and semantic search
-*   **Development Guide**: See DATABASE_OPERATIONS_GUIDE.md for implementation details
-
-### Manual Database Management
-
-If you need to manage the database manually:
-
-```bash
-# Start only PostgreSQL
-docker compose up postgres -d
-
-# Start database service
-docker compose up db-service -d
-
-# Stop database services
-docker compose stop postgres db-service
-
-# View database logs
-docker compose logs postgres
-```
-
 ## Daily Workflow
 
 1.  **Starting the Environment:**
@@ -165,34 +113,24 @@ docker compose logs postgres
     *   Open the integrated terminal in VS Code (`Ctrl+` ` ` or `Cmd+` ` ` on Mac). This is a terminal *inside* the container.
     *   Run all the services defined in our simulation using Docker Compose:
         ```bash
-        docker-compose up --build
-        ```
-    *   You will see the logs from all the microservices streaming in this terminal.
-    *   **Note**: PostgreSQL starts automatically with the dev container, but you can also run individual services:
-        ```bash
-        # Start specific services
-        docker compose up postgres db-service -d
-        
-        # Start all services
-        docker compose up --build
+        ./scripts/clean.sh && ./scripts/build.sh && ./scripts/deploy.sh
         ```
 
 3.  **Stopping the Services:**
     *   Press `Ctrl+C` in the terminal where `docker-compose` is running.
-    *   To fully remove the containers and networks, run:
+    *   Double check by running 
         ```bash
-        docker-compose down
+        sudo docker-compose down
         ```
-
 
 ## Managing Python Dependencies
 
-All Python packages for the project are managed by the `.devcontainer/environment.yml` file. **Do not use `pip install` directly in the terminal for permanent changes.**
+All Python packages for the development environment are managed by the `.devcontainer/environment.yml` file. **Do not use `pip install` directly in the terminal for permanent changes.**
 
 To add a new Python package:
 
 1.  Open the `.devcontainer/environment.yml` file.
-2.  Add the package name (e.g., `new-package-name`) to the `pip:` section.
+2.  Add the package name (e.g., `new-package-name`) to the `pip:` section if handled by pip. Otherwise, just make a entry under dependencies.
 3.  Save the file.
 4.  Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac).
 5.  Run the command: **"Dev Containers: Rebuild and Reopen in Container"**.
