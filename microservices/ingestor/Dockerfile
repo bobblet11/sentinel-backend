@@ -1,4 +1,4 @@
-# Step 1: Start from an official Python base image.
+# Step 1: Start from our base image
 FROM sentinel/base-image:1.0
 
 # Step 2: Set a working directory inside the container.
@@ -13,7 +13,6 @@ RUN apt-get update && apt-get install -y cron && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Step 5: Copy the rest of your application's source code.
-COPY common/ /app/common/
 COPY microservices/ingestor/ /app/microservices/ingestor
 
 # Step 6: Copy the cronjob file into the container.
@@ -26,4 +25,4 @@ RUN sed -i 's/\r$//' /tmp/app-cronjob && \
     touch /var/log/cron.log
 
 # Step 8: Define the command to run your application.
-CMD ["cron", "-f"]
+CMD ["/bin/sh", "-c", "cron && tail -f /var/log/cron.log"]
