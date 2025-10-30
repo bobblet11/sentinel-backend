@@ -9,7 +9,11 @@ echo "==> Project root identified as: $PROJECT_ROOT"
 cd "$PROJECT_ROOT"
 echo "==> Changed directory to project root"
 
-echo "==> Building microserivce images..."
-sudo -E docker-compose up
+echo "==> Tearing down existing services to ensure a clean start..."
+sudo -E docker-compose down
 
-echo "==> Deploy complete."
+echo "==> Starting services with newly built images..."
+sudo -E docker-compose up --force-recreate -d
+
+echo "==> Deploy complete. Following logs (Ctrl+C to stop)..."
+sudo -E docker-compose logs -f
