@@ -22,7 +22,7 @@ services:
       - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ../../microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -66,10 +66,8 @@ services:
       dockerfile: ./microservices/ingestor/Dockerfile
     
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
+      - postgres
+      - redis
     
     volumes:
       - ingestor_service_logs:/var/log
