@@ -114,7 +114,7 @@ class RedisConsumer:
             pass
         except json.JSONDecodeError as e:
             print(
-                f"CORRUPTED MESSAGE: Failed to decode JSONs from stream '{self.stream_name}'. Raw data: '{payload_json}'. Error: {e}"
+                f"CORRUPTED MESSAGE: Failed to decode JSONs from stream '{self.stream_name}'. Error: {e}"
             )
             raise
 

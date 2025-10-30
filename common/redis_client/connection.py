@@ -21,7 +21,8 @@ class RedisConnection:
 
     def __new__(cls):
         """
-        before __init__, make sure no other class instance already exists with a connection pool. Enforces Singleton rule.
+        before __init__, make sure no other class
+        instance already exists with a connection pool. Enforces Singleton rule.
         """
 
         # Singleton instance already exists
