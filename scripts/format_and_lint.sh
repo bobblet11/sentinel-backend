@@ -3,6 +3,9 @@ set -e
 
 # --- Find the Project Root Directory ---
 PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." &> /dev/null && pwd)
+EXCLUDE_REGEX="cronjob$"          # Regex for black and mypy (matches paths ending in 'cronjob')
+EXCLUDE_GLOB="**/cronjob"         # Glob for isort and flake8 (matches 'cronjob' in any directory)
+
 echo "==> Project root identified as: $PROJECT_ROOT"
 
 
@@ -11,17 +14,17 @@ cd "$PROJECT_ROOT"
 echo "==> Changed directory to project root"
 
 echo "==> Sorting imports"
-isort .
+isort . --skip-glob "$EXCLUDE_GLOB"
 
 echo "==> Formatting code"
-black .
+black . --exclude "$EXCLUDE_REGEX"
 
 echo "==> Formatting complete."
 
 echo "==> Finding errors in code"
-flake8 .
+flake8 . --extend-exclude "$EXCLUDE_GLOB"
 
 echo "==> Checking type hints in code"
-mypy .
+mypy . --exclude "$EXCLUDE_REGEX"
 
 echo "==> Static analysis complete."

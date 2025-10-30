@@ -12,7 +12,7 @@ echo "==> Changed directory to project root"
 echo "==> Spinning down containers"
 sudo -E docker-compose down
 
-echo "==> Removing all unused images..."
-sudo -E docker image prune -a -f
+echo "==> Pruning old Docker build cache..."
+sudo -E docker system prune -f
 
 echo "==> Clean complete."
