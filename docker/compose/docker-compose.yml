@@ -93,7 +93,14 @@ services:
     environment:
       - INPUT_STREAMS=user-scraper-jobs, background-scraper-jobs
       - OUTPUT_STREAM=scraper-priority-queue
-    
+
+  nlp-prioritiser:  
+    <<: *prioritizer-service
+    container_name: sentinel-nlp-prioritiser
+    environment:
+      - INPUT_STREAMS=user-nlp-jobs, background-nlp-jobs
+      - OUTPUT_STREAM=nlp-priority-queue
+
 volumes:
   redis_data: {}
   ingestor_service_logs: {}
