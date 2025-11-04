@@ -1,0 +1,87 @@
+x-common-env: &common-env
+  env_file:
+    - ../../.env
+
+services:
+  # --- INFRASTRUCTURE ---
+  redis:
+    container_name: sentinel-redis-container
+    image: "redis:alpine"
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - sentinel-net
+
+  postgres:
+    container_name: sentinel-postgres-container
+    image: pgvector/pgvector:pg15
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    <<: *common-env
+    restart: unless-stopped
+    networks:
+      - sentinel-net
+    command: postgres -c shared_preload_libraries=vector
+
+  # --- MICROSERVICES ---
+  db-service:
+    container_name: sentinel-db-service-container
+    image: sentinel/db-service:1.0
+    build:
+      context: ../../
+      dockerfile: ./microservices/db/Dockerfile
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+    volumes:
+      - db_service_logs:/var/log
+    ports:
+      - "${DB_SERVICE_PORT}:8001"
+
+    <<: *common-env
+    restart: unless-stopped
+    networks:
+      - sentinel-net
+
+  ingestor-service:
+    container_name: sentinel-ingestor-service-container
+    image: sentinel/ingestor-service:1.0
+    build: 
+      context: ../../
+      dockerfile: ./microservices/ingestor/Dockerfile
+    
+    depends_on:
+      - postgres
+      - redis
+    
+    volumes:
+      - ingestor_service_logs:/var/log
+    <<: *common-env 
+    restart: unless-stopped
+    networks:
+      - sentinel-net
+    
+volumes:
+  redis_data: {}
+  ingestor_service_logs: {}
+  db_service_logs: {}
+  postgres_data: {}
+
+networks:
+  sentinel-net:
+    driver: bridge
