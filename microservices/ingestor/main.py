@@ -1,7 +1,6 @@
 import datetime
 import json
 import os
-import datetime
 from microservices.ingestor.rss_ingestor import RssIngestor
 from common.process.monitor import format_sys_stats, get_sys_stats
 from common.io.redirect_and_modify import redirect_and_modify
