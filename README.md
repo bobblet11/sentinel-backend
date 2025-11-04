@@ -70,7 +70,27 @@ The process is nearly identical for both macOS and Windows.
 3.  **Initial Config:**
     *   Duplicate the .env.template file, rename it to .env, and edit values.
     *   You should have .env.template and .env files at project root now
-    *   Add your git credentials to the .env
+    *   **Configure PostgreSQL** in your .env file:
+        ```bash
+        # PostgreSQL Configuration
+        POSTGRES_DB=sentinel_db
+        POSTGRES_USER=sentinel_user
+        POSTGRES_PASSWORD=your_secure_password_here
+        POSTGRES_PORT=15432
+        DB_SERVICE_PORT=8001
+        ```
+    *   **Configure PostgreSQL credentials** in your .env file:
+        ```bash
+        # --- Github Credentials ---
+        GITHUB_USER=your_github_username
+        GITHUB_EMAIL=your_github_email
+        ```
+    *   **Configure Redis credentials** in your .env file:
+        ```bash
+        # --- Redis Configuration ---
+        REDIS_HOST=redis
+        REDIS_PORT=6379
+        ```
 
 4.  **Reopen in Container:**
     * 	Open the container by,
@@ -81,10 +101,7 @@ The process is nearly identical for both macOS and Windows.
     *   VS Code will now build the Docker image for the development environment. This will take a significant amount of time (15-30 minutes) as it downloads Docker images, system packages, and all our Python dependencies.
     *   **This is a one-time cost.** Subsequent launches will be much faster.
     *   Once the build is complete, your VS Code window will reload, and you will be inside the fully configured Dev Container. Check the bottom-left corner; it should say **"Dev Container: Sentinel..."**.
-
-
-
-
+    *   **PostgreSQL will start automatically** when the dev container is ready.
 
 ## Daily Workflow
 
@@ -96,31 +113,52 @@ The process is nearly identical for both macOS and Windows.
     *   Open the integrated terminal in VS Code (`Ctrl+` ` ` or `Cmd+` ` ` on Mac). This is a terminal *inside* the container.
     *   Run all the services defined in our simulation using Docker Compose:
         ```bash
-        docker-compose up --build
+        ./scripts/clean.sh && ./scripts/build.sh && ./scripts/deploy.sh
         ```
-    *   You will see the logs from all the microservices streaming in this terminal.
 
 3.  **Stopping the Services:**
     *   Press `Ctrl+C` in the terminal where `docker-compose` is running.
-    *   To fully remove the containers and networks, run:
+    *   Double check by running 
         ```bash
-        docker-compose down
+        sudo docker-compose down
         ```
-
-
-
-
-
 
 ## Managing Python Dependencies
 
-All Python packages for the project are managed by the `.devcontainer/environment.yml` file. **Do not use `pip install` directly in the terminal for permanent changes.**
+All Python packages for the development environment are managed by the `.devcontainer/environment.yml` file. **Do not use `pip install` directly in the terminal for permanent changes.**
 
 To add a new Python package:
 
 1.  Open the `.devcontainer/environment.yml` file.
-2.  Add the package name (e.g., `new-package-name`) to the `pip:` section.
+2.  Add the package name (e.g., `new-package-name`) to the `pip:` section if handled by pip. Otherwise, just make a entry under dependencies.
 3.  Save the file.
 4.  Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac).
 5.  Run the command: **"Dev Containers: Rebuild and Reopen in Container"**.
 6.  This will rebuild the environment with your new package installed, ensuring everyone on the team gets it automatically.
+
+
+## Microservices Architecture
+
+The Sentinel backend consists of several microservices that work together:
+
+### Core Services
+
+*   **API Gateway** (`microservices/api_gateway/`): Main entry point for external requests
+*   **Database Service** (`microservices/db/`): PostgreSQL operations and data management
+*   **Ingestor** (`microservices/ingestor/`): RSS feed processing and content ingestion
+*   **Web Scraper** (`microservices/web-scraper/`): Content extraction from URLs
+*   **NLP Service** (`microservices/nlp/`): Natural language processing and analysis
+
+### Infrastructure Services
+
+*   **PostgreSQL**: Primary database with pgvector for semantic search
+*   **Redis**: Message queuing and caching
+
+### Service Communication
+
+Services communicate via:
+*   **Docker network**: `sentinel-net` for internal communication
+*   **REST APIs**: HTTP endpoints for service-to-service calls
+*   **Message queues**: Redis streams for asynchronous processing
+
+All services are designed to be stateless and scalable, following microservices best practices.

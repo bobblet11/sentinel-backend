@@ -1,30 +1,41 @@
+import logging
+
+from config import CACHE_TTL, NLP_URL, WEB_SCRAPER_URL
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
+from routers import analysis, articles, database, health, sources
 from utils.cache import get_cache, set_cache
+from utils.helpers import httpx_encode, url_key
 from utils.requests import fetch_json
-from config import WEB_SCRAPER_URL, NLP_URL, CACHE_TTL
-import logging
-import hashlib
 
 app = FastAPI(title="Sentinel API Gateway", version="0.1")
 
 logger = logging.getLogger("api_gateway")
 logging.basicConfig(level=logging.INFO)
 
+# Include routers
+app.include_router(health.router)
+app.include_router(database.router)
+app.include_router(analysis.router)
+app.include_router(articles.router)
+app.include_router(sources.router)
 
-def url_key(u: str) -> str:
-    # deterministic cache key for URL
-    h = hashlib.sha256(u.encode("utf-8")).hexdigest()
-    return f"analysis:{h}"
 
-
+# Legacy endpoint for backward compatibility
 @app.get("/healthz")
 async def healthz():
+    """Legacy health check endpoint"""
     return {"status": "ok"}
 
 
+# Legacy analyze endpoint for backward compatibility
 @app.get("/analyze")
 async def analyze(url: str = Query(..., description="URL of article to analyze")):
+    """Legacy analyze endpoint - maintained for backward compatibility
+
+    Note: New analyze logic is in /analysis/analyze router.
+    This endpoint maintains the original implementation for existing clients.
+    """
     key = url_key(url)
 
     # 1) Check cache
@@ -42,20 +53,16 @@ async def analyze(url: str = Query(..., description="URL of article to analyze")
 
         # call NLP
         nlp_req = {"url": url, "content": scraped}
-        analysis = await fetch_json(f"{NLP_URL}/analyze", method="POST", json=nlp_req)
+        analysis_result = await fetch_json(
+            f"{NLP_URL}/analyze", method="POST", json=nlp_req
+        )
 
         # store cache
-        await set_cache(key, analysis, ttl=CACHE_TTL)
+        await set_cache(key, analysis_result, ttl=CACHE_TTL)
 
-        return {"cached": False, "data": analysis}
+        return {"cached": False, "data": analysis_result}
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Failed analyze pipeline")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# small helper to urlencode manually (avoid importing heavy libs)
-def httpx_encode(u: str) -> str:
-    import urllib.parse
-    return urllib.parse.quote_plus(u)
