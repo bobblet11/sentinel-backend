@@ -1,15 +1,7 @@
 import io
 import sys
+from common.io.utils import indent_with_tab
 from contextlib import redirect_stdout
-
-
-def indent_with_tab(line):
-    return f"\t{line}"
-
-
-def indent_with_space(line):
-    return f"        {line}"
-
 
 def redirect_and_modify(string_modification_function=indent_with_tab):
     def decorator(func):
