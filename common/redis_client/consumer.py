@@ -1,6 +1,6 @@
 import json
+import redis
 from typing import Any, Dict, Optional
-
 from common.redis_client.connection import redis_connection
 
 
@@ -72,7 +72,7 @@ class RedisConsumer:
                 A dictionary like {'redis_message_id': '...', 'payload': {...}},
                 or None if the operation timed out.
         """
-        try:
+        try:            
             response = self.client.xreadgroup(
                 self.group_name,
                 self.consumer_name,
@@ -82,17 +82,21 @@ class RedisConsumer:
             )
 
             if not response:
-                raise Exception("no response")
+                None
 
-            redis_message_id = response[0][1][0][0]
-            payload_json = response[0][1][0][1]["payload"]
-            payload_dict = json.loads(payload_json)
-
-            return {"redis_message_id": redis_message_id, "payload": payload_dict}
-
+            for stream_name, messages in response:
+                for message_id, fields in messages:
+                    decoded_fields = {k.decode('utf-8'): v.decode('utf-8') for k, v in fields.items()}
+                    return {
+                        'stream': stream_name.decode('utf-8'),
+                        'message_id': message_id.decode('utf-8'),
+                        'data': decoded_fields
+                    }
+            return None 
+        
         except json.JSONDecodeError as e:
             print(
-                f"CORRUPTED MESSAGE: Failed to decode JSON from stream '{self.stream_name}'. Raw data: '{payload_json}'. Error: {e}"
+                f"CORRUPTED MESSAGE: Failed to decode JSON from stream '{self.stream_name}'. Raw data: '{decoded_fields}'. Error: {e}"
             )
             raise
 
@@ -111,7 +115,33 @@ class RedisConsumer:
                 or None if the operation timed out.
         """
         try:
-            pass
+            all_messages = []
+            
+            response = self.client.xreadgroup(
+                self.group_name,
+                self.consumer_name,
+                {self.stream_name: ">"},
+                count=num_to_consume,
+                block=block,
+            )
+
+            if not response:
+                return all_messages
+
+            for stream_name, messages in response:
+                for message_id, fields in messages:
+                    decoded_fields = {k.decode('utf-8'): v.decode('utf-8') for k, v in fields.items()}
+
+                    message_dict = {
+                        'stream': stream_name.decode('utf-8'),
+                        'message_id': message_id.decode('utf-8'),
+                        'data': decoded_fields
+                    }
+                    
+                    all_messages.append(message_dict)
+
+            return all_messages
+        
         except json.JSONDecodeError as e:
             print(
                 f"CORRUPTED MESSAGE: Failed to decode JSONs from stream '{self.stream_name}'. Error: {e}"
@@ -124,16 +154,16 @@ class RedisConsumer:
 
     def acknowledge(self, message_id: str):
         """
-        Acknowledges that a message has been successfully processed, removing it
-        from the Pending Entries List (PEL) for this consumer group.
-
-        This allows the group to shift to the next message so that any other listeners can get the next message.
-
-        Args:
-                message_id (str): The ID of the message to acknowledge.
+        Acknowledges that a message has been successfully processed.
         """
         try:
-            self.client.xack(self.stream_name, self.group_name, message_id)
-            print(f"Acknowledged message {message_id} in group '{self.group_name}'.")
-        except Exception as e:
-            print(f"Error acknowledging message {message_id}: {e}.")
+            # XACK returns the number of messages acknowledged (0 or 1)
+            result = self.client.xack(self.stream_name, self.group_name, message_id)
+            if result == 1:
+                print(f"Acknowledged message {message_id} in group '{self.group_name}'.")
+            else:
+                # This can happen if the ID is wrong or was already acked/doesn't exist in PEL
+                print(f"Warning: Acknowledgment for message {message_id} failed. It may not be in the pending list.")
+        except redis.exceptions.RedisError as e:
+            print(f"Error acknowledging message {message_id}: {e}")
+            raise
