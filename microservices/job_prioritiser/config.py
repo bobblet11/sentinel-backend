@@ -2,7 +2,9 @@ import os
 import sys
 from dotenv import load_dotenv
 
-def print_env(INPUT_STREAMS, OUTPUT_STREAM):
+def print_env(INPUT_STREAMS, OUTPUT_STREAM, GROUP_NAME, PRIORITY_MAP):
+	print(f"Group name: {GROUP_NAME}\n\n")
+	print(f"Priority map: {PRIORITY_MAP}\n\n")
 	print("-" * 9)
 	print(INPUT_STREAMS)
 	print("-" * 9)
@@ -25,6 +27,20 @@ if not OUTPUT_STREAM:
     print("FATAL: OUTPUT_STREAM environment variable is not set. Exiting.")
     sys.exit(1)
     
-print_env(INPUT_STREAMS, OUTPUT_STREAM)
+GROUP_NAME = os.getenv("GROUP_NAME")
+if not GROUP_NAME:
+    print("FATAL: GROUP_NAME environment variable is not set. Exiting.")
+    sys.exit(1)
+
+PRIORITY_MAP = {
+    'user': 1,
+    'admin': 1, # Same priority as user
+    'background': 2,
+    'logging': 3
+}
+
+LOWEST_PRIORITY = float('inf')
+
+print_env(INPUT_STREAMS, OUTPUT_STREAM, GROUP_NAME, PRIORITY_MAP)
     
 
