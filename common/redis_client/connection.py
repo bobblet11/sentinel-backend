@@ -48,7 +48,7 @@ class RedisConnection:
         Idempotently attempts to establish a connection to the Redis server.
         """
 
-        print(f"Attempting to connect to Redis at {REDIS_HOST}:{REDIS_PORT}.")
+        # print(f"Attempting to connect to Redis at {REDIS_HOST}:{REDIS_PORT}.")
 
         pool = redis.ConnectionPool(
             host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True
