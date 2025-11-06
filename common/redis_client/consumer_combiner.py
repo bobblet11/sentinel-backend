@@ -3,7 +3,7 @@ import socket
 from typing import Any, Dict, List, Optional
 import redis
 from common.redis_client.connection import redis_connection
-
+import json
 
 class RedisConsumerCombiner:
     """
@@ -29,12 +29,8 @@ class RedisConsumerCombiner:
 
         self.streams = streams
         self.group_name = group_name
-        
-        # Generate a single, unique consumer name for this process.
-        # This one worker will be responsible for messages from all streams it pulls.
         self.consumer_name = f"{socket.gethostname()}-{os.getpid()}"
         
-        # We only need one client to talk to Redis.
         self.client = redis_connection.get_client()
 
         print("--- Initializing RedisConsumerCombiner ---")
@@ -59,6 +55,26 @@ class RedisConsumerCombiner:
                     print(f"  - Group '{self.group_name}' already exists on stream '{stream}'.")
                 else:
                     raise
+                
+    def __decode_one_message(self, stream_name, redis_message_id, fields):
+        """
+        Decodes a single raw message from Redis, handling byte conversion and JSON parsing.
+        """
+        decoded_fields = fields 
+
+        if 'payload' in decoded_fields:
+            message_data = json.loads(decoded_fields['payload'])
+        else:
+            print(f"Warning: Message {redis_message_id} is missing 'payload' field.")
+            message_data = decoded_fields
+
+        message_dict = {
+            'stream': stream_name,
+            'redis_message_id': redis_message_id, # Changed key for consistency
+            'data': message_data
+        }
+    
+        return message_dict
 
     def consume_one(self, block: int = 0) -> Optional[Dict[str, Any]]:
         """
@@ -87,17 +103,14 @@ class RedisConsumerCombiner:
 
             # The response is [[stream_name, [message_tuple]]]. We just need the first one.
             stream_name, messages = response[0]
-            message_id, fields = messages[0]
+            redis_message_id, fields = messages[0]
 
-            return {
-                'stream': stream_name,
-                'message_id': message_id,
-                'data': fields
-            }
+            return self.__decode_one_message(stream_name, redis_message_id, fields)
         
         except Exception as e:
             print(f"An error occurred in RedisConsumerCombiner.consume_one: {e}")
             return None
+        
     def consume_many(self, num_to_consume: int = 1, block: int = 0) -> List[Dict[str, Any]]:
         """
         Waits for and consumes up to N messages from ANY of the configured streams.
@@ -112,7 +125,7 @@ class RedisConsumerCombiner:
         all_messages = []
         try:
             streams_dict = {stream: ">" for stream in self.streams}
-            
+
             response = self.client.xreadgroup(
                 self.group_name,
                 self.consumer_name,
@@ -123,30 +136,30 @@ class RedisConsumerCombiner:
 
             if not response:
                 return all_messages
-
+            
             # Loop through the response which may contain messages from multiple streams
             for stream_name, messages in response:
-                for message_id, fields in messages:
-                    message_dict = {
-                        'stream': stream_name,
-                        'message_id': message_id,
-                        'data': fields
-                    }
-                    all_messages.append(message_dict)
-
+                for redis_message_id, fields in messages:
+                    try:
+                        message_dict = self.__decode_one_message(stream_name, redis_message_id, fields)
+                        all_messages.append(message_dict)
+                    except json.JSONDecodeError as e:
+                        print(f"CORRUPTED MESSAGE: Skipping message {redis_message_id} from stream '{stream_name}' due to JSON decode error: {e}")
+                        continue
             return all_messages
+        
         except Exception as e:
             print(f"An error occurred in RedisConsumerCombiner.consume_many: {e}")
             return all_messages
 
-    def acknowledge(self, stream_name: str, message_id: str):
+    def acknowledge(self, stream_name: str, redis_message_id: str):
         """
         Acknowledges that a message from a specific stream has been processed.
-        You must know which stream the message came from.
         """
-        # This method can be simple, just calling the client directly.
         try:
-            self.client.xack(stream_name, self.group_name, message_id)
+            result = self.client.xack(stream_name, self.group_name, redis_message_id)
+            if result == 0:
+                print(f"Warning: Acknowledgment for message {redis_message_id} on stream {stream_name} failed.")
         except Exception as e:
-            print(f"Error acknowledging message {message_id} on stream {stream_name}: {e}")
+            print(f"Error acknowledging message {redis_message_id} on stream {stream_name}: {e}")
             raise
