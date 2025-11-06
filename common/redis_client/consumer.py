@@ -1,8 +1,8 @@
 import json
-import redis
+import socket
 from typing import Any, Dict, Optional
 from common.redis_client.connection import redis_connection
-
+import os
 
 class RedisConsumer:
     """
@@ -16,7 +16,7 @@ class RedisConsumer:
             consumer_name: name given to redis when a message is consumed from stream.
     """
 
-    def __init__(self, stream_name: str, group_name: str, consumer_name: str):
+    def __init__(self, stream_name: str, group_name: str):
         """
         stream_name (str): The name of the Redis stream to listen to.
         group_name (str): The name of the Redis group to listen to.
@@ -29,12 +29,9 @@ class RedisConsumer:
         if not isinstance(group_name, str) or not group_name:
             raise ValueError("Group name must be a non-empty string.")
 
-        if not isinstance(consumer_name, str) or not consumer_name:
-            raise ValueError("Consumer name must be a non-empty string.")
-
         self.stream_name = stream_name
         self.group_name = group_name
-        self.consumer_name = consumer_name
+        self.consumer_name = f"{socket.gethostname()}-{os.getpid()}"
         self.max_len = 100
         self.client = redis_connection.get_client()
 
@@ -64,6 +61,23 @@ class RedisConsumer:
                 print(f"Error creating consumer group: {e}")
                 raise
 
+    def __decode_one_message(self, stream_name, redis_message_id, fields):
+        decoded_fields = fields 
+
+        if 'payload' in decoded_fields:
+            message_data = json.loads(decoded_fields['payload'])
+        else:
+            print(f"Warning: Message {redis_message_id} is missing 'payload' field.")
+            message_data = decoded_fields
+
+        message_dict = {
+            'stream': stream_name,
+            'redis_message_id': redis_message_id,
+            'data': message_data
+        }
+    
+        return message_dict
+    
     def consume_one(self, block: int = 0) -> Optional[Dict[str, Any]]:
         """
         Waits for and consumes ONE new raw message from the stream.
@@ -84,19 +98,14 @@ class RedisConsumer:
             if not response:
                 None
 
-            for stream_name, messages in response:
-                for message_id, fields in messages:
-                    decoded_fields = {k.decode('utf-8'): v.decode('utf-8') for k, v in fields.items()}
-                    return {
-                        'stream': stream_name.decode('utf-8'),
-                        'message_id': message_id.decode('utf-8'),
-                        'data': decoded_fields
-                    }
-            return None 
-        
+            stream_name, messages = response[0]
+            redis_message_id, fields = messages[0]
+
+            return self.__decode_one_message(stream_name, redis_message_id, fields)
+            
         except json.JSONDecodeError as e:
             print(
-                f"CORRUPTED MESSAGE: Failed to decode JSON from stream '{self.stream_name}'. Raw data: '{decoded_fields}'. Error: {e}"
+                f"CORRUPTED MESSAGE: Failed to decode JSON from stream '{self.stream_name}'. Error: {e}"
             )
             raise
 
@@ -129,41 +138,29 @@ class RedisConsumer:
                 return all_messages
 
             for stream_name, messages in response:
-                for message_id, fields in messages:
-                    decoded_fields = {k.decode('utf-8'): v.decode('utf-8') for k, v in fields.items()}
-
-                    message_dict = {
-                        'stream': stream_name.decode('utf-8'),
-                        'message_id': message_id.decode('utf-8'),
-                        'data': decoded_fields
-                    }
-                    
-                    all_messages.append(message_dict)
+                for redis_message_id, fields in messages:
+                    try:
+                        message_dict = self.__decode_one_message(stream_name, redis_message_id, fields)
+                        all_messages.append(message_dict)
+                    except json.JSONDecodeError as e:
+                        msg_id_str = redis_message_id
+                        print(f"CORRUPTED MESSAGE: Skipping message {msg_id_str} due to JSON decode error: {e}")
+                        continue
 
             return all_messages
         
-        except json.JSONDecodeError as e:
-            print(
-                f"CORRUPTED MESSAGE: Failed to decode JSONs from stream '{self.stream_name}'. Error: {e}"
-            )
-            raise
-
         except Exception as e:
             print(f"Error consuming from stream '{self.stream_name}': {e}")
             raise
 
-    def acknowledge(self, message_id: str):
+    def acknowledge(self, redis_message_id: str):
         """
-        Acknowledges that a message has been successfully processed.
+        Acknowledges that a message from a specific stream has been processed.
         """
         try:
-            # XACK returns the number of messages acknowledged (0 or 1)
-            result = self.client.xack(self.stream_name, self.group_name, message_id)
-            if result == 1:
-                print(f"Acknowledged message {message_id} in group '{self.group_name}'.")
-            else:
-                # This can happen if the ID is wrong or was already acked/doesn't exist in PEL
-                print(f"Warning: Acknowledgment for message {message_id} failed. It may not be in the pending list.")
-        except redis.exceptions.RedisError as e:
-            print(f"Error acknowledging message {message_id}: {e}")
+            result = self.client.xack(self.stream_name, self.group_name, redis_message_id)
+            if result == 0:
+                print(f"Warning: Acknowledgment for message {redis_message_id} on stream {self.stream_name} failed.")
+        except Exception as e:
+            print(f"Error acknowledging message {redis_message_id} on stream {self.stream_name}: {e}")
             raise

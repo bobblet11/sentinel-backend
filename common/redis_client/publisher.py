@@ -30,6 +30,7 @@ class RedisPublisher:
 
         print(f"Redis publisher initialised and publishing to {stream_name}")
 
+
     def publish_one(self, message: Dict[str, Any]):
         """
         Serializes a dictionary to JSON and adds it to the stream.
@@ -50,9 +51,9 @@ class RedisPublisher:
             redis_message_id = self.client.xadd(
                 self.stream_name, payload, maxlen=self.max_len, approximate=True
             )
-            print(
-                f"Published message {message.header.message_id} to {self.stream_name}. [ REDIS_MESSAGE_ID: {redis_message_id} ]"
-            )
+            # print(
+            #     f"Published message {message.header.message_id} to {self.stream_name}. [ REDIS_MESSAGE_ID: {redis_message_id} ]"
+            # )
             return redis_message_id
 
         except TypeError as e:
@@ -66,6 +67,7 @@ class RedisPublisher:
                 f"Failed to publish message {message.header.message_id} to {self.stream_name}: {e}. Data not published"
             )
             return None
+
 
     def publish_many(self, messages: List[Dict[str, Any]]) -> Optional[List[str]]:
         """
@@ -92,10 +94,10 @@ class RedisPublisher:
                     self.stream_name, payload, maxlen=self.max_len, approximate=True
                 )
 
-            message_ids = pipe.execute()
+            redis_message_ids = pipe.execute()
 
-            print(f"Published {len(message_ids)} messages to {self.stream_name}.")
-            return message_ids
+            print(f"Published {len(redis_message_ids)} messages to {self.stream_name}.")
+            return redis_message_ids
 
         except TypeError as e:
             # This specific error is for when json.dumps fails.
