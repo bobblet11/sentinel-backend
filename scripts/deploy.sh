@@ -13,7 +13,4 @@ echo "==> Tearing down existing services to ensure a clean start..."
 sudo -E docker-compose down
 
 echo "==> Starting services with newly built images..."
-sudo -E docker-compose up --force-recreate -d
-
-echo "==> Deploy complete. Following logs (Ctrl+C to stop)..."
-sudo -E docker-compose logs -f
+sudo -E docker-compose up --force-recreate --build
