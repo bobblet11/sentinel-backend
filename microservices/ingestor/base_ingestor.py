@@ -63,11 +63,11 @@ class BaseIngestor:
             article = unique_articles_map[link]
 
             payload = MessageURLPayload(url=link, source_rss=article.get("source"))
-
             message = Message(
                 header=MessageHeader(
                     message_id=hashlib.md5(link.encode()).hexdigest(),
                     timestamp=datetime.datetime.now().isoformat(),
+                    type="background"
                 ),
                 data=payload,
             )
