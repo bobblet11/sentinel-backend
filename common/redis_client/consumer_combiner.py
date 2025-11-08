@@ -14,7 +14,7 @@ class RedisConsumerCombiner:
     from whichever stream has them available first.
     """
 
-    def __init__(self, streams: List[str], group_name: str):
+    def __init__(self, streams: List[str], group_name: str, consumer_name:str):
         """
         Initializes the RedisConsumerCombiner.
 
@@ -29,7 +29,7 @@ class RedisConsumerCombiner:
 
         self.streams = streams
         self.group_name = group_name
-        self.consumer_name = f"{socket.gethostname()}-{os.getpid()}"
+        self.consumer_name = consumer_name
         
         self.client = redis_connection.get_client()
 

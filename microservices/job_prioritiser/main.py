@@ -1,7 +1,7 @@
 import datetime
 
 from common.models.api.redis_models import Message, MessageHeader, MessageURLPayload
-from .config import INPUT_STREAMS, OUTPUT_STREAM, GROUP_NAME, PRIORITY_MAP, LOWEST_PRIORITY
+from .config import INPUT_STREAMS, OUTPUT_STREAM, GROUP_NAME, PRIORITY_MAP, LOWEST_PRIORITY, CONSUMER_NAME
 from common.redis_client.consumer_combiner import RedisConsumerCombiner
 from common.redis_client.publisher import RedisPublisher
 
@@ -29,7 +29,7 @@ def exec():
     and then processes them one by one.
     """
     print(INPUT_STREAMS)
-    combiner = RedisConsumerCombiner(streams=INPUT_STREAMS, group_name=GROUP_NAME)
+    combiner = RedisConsumerCombiner(streams=INPUT_STREAMS, group_name=GROUP_NAME, consumer_name=CONSUMER_NAME)
     publisher = RedisPublisher(stream_name=OUTPUT_STREAM)
 
     while True:

@@ -2,15 +2,16 @@ import os
 import sys
 from dotenv import load_dotenv
 
-def print_env(INPUT_STREAMS, OUTPUT_STREAM, GROUP_NAME, PRIORITY_MAP):
-	print(f"Group name: {GROUP_NAME}\n\n")
-	print(f"Priority map: {PRIORITY_MAP}\n\n")
-	print("-" * 9)
-	print(INPUT_STREAMS)
-	print("-" * 9)
-	print("    |    \n    V    ")
-	print("-" * 9)
-	print(OUTPUT_STREAM)
+def print_env(CONSUMER_NAME, INPUT_STREAMS, OUTPUT_STREAM, GROUP_NAME, PRIORITY_MAP):
+    print(f"Consumer name {CONSUMER_NAME}")
+    print(f"Group name: {GROUP_NAME}\n\n")
+    print(f"Priority map: {PRIORITY_MAP}\n\n")
+    print("-" * 9)
+    print(INPUT_STREAMS)
+    print("-" * 9)
+    print("    |    \n    V    ")
+    print("-" * 9)
+    print(OUTPUT_STREAM)
 
 load_dotenv()
 
@@ -41,6 +42,12 @@ PRIORITY_MAP = {
 
 LOWEST_PRIORITY = float('inf')
 
-print_env(INPUT_STREAMS, OUTPUT_STREAM, GROUP_NAME, PRIORITY_MAP)
+CONSUMER_NAME = os.getenv("CONSUMER_NAME")
+if not CONSUMER_NAME:
+    print("FATAL: CONSUMER_NAME environment variable is not set. Exiting.")
+    sys.exit(1)
+
+
+print_env(CONSUMER_NAME, INPUT_STREAMS, OUTPUT_STREAM, GROUP_NAME, PRIORITY_MAP)
     
 
