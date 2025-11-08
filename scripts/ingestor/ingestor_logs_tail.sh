@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CONTAINER_NAME="sentinel-backend-ingestor-1"
+CONTAINER_NAME="sentinel-ingestor-service-container"
 
 echo "--- Attempting to tail cron logs from container: $CONTAINER_NAME ---"
 

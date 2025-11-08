@@ -1,15 +1,29 @@
-name: sentinel-env # The name of your conda environment
-channels:
-  - conda-forge
-  - defaults
 dependencies:
-  # --- Core Python ---
-  - python=3.13
+  # --- Application Runtime Dependencies ---
+  - fastapi
+  - pydantic
+  - redis-py 
+  - feedparser
+  - uvicorn 
+  - python-dotenv 
 
   # --- Your Project's PIP Dependencies ---
-  # Conda will use pip to install these
+  - pip
   - pip:
-    - fastapi
-    - redis
-    - pydantic
-    - feedparser
+    # Testing
+    - pytest
+    - pytest-cov
+    - httpx      
+
+    # Code Quality & Formatting
+    - black       # The uncompromising code formatter
+    - black[jupyter]
+    - isort       # Sorts imports automatically
+    - flake8      # A great linter for catching errors
+    - mypy        # For static type checking
+
+    # Debugging & IDE Integration
+    - debugpy   
+
+    # Pre-commit hooks to automate code quality checks
+    - pre-commit

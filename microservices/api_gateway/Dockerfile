@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# Step 1: Start from an official Python base image.
+FROM sentinel/base-image:1.0
 
 WORKDIR /app
 
