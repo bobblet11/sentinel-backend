@@ -96,6 +96,7 @@ services:
       - INPUT_STREAMS=ingestor:to.be.scraped
       - OUTPUT_STREAM=prioritised:to.be.scraped
       - GROUP_NAME=default
+      - CONSUMER_NAME=scraper-prioritiser-1
 
 
   # nlp-prioritiser:  
@@ -104,6 +105,7 @@ services:
   #   environment:
   #     - INPUT_STREAMS=user-nlp-jobs, background-nlp-jobs
   #     - OUTPUT_STREAM=nlp-priority-queue
+  #     - CONSUMER_NAME=scraper-prioritiser-1
 
 volumes:
   redis_data: {}

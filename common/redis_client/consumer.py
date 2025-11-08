@@ -16,7 +16,7 @@ class RedisConsumer:
             consumer_name: name given to redis when a message is consumed from stream.
     """
 
-    def __init__(self, stream_name: str, group_name: str):
+    def __init__(self, stream_name: str, group_name: str, consumer_name:str):
         """
         stream_name (str): The name of the Redis stream to listen to.
         group_name (str): The name of the Redis group to listen to.
@@ -31,7 +31,7 @@ class RedisConsumer:
 
         self.stream_name = stream_name
         self.group_name = group_name
-        self.consumer_name = f"{socket.gethostname()}-{os.getpid()}"
+        self.consumer_name = consumer_name
         self.max_len = 100
         self.client = redis_connection.get_client()
 
