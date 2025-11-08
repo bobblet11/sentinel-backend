@@ -71,19 +71,30 @@ services:
   #   networks:
   #     - sentinel-net
 
-  ingestor-service:
-    container_name: sentinel-ingestor-service-container
-    image: sentinel/ingestor-service:1.0
+  # ingestor-service:
+  #   container_name: sentinel-ingestor-service-container
+  #   image: sentinel/ingestor-service:1.0
+  #   build: 
+  #     context: ../../
+  #     dockerfile: ./microservices/ingestor/Dockerfile
+    
+  #   depends_on:
+  #     # - postgres
+  #     - redis
+
+  web-scraper-service:
+    container_name: sentinel-web-scraper-service-container
+    image: sentinel/web-scraper-service:1.0
     build: 
       context: ../../
-      dockerfile: ./microservices/ingestor/Dockerfile
+      dockerfile: ./microservices/web-scraper/Dockerfile
     
     depends_on:
       # - postgres
       - redis
     
     volumes:
-      - ingestor_service_logs:/var/log
+      - web-scraper_service_logs:/var/log
     <<: *common-env 
     restart: unless-stopped
     networks:
@@ -110,6 +121,7 @@ services:
 volumes:
   redis_data: {}
   ingestor_service_logs: {}
+  web-scraper_service_logs: {}
   db_service_logs: {}
   postgres_data: {}
 
