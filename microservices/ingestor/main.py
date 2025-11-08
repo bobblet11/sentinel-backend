@@ -21,6 +21,6 @@ def exec():
 
 if __name__ == "__main__":
         print(f"\n\nmain.py is being run. It is currently {datetime.datetime.now()}")
-        print(format_sys_stats(get_sys_stats()))
+        # print(format_sys_stats(get_sys_stats()))
         exec()
         print(f"\n\nmain.py is finished. It is currently {datetime.datetime.now()}")
