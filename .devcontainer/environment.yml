@@ -8,10 +8,16 @@ dependencies:
   - python-dotenv 
   - requests
   - beautifulsoup4
+  - user-agents
+
   
   # --- Your Project's PIP Dependencies ---
   - pip
   - pip:
+
+    # Application runtime (pip only)
+    - fake_useragent
+
     # Testing
     - pytest
     - pytest-cov
