@@ -82,12 +82,12 @@ services:
   #     # - postgres
   #     - redis
 
-  web-scraper-service:
+  web_scraper-service:
     container_name: sentinel-web-scraper-service-container
     image: sentinel/web-scraper-service:1.0
     build: 
       context: ../../
-      dockerfile: ./microservices/web-scraper/Dockerfile
+      dockerfile: ./microservices/web_scraper/Dockerfile
     
     depends_on:
       # - postgres
