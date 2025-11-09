@@ -146,7 +146,7 @@ The Sentinel backend consists of several microservices that work together:
 *   **API Gateway** (`microservices/api_gateway/`): Main entry point for external requests
 *   **Database Service** (`microservices/db/`): PostgreSQL operations and data management
 *   **Ingestor** (`microservices/ingestor/`): RSS feed processing and content ingestion
-*   **Web Scraper** (`microservices/web-scraper/`): Content extraction from URLs
+*   **Web Scraper** (`microservices/web_scraper/`): Content extraction from URLs
 *   **NLP Service** (`microservices/nlp/`): Natural language processing and analysis
 
 ### Infrastructure Services
