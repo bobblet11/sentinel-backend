@@ -13,6 +13,9 @@ echo "==> Project root identified as: $PROJECT_ROOT"
 cd "$PROJECT_ROOT"
 echo "==> Changed directory to project root"
 
+echo "==> Removing unused imports and variables"
+autoflake --in-place --recursive --remove-all-unused-imports --remove-unused-variables . --exclude "$EXCLUDE_GLOB"
+
 echo "==> Sorting imports"
 isort . --skip-glob "$EXCLUDE_GLOB"
 
@@ -22,7 +25,7 @@ black . --exclude "$EXCLUDE_REGEX"
 echo "==> Formatting complete."
 
 echo "==> Finding errors in code"
-flake8 . --extend-exclude "$EXCLUDE_GLOB"
+flake8 . --extend-exclude "$EXCLUDE_GLOB" --max-line-length=88 --ignore=E501,E203
 
 echo "==> Checking type hints in code"
 mypy . --exclude "$EXCLUDE_REGEX"

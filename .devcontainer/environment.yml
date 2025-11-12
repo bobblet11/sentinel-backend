@@ -9,11 +9,13 @@ dependencies:
   - requests
   - beautifulsoup4
   - user-agents
-
+  - psutil
   
   # --- Your Project's PIP Dependencies ---
   - pip
   - pip:
+    - types-requests
+    - types-psutil
 
     # Application runtime (pip only)
     - fake_useragent
@@ -24,6 +26,7 @@ dependencies:
     - httpx      
 
     # Code Quality & Formatting
+    - autoflake
     - black       # The uncompromising code formatter
     - black[jupyter]
     - isort       # Sorts imports automatically
