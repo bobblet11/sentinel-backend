@@ -1,5 +1,6 @@
 import datetime
 import json
+import os
 import random
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -8,11 +9,10 @@ from typing import Dict, List, Optional, Set, Tuple
 import requests
 from bs4 import BeautifulSoup
 
-from microservices.web_scraper.config import PROXIFLY_API_KEY
 from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
 
 ONE_DAY_IN_SECONDS = 86400
-
+DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 class ProxyManager:
     """
@@ -41,8 +41,8 @@ class ProxyManager:
         test_url_http: str = "http://httpbin.org/ip",
         test_url_https: str = "https://httpbin.org/ip",
         request_timeout_connect: float = 2.0,
-        request_timeout_read: float = 3.0,
-        max_workers: int = 40,
+        request_timeout_read: float = 2.0,
+        max_workers: int = 100,
     ):
 
         if getattr(self, "_initialized", False):
@@ -67,6 +67,23 @@ class ProxyManager:
             self._refresh_lock = threading.Lock()
             self.datetime_last_fetched: Optional[datetime.datetime] = None
 
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            self.saved_proxies_json_path = os.path.join(script_dir, "proxies.json")
+
+            print("[*] Loading Saved Proxies")
+            with open(self.saved_proxies_json_path, "r") as file:
+                proxies: Dict[str, List[str]] = json.load(file)
+                self.http_proxies=proxies.get("http", set())
+                self.https_proxies=proxies.get("https", set())
+                datetime_str:Optional[str] = proxies.get("datetime_last_fetched", None)
+                
+                if datetime_str:
+                    self.datetime_last_fetched =  datetime.datetime.strptime(datetime_str, DATETIME_FORMAT)
+            print("[*] Validating Loaded Proxies")
+            valid_stored_proxies = self.__validate_proxies(self.http_proxies, self.https_proxies)
+            self.http_proxies = valid_stored_proxies.get("http", set())
+            self.https_proxies = valid_stored_proxies.get("https", set())
+            print(f"[*] Validated!: (http: { len(self.http_proxies)}, https: {len(self.https_proxies)})")
             self._initialized = True
 
     def refresh_now(self) -> None:
@@ -80,20 +97,11 @@ class ProxyManager:
             self.https_proxies.clear()
             self.datetime_last_fetched = None
 
-    def get_proxy(self, protocol: str = "http") -> Optional[str]:
-        protocol = (protocol or "http").lower()
-        if protocol not in ("http", "https"):
-            raise ValueError("protocol must be 'http' or 'https'")
+    def get_proxy(self) -> Optional[str]:
         self.__refresh_proxies_if_needed()
-
-        target_set = self.https_proxies if protocol == "https" else self.http_proxies
-
-        if not target_set:
-            print(
-                f"[!] Could not find any valid {protocol} proxies after attempting a refresh."
-            )
-            return None
-        return random.choice(list(target_set))
+        # if not self.https_proxies:
+        #     print("[!] Could not find any valid HTTPS-capable proxies.")
+        #     return None
 
     def __refresh_proxies_if_needed(self) -> None:
         """
@@ -101,22 +109,27 @@ class ProxyManager:
         This is the core of the state management logic.
         """
 
-        if self.__should_refresh():
-            with self._refresh_lock:
-                # Double-check inside the lock to prevent a race condition
-                if self.__should_refresh():
-                    print(
-                        "[*] Proxy list is empty or stale. Performing a full refresh..."
-                    )
-                    self.__perform_full_refresh()
-                else:
-                    print(
-                        "[*] Refresh was needed, but another thread completed it. Skipping."
-                    )
+        if not self.__should_refresh():
+                print("[*] Refresh not needed.")
+                return
+            
+        with self._refresh_lock:
+            # Double-check inside the lock to prevent a race condition
+            if not self.__should_refresh():
+                print(
+                    "[*] Refresh was needed, but another thread completed it. Skipping."
+                )
+                return
+            
+            print(
+                "[*] Proxy list is empty or stale. Performing a full refresh..."
+            )
+            self.__perform_full_refresh()
+    
 
     def __should_refresh(self) -> bool:
         """Determines if a refresh is required."""
-        is_empty = not self.http_proxies and not self.https_proxies
+        is_empty = len(self.http_proxies) == 0 or len(self.https_proxies) < 5
         if self.datetime_last_fetched:
             age = (datetime.datetime.now() - self.datetime_last_fetched).total_seconds()
             return is_empty or age > self.refresh_interval_seconds
@@ -137,7 +150,7 @@ class ProxyManager:
             return None, None
         if len(items) == 1:
             only = next(iter(items))
-            return only, None
+            return only, only
         pick = random.sample(list(items), 2)
         return pick[0], pick[1]
 
@@ -170,29 +183,22 @@ class ProxyManager:
         )
         new_http.update(tested_proxinet_proxies.get("http", []))
         new_https.update(tested_proxinet_proxies.get("https", []))
-
-        if not new_http and not new_https:
-            print("[!] Could not find any valid bootstrap proxies. Skipping Proxifly.")
-            self.http_proxies = new_http
-            self.https_proxies = new_https
-            self.datetime_last_fetched = datetime.datetime.now()
+        print(f"Total proxies: http={len(new_http)}, https={len(new_https)}")
+        http1, http2 = None, None
+        https1, https2 = None, None
+        if not new_https:
+            print("[!] Enhancing: Could not find any valid bootstrap proxies. Using actual IP on Proxifly.")
+        else:
+            # Finding premium proxies from Proxifly
+            print("[*] Enhancing: Fetching from Proxifly using bootstrap proxy...")
+            # --- For HTTP proxies ---
+            http1, http2 = self.__random_two(new_http)
+            https1, https2 = self.__random_two(new_https)
             print(
-                f"Final Proxy list: http={len(self.http_proxies)}, https={len(self.https_proxies)}"
+                f"Using bootstrapped proxies, \n\tHTTP:  {http1}, {http2}\n\tHTTPS: {https1}, {https2}"
             )
-            return
-
-        # Finding premium proxies from Proxifly
-        print("[*] Enhancing: Fetching from Proxifly using bootstrap proxy...")
-        # --- For HTTP proxies ---
-        http1, http2 = self.__random_two(new_http)
-        https1, https2 = self.__random_two(new_https)
-
-        print(
-            f"Using bootstrapped proxies, \n\tHTTP:  {http1}, {http2}\n\tHTTPS: {https1}, {https2}"
-        )
+            
         untested_proxifly_proxies = self.__fetch_proxifly(
-            quantity=20,
-            format="json",
             proxies_round1=(
                 {"http": http1, "https": https1}
                 if (http1 and https1)
@@ -202,7 +208,7 @@ class ProxyManager:
                 {"http": http2, "https": https2}
                 if (http2 and https2)
                 else {"http": https2, "https": https2} if (https2) else None
-            ),
+            )
         )
 
         print("[*] Enhancing: Validating proxies from Proxifly...")
@@ -212,11 +218,20 @@ class ProxyManager:
         )
         new_http.update(tested_proxifly_proxies.get("http", []))
         new_https.update(tested_proxifly_proxies.get("https", []))
-
+        print(f"Total proxies: http={len(new_http)}, https={len(new_https)}")
         # Updating proxy set
         self.http_proxies = new_http
         self.https_proxies = new_https
         self.datetime_last_fetched = datetime.datetime.now()
+
+        # Saving proxy set
+        with open(self.saved_proxies_json_path, "w") as file:
+            proxies: str = json.dumps(
+                {"http": list(self.http_proxies), "https": list(self.https_proxies), "datetime_last_fetched" : self.datetime_last_fetched.strftime(DATETIME_FORMAT)},
+                indent=4,
+            )
+            file.write(proxies)
+
         print(
             f"Final Proxy list: http={len(self.http_proxies)}, https={len(self.https_proxies)}"
         )
@@ -251,7 +266,7 @@ class ProxyManager:
         proxies = {"http": proxy_norm, "https": proxy_norm}
         url = self.test_url_http if protocol == "http" else self.test_url_https
 
-        try:
+        try:            
             response = requests.get(url, proxies=proxies, timeout=self.timeout)
             response.raise_for_status()
             return proxy_norm
@@ -260,8 +275,6 @@ class ProxyManager:
 
     def __fetch_proxifly(
         self,
-        quantity: int = 20,
-        format: str = "json",
         proxies_round1: Optional[Dict[str, str]] = None,
         proxies_round2: Optional[Dict[str, str]] = None,
     ) -> Dict[str, List[str]]:
@@ -292,42 +305,36 @@ class ProxyManager:
             quantity: 1, // 1 - 20
         };
         """
-
-        proxifly_url = "https://api.proxifly.dev/proxy"
-
+        proxifly_http_url = "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/http/data.txt"
+        proxifly_https_url = "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/https/data.txt"
+        
         def fetch(
-            https_flag: bool, bootstrap_proxies: Optional[Dict[str, str]]
+            url: str, bootstrap_proxies: Optional[Dict[str, str]], http:bool
         ) -> List[str]:
 
-            options = {
-                "format": format,
-                "quantity": max(1, min(20, int(quantity))),
-                "protocol": ["http"],
-                "https": https_flag,
-            }
-
             headers = {
-                "Content-Type": "application/json; charset=utf-8",
-                "Authorization": PROXIFLY_API_KEY,
+                "Content-Type": "text/html; charset=utf-8",
                 "User-Agent": user_agent_manager.get_random_agent(),
             }
+            
             try:
-                response = requests.post(
-                    proxifly_url,
+                response = requests.get(
+                    url,
                     headers=headers,
-                    json=options,
                     proxies=bootstrap_proxies,
-                    timeout=self.timeout,
+                    timeout=(10,10),
                 )
                 # could check for status code here, and set a time for next proxifly fetch
                 response.raise_for_status()
-                data = response.json()
-
-                if not isinstance(data, list):
+                raw_text = response.text
+                
+                if not isinstance(raw_text, str):
                     raise Exception("Garbled data from Proxifly")
-
-                print(f"Proxlify: [+] Successfully fetched {len(data)} HTTP proxies.")
-                return [self.__normalize_proxy(x["proxy"]) for x in data]
+                
+                lines = raw_text.splitlines()
+                proxy_list = [line.strip() for line in lines if line.strip()]
+                print(f"Proxlify: [+] Successfully fetched {len(proxy_list)} { 'HTTP' if http else 'HTTPS' } proxies.")
+                return proxy_list
 
             except requests.exceptions.HTTPError as http_err:
                 print(
@@ -344,11 +351,11 @@ class ProxyManager:
                 print("Proxlify: [!] Failed to decode JSON response for HTTP proxies.")
                 return []
 
-        http_proxies = fetch(False, proxies_round1)
-        https_proxies = fetch(True, proxies_round2)
+        http_proxies = fetch(proxifly_http_url, proxies_round1, http=True)
+        https_proxies = fetch(proxifly_https_url, proxies_round2, http=False)
 
         return {
-            "http": http_proxies + https_proxies,
+            "http": http_proxies,
             "https": https_proxies,
         }
 
@@ -422,14 +429,9 @@ class ProxyManager:
 if __name__ == "__main__":
     proxy_handler = ProxyManager()
 
-    print("--- Getting an HTTP proxy ---")
-    http_proxy = proxy_handler.get_proxy(protocol="http")
+    print("--- Getting a proxy ---")
+    http_proxy = proxy_handler.get_proxy()
     if http_proxy:
-        print(f"\n[SUCCESS] Got HTTP Proxy: {http_proxy}\n")
-
-    print("--- Getting an HTTPS proxy ---")
-    https_proxy = proxy_handler.get_proxy(protocol="https")
-    if https_proxy:
-        print(f"\n[SUCCESS] Got HTTPS Proxy: {https_proxy}\n")
+        print(f"\n[SUCCESS] Got Proxy: {http_proxy}\n")
 
 # proxy_manager = ProxyManager()
