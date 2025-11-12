@@ -40,9 +40,9 @@ class ProxyManager:
         refresh_interval_seconds: int = ONE_DAY_IN_SECONDS,
         test_url_http: str = "http://httpbin.org/ip",
         test_url_https: str = "https://httpbin.org/ip",
-        request_timeout_connect: float = 20,
-        request_timeout_read: float = 20,
-        max_workers: int = 40,
+        request_timeout_connect: float = 12,
+        request_timeout_read: float = 14,
+        max_workers: int = 500,
     ):
 
         if getattr(self, "_initialized", False):
@@ -99,7 +99,7 @@ class ProxyManager:
                     normalized_proxies = [self.__normalize_user_and_pass(p) for p in proxies.get("https", [])]
                     self.https_proxies.update(normalized_proxies)
                     self.webshareio_https_proxies.update(normalized_proxies)
-                    print(f"There are {len(self.https_proxies)} WebShare.io proxies")
+                    print(f"There are {len(self.webshareio_https_proxies)} WebShare.io proxies")
             else:
                 print("[*] No saved webshareio file found; continuing...")
             
