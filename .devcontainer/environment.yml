@@ -6,7 +6,9 @@ dependencies:
   - feedparser
   - uvicorn 
   - python-dotenv 
-  - requests[socks]
+  - requests
+  - pysocks
+
   - beautifulsoup4
   - user-agents
   - psutil
