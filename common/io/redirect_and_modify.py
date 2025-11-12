@@ -1,7 +1,9 @@
 import io
 import sys
-from common.io.utils import indent_with_tab
 from contextlib import redirect_stdout
+
+from common.io.utils import indent_with_tab
+
 
 def redirect_and_modify(string_modification_function=indent_with_tab):
     def decorator(func):

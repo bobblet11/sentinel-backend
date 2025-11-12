@@ -30,8 +30,7 @@ class RedisPublisher:
 
         print(f"Redis publisher initialised and publishing to {stream_name}")
 
-
-    def publish_one(self, message: Dict[str, Any]):
+    def publish_one(self, message: Dict[Any, Any]):
         """
         Serializes a dictionary to JSON and adds it to the stream.
 
@@ -64,12 +63,11 @@ class RedisPublisher:
 
         except Exception as e:
             print(
-                f"Failed to publish message {message.header.message_id} to {self.stream_name}: {e}. Data not published"
+                f"Failed to publish message to {self.stream_name}: {e}. Data not published"
             )
             return None
 
-
-    def publish_many(self, messages: List[Dict[str, Any]]) -> Optional[List[str]]:
+    def publish_many(self, messages: List[Dict[Any, Any]]) -> Optional[List[str]]:
         """
         Serializes messages dictionaries to JSON and adds all to the stream.
 

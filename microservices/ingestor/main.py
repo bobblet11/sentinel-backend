@@ -1,10 +1,10 @@
 import datetime
 import json
 import os
-from microservices.ingestor.rss_ingestor import RssIngestor
-from common.process.monitor import format_sys_stats, get_sys_stats
+
 from common.io.redirect_and_modify import redirect_and_modify
 from common.io.utils import indent_with_tab
+from microservices.ingestor.rss_ingestor import RssIngestor
 
 
 @redirect_and_modify(string_modification_function=indent_with_tab)
@@ -20,7 +20,7 @@ def exec():
 
 
 if __name__ == "__main__":
-        print(f"\n\nmain.py is being run. It is currently {datetime.datetime.now()}")
-        # print(format_sys_stats(get_sys_stats()))
-        exec()
-        print(f"\n\nmain.py is finished. It is currently {datetime.datetime.now()}")
+    print(f"\n\nmain.py is being run. It is currently {datetime.datetime.now()}")
+    # print(format_sys_stats(get_sys_stats()))
+    exec()
+    print(f"\n\nmain.py is finished. It is currently {datetime.datetime.now()}")

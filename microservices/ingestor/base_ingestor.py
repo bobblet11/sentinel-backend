@@ -67,7 +67,7 @@ class BaseIngestor:
                 header=MessageHeader(
                     message_id=hashlib.md5(link.encode()).hexdigest(),
                     timestamp=datetime.datetime.now().isoformat(),
-                    type="background"
+                    type="background",
                 ),
                 data=payload,
             )
@@ -87,7 +87,7 @@ class BaseIngestor:
             return
 
         self.duplicate_filter.add_many(unseen_article_links)
-        print(f"--- Ingestion cycle finished ---")
+        print("--- Ingestion cycle finished ---")
         print(f"\tNew: {unseen}")
         print(f"\tSeen: {total_fetched - unseen}")
         print(f"\tTotal: {total_fetched}")

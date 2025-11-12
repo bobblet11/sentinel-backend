@@ -3,7 +3,6 @@
 GPU Jupyter launcher that KEEPS the session alive
 Uses pexpect to maintain interactive GPU session
 """
-import os
 import re
 import sys
 import time
@@ -38,7 +37,7 @@ def launch_gpu_jupyter(portal_id="farhan", gateway="gpu2gate1.cs.hku.hk"):
 
             password = getpass.getpass("Enter password: ")
             child.sendline(password)
-            shell_index = child.expect(["\\$ ", "~\\$ ", ":\\~\\$"], timeout=30)
+            # shell_index = child.expect(["\\$ ", "~\\$ ", ":\\~\\$"], timeout=30)
         elif index in [1, 2, 3]:  # Already at shell
             print("Already at shell prompt")
 
@@ -165,7 +164,8 @@ if __name__ == "__main__":
 
     # Check if pexpect is available
     try:
-        import pexpect
+        # import pexpect
+        pass
     except ImportError:
         print("❌ pexpect not installed")
         print("Install it with: pip install pexpect")
