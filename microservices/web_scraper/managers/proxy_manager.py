@@ -11,15 +11,9 @@ from bs4 import BeautifulSoup
 
 from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
 
-try:
-    import socks 
-    print("[*] PySocks installed")
-except ImportError:
-    print("[!] PySocks not installed; SOCKS proxies will always fail. Run: pip install pysocks")
-
 ONE_DAY_IN_SECONDS = 86400
 DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
-MIN_HTTPS_SOCKS4_SOCKS5_NUMBER = 10
+MIN_HTTPS_SOCKS4_SOCKS5_NUMBER = 1
 class ProxyManager:
     """
     A thread-safe Singleton class that fetches, validates, and rotates proxies
@@ -46,8 +40,8 @@ class ProxyManager:
         refresh_interval_seconds: int = ONE_DAY_IN_SECONDS,
         test_url_http: str = "http://httpbin.org/ip",
         test_url_https: str = "https://httpbin.org/ip",
-        request_timeout_connect: float = 8.0,
-        request_timeout_read: float = 12.0,
+        request_timeout_connect: float = 20,
+        request_timeout_read: float = 20,
         max_workers: int = 40,
     ):
 
@@ -63,6 +57,7 @@ class ProxyManager:
             self.https_proxies:Set[str] = set()
             self.socks4_proxies:Set[str] = set()
             self.socks5_proxies:Set[str] = set()
+            self.webshareio_https_proxies:Set[str] = set()
             self.usable_proxies:Set[str] = set()
             
             # Config
@@ -95,12 +90,26 @@ class ProxyManager:
                             self.datetime_last_fetched = None
             else:
                 print("[*] No saved proxies file found; starting fresh.")
-                    
+            
+            webshareio_proxies = os.path.join(script_dir, "webshareio_proxies.json")
+            print("[*] Loading WebShare.io Proxies")
+            if os.path.exists(webshareio_proxies):
+                with open(webshareio_proxies, "r") as file:
+                    proxies: Dict[str, List[str]] = json.load(file)
+                    normalized_proxies = [self.__normalize_user_and_pass(p) for p in proxies.get("https", [])]
+                    self.https_proxies.update(normalized_proxies)
+                    self.webshareio_https_proxies.update(normalized_proxies)
+                    print(f"There are {len(self.https_proxies)} WebShare.io proxies")
+            else:
+                print("[*] No saved webshareio file found; continuing...")
+            
             print("[*] Validating Loaded Proxies")
             valid_stored_proxies = self.__validate_proxies(self.https_proxies, self.socks4_proxies, self.socks5_proxies)
             self.https_proxies = valid_stored_proxies.get("https", set())
             self.socks4_proxies = valid_stored_proxies.get("socks4", set())
             self.socks5_proxies = valid_stored_proxies.get("socks5", set())
+            
+
             
             print(f"[*] Validated!:\n\thttps: {len(self.https_proxies)}\n\tsocks4: {len(self.socks4_proxies)}\n\tsocks5: {len(self.socks5_proxies)}")
             self._initialized = True
@@ -122,7 +131,7 @@ class ProxyManager:
         self.__refresh_proxies_if_needed()
 
         if self.usable_proxies:
-            return random.choice(list(self.usable_proxies))
+            return self.__create_proxy_dict(random.choice(list(self.usable_proxies)))
         
         print("[!] Could not find any valid proxies.")
         return None
@@ -161,13 +170,25 @@ class ProxyManager:
         return True
 
     @staticmethod
-    def __normalize_proxy(p: str, scheme: str = "https") -> str:
+    def __normalize_proxy(p: str, scheme: str = "http") -> str:
         p = (p or "").strip()
         if not p:
             return p
         if "://" not in p:
             return f"{scheme}://{p}"
         return p
+    
+    @staticmethod
+    def __create_proxy_dict(proxy_url: str) -> Optional[Dict[str, str]]:
+        """Creates a correctly formatted proxy dictionary for requests."""
+        if not proxy_url:
+            return None
+        return {"http": proxy_url, "https": proxy_url}
+    
+    @staticmethod
+    def __normalize_user_and_pass(p: str) -> str:
+        ip, port, username, password = p.split(':')
+        return ProxyManager.__normalize_proxy(f"{username}:{password}@{ip}:{port}", "http")
 
     @staticmethod
     def __random_two(items: Set[str]) -> Tuple[Optional[str], Optional[str]]:
@@ -216,7 +237,7 @@ class ProxyManager:
         """
 
         print("\n--- Full Proxy Refresh ---")
-        new_https: Set[str] = set()
+        new_https: Set[str] = self.webshareio_https_proxies
         new_socks4: Set[str] = set()
         new_socks5: Set[str] = set()
 
@@ -254,21 +275,9 @@ class ProxyManager:
             )
             
         untested_proxifly_proxies = self.__fetch_proxifly(
-            proxies_round1=(
-                {"http": https1, "https": https1}
-                if (https1)
-                else None
-            ),
-            proxies_round2=(
-                {"http": https2, "https": https2}
-                if (https2)
-                else None
-            ),
-            proxies_round3=(
-                {"http": https3, "https": https3}
-                if (https3)
-                else None
-            )
+            proxies_round1=self.__create_proxy_dict(https1),
+            proxies_round2=self.__create_proxy_dict(https2),
+            proxies_round3=self.__create_proxy_dict(https3)
         )
 
         print("[*] Enhancing: Validating proxies from Proxifly...")
@@ -337,12 +346,14 @@ class ProxyManager:
         return { "https": valid_https, "socks4": valid_socks4, "socks5": valid_socks5}
 
     def __test_proxy(self, proxy: str, protocol: str) -> Optional[str]:
+        
+
         # protocol is one of: "http", "https", "socks4", "socks5"
-        if protocol in ("http", "https"):
+        if protocol == "https":
             # Use http scheme in requests proxy URL even for https-capable HTTP proxies
             proxy_norm = self.__normalize_proxy(proxy, "http")
             proxies = {"http": proxy_norm, "https": proxy_norm}
-            url = self.test_url_http if protocol == "http" else self.test_url_https
+            url = self.test_url_https
         elif protocol == "socks4":
             # requests needs PySocks and scheme socks4://
             proxy_norm = self.__normalize_proxy(proxy, "socks4")
