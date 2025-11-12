@@ -12,4 +12,5 @@ typing_extensions==4.15.0
 beautifulsoup4==4.14.2
 user-agents==0.1.14
 fake-useragent==2.2.0
-requests[socks]
+requests
+pysocks
