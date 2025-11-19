@@ -2,12 +2,17 @@ import datetime
 
 from common.io.redirect_and_modify import redirect_and_modify
 from common.io.utils import indent_with_space
+from microservices.web_scraper.ScraperService import ScraperService
+import signal
 
 
-@redirect_and_modify(string_modification_function=indent_with_space)
 def exec():
-    pass
-
+    scraper_service = ScraperService()
+    
+    signal.signal(signal.SIGINT, scraper_service.shutdown)
+    signal.signal(signal.SIGTERM, scraper_service.shutdown)
+    
+    scraper_service.run()
 
 if __name__ == "__main__":
 
