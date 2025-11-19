@@ -248,7 +248,7 @@ class ProxyManager:
             tasks = []
             for p_type, proxy_set in candidates.items():
                 for proxy in proxy_set:
-                    target_url = random.choice(self.validation_targets)
+                    target_url = random.choice(self.test_urls)
                     tasks.append(executor.submit(self._test_proxy, proxy, p_type, target_url))
 
             # Collect valid results
