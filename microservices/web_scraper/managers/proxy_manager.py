@@ -2,11 +2,12 @@ import datetime
 import os
 import random
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Set, Tuple
 
 import requests
 from microservices.web_scraper.config import PROXY_VALIDATION_MAX_WORKERS
+from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
 from microservices.web_scraper.managers.proxy_class import (
     JsonFileSource,
     ProxiflyHttpSource,
@@ -47,7 +48,7 @@ class ProxyManager:
         self,
         sources: Optional[List[ProxySource]],
         refresh_interval_seconds: int = ONE_DAY_IN_SECONDS,
-        test_url: str = "https://httpbin.org/ip",
+        test_urls: str = ["https://www.bbc.com/news", "https://www.reuters.com/", "https://www.espn.com"],
         timeout: Tuple[float, float] = (10.0, 12.0),
         max_workers: int = PROXY_VALIDATION_MAX_WORKERS,
     ):
@@ -69,7 +70,7 @@ class ProxyManager:
 
             # Config
             self.refresh_interval_seconds = refresh_interval_seconds
-            self.test_url = test_url
+            self.test_urls = test_urls
             self.timeout = timeout
             self.max_workers = max_workers
 
@@ -246,19 +247,19 @@ class ProxyManager:
             # Create a list of (proxy, type) tuples
             tasks = []
             for p_type, proxy_set in candidates.items():
-                tasks.extend([(proxy, p_type) for proxy in proxy_set])
-
-            # Execute all tests
-            results = executor.map(lambda p: self._test_proxy(*p), tasks)
+                for proxy in proxy_set:
+                    target_url = random.choice(self.validation_targets)
+                    tasks.append(executor.submit(self._test_proxy, proxy, p_type, target_url))
 
             # Collect valid results
-            for proxy, p_type in results:
+            for future in as_completed(tasks):
+                proxy, p_type = future.result()
                 if proxy:
                     validated[p_type].add(proxy)
 
         return validated
 
-    def _test_proxy(self, proxy: str, p_type: str) -> Optional[Tuple[str, str]]:
+    def _test_proxy(self, proxy: str, p_type: str, test_url: str) -> Optional[Tuple[str, str]]:
         """Tests a single proxy against the test URL."""
 
         schemes = {"https": "http", "socks4": "socks4", "socks5": "socks5h"}
@@ -269,9 +270,11 @@ class ProxyManager:
         proxy_url = normalize_proxy_scheme(proxy, scheme)
 
         try:
+            headers = {"User-Agent": user_agent_manager.get_random_agent()}
             response = requests.get(
-                self.test_url,
+                test_url,
                 proxies={"http": proxy_url, "https": proxy_url},
+                headers=headers,
                 timeout=self.timeout,
             )
             response.raise_for_status()
