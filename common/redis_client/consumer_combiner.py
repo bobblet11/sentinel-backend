@@ -161,6 +161,49 @@ class RedisConsumerCombiner:
             print(f"An error occurred in RedisConsumerCombiner.consume_many: {e}")
             return all_messages
 
+
+    def consume_pending(
+        self
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Consumes messages that are pending for this specific consumer.
+        This should be called on startup to recover from a previous crash.
+        """
+        
+        try:
+            all_messages: List[Dict[str, Any]] = []
+
+            response = self.client.xreadgroup(
+                self.group_name,
+                self.consumer_name,
+                streams={self.stream_name: "0-0"},
+            )
+
+            if not response:
+                return all_messages
+
+            for stream_name, messages in response:
+                for redis_message_id, fields in messages:
+                    try:
+                        message_dict = self.__decode_one_message(
+                            stream_name, redis_message_id, fields
+                        )
+                        all_messages.append(message_dict)
+                    except json.JSONDecodeError as e:
+                        msg_id_str = redis_message_id
+                        print(
+                            f"CORRUPTED MESSAGE: Skipping message {msg_id_str} due to JSON decode error: {e}"
+                        )
+                        continue
+            return all_messages
+
+        except Exception as e:
+            print(f"Error consuming from stream '{self.stream_name}': {e}")
+            raise
+
+
+
+
     def acknowledge(self, stream_name: str, redis_message_id: str):
         """
         Acknowledges that a message from a specific stream has been processed.
