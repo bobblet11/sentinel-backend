@@ -11,7 +11,6 @@ class RedisConsumer:
     Attributes:
             stream_name (str): The name of the Redis stream used as the queue.
             client: The connected redis-py client instance, managed by the RedisConnection singleton.
-            max_len (int): maximum number of messages in queue before a message is removed (allows for prioritisation of messages)
             group_name: name of group to listen to (like a bookmark)
             consumer_name: name given to redis when a message is consumed from stream.
     """
@@ -32,12 +31,13 @@ class RedisConsumer:
         self.stream_name = stream_name
         self.group_name = group_name
         self.consumer_name = consumer_name
-        self.max_len = 100
         self.client = redis_connection.get_client()
 
         print(
             f"Redis consumer initialised and listening to {stream_name}, group {group_name} under the name {consumer_name}"
         )
+        
+        self._create_group()
 
     def _create_group(self):
         """
@@ -48,7 +48,7 @@ class RedisConsumer:
             # '$' means start reading from the end of the stream (only new messages).
             # MKSTREAM will create the stream if it doesn't exist.
             self.client.xgroup_create(
-                self.stream_name, self.group_name, id="$", mkstream=True
+                self.stream_name, self.group_name, id="0", mkstream=True
             )
             print(
                 f"Created consumer group '{self.group_name}' on stream '{self.stream_name}'."
@@ -90,7 +90,7 @@ class RedisConsumer:
             response = self.client.xreadgroup(
                 self.group_name,
                 self.consumer_name,
-                {self.stream_name: ">"},
+                streams={self.stream_name: ">"},
                 count=1,
                 block=block,
             )
@@ -129,7 +129,7 @@ class RedisConsumer:
             response = self.client.xreadgroup(
                 self.group_name,
                 self.consumer_name,
-                {self.stream_name: ">"},
+                streams={self.stream_name: ">"},
                 count=num_to_consume,
                 block=block,
             )
@@ -156,6 +156,47 @@ class RedisConsumer:
         except Exception as e:
             print(f"Error consuming from stream '{self.stream_name}': {e}")
             raise
+
+    def consume_pending(
+        self
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Consumes messages that are pending for this specific consumer.
+        This should be called on startup to recover from a previous crash.
+        """
+        
+        try:
+            all_messages: List[Dict[str, Any]] = []
+
+            response = self.client.xreadgroup(
+                self.group_name,
+                self.consumer_name,
+                streams={self.stream_name: "0-0"},
+            )
+
+            if not response:
+                return all_messages
+
+            for stream_name, messages in response:
+                for redis_message_id, fields in messages:
+                    try:
+                        message_dict = self.__decode_one_message(
+                            stream_name, redis_message_id, fields
+                        )
+                        all_messages.append(message_dict)
+                    except json.JSONDecodeError as e:
+                        msg_id_str = redis_message_id
+                        print(
+                            f"CORRUPTED MESSAGE: Skipping message {msg_id_str} due to JSON decode error: {e}"
+                        )
+                        continue
+            return all_messages
+
+        except Exception as e:
+            print(f"Error consuming from stream '{self.stream_name}': {e}")
+            raise
+
+
 
     def acknowledge(self, redis_message_id: str):
         """
