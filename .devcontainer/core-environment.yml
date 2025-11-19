@@ -12,3 +12,7 @@ dependencies:
     # --- Core Data Science Libraries ---
   - numpy
   - pandas
+  - pytorch
+  - ipykernel
+  - matplotlib
+  - jupyter
