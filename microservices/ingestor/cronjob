@@ -1,1 +1,2 @@
-0 * * * * PYTHONPATH=/app /usr/local/bin/python3 -m microservices.ingestor.main >> /var/log/cron.log 2>&1
+# The command to run will be provided by a wrapper script 
+0 * * * * /usr/local/bin/python3 -m microservices.ingestor.main >> /var/log/service.log 2>&1

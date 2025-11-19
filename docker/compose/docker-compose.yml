@@ -1,130 +1,161 @@
-version: '3.8'
+  version: '3.8'
 
-x-common-env: &common-env
-  env_file:
-    - ../../.env
+  x-common-env: &common-env
+    env_file:
+      - ../../.env
 
-x-prioritiser-service: &prioritiser-service
-  image: sentinel/job-prioritiser:1.0 
-  build:
-    context: ../../
-    dockerfile: ./microservices/job_prioritiser/Dockerfile
-  depends_on:
-    - redis
-  restart: unless-stopped
-  networks:
-    - sentinel-net
-
-services:
-  # --- INFRASTRUCTURE ---
-  redis:
-    container_name: sentinel-redis-container
-    image: "redis:alpine"
-    ports:
-      - "${REDIS_PORT}:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    networks:
-      - sentinel-net
-
-  # postgres:
-  #   container_name: sentinel-postgres-container
-  #   image: pgvector/pgvector:pg15
-  #   ports:
-  #     - "${POSTGRES_PORT}:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #     - ../../microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #   <<: *common-env
-  #   restart: unless-stopped
-  #   networks:
-  #     - sentinel-net
-  #   command: postgres -c shared_preload_libraries=vector
-
-  # --- MICROSERVICES ---
-  # db-service:
-  #   container_name: sentinel-db-service-container
-  #   image: sentinel/db-service:1.0
-  #   build:
-  #     context: ../../
-  #     dockerfile: ./microservices/db/Dockerfile
-
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_started
-
-  #   volumes:
-  #     - db_service_logs:/var/log
-  #   ports:
-  #     - "${DB_SERVICE_PORT}:8001"
-
-  #   <<: *common-env
-  #   restart: unless-stopped
-  #   networks:
-  #     - sentinel-net
-
-  # ingestor-service:
-  #   container_name: sentinel-ingestor-service-container
-  #   image: sentinel/ingestor-service:1.0
-  #   build: 
-  #     context: ../../
-  #     dockerfile: ./microservices/ingestor/Dockerfile
-    
-  #   depends_on:
-  #     # - postgres
-  #     - redis
-
-  web_scraper-service:
-    container_name: sentinel-web-scraper-service-container
-    image: sentinel/web-scraper-service:1.0
-    build: 
+  x-prioritiser-service: &prioritiser-service
+    image: sentinel/job-prioritiser:1.0 
+    build:
       context: ../../
-      dockerfile: ./microservices/web_scraper/Dockerfile
-    
+      dockerfile: ./microservices/job_prioritiser/Dockerfile
     depends_on:
-      # - postgres
       - redis
-    
-    volumes:
-      - web-scraper_service_logs:/var/log
-    <<: *common-env 
     restart: unless-stopped
     networks:
       - sentinel-net
-    
-  scraper-prioritiser:  
-    <<: [ *common-env, *prioritiser-service ]
-    container_name: sentinel-scraper-prioritiser-service-container
-    environment:
-      - INPUT_STREAMS=ingestor:to.be.scraped
-      - OUTPUT_STREAM=prioritised:to.be.scraped
-      - GROUP_NAME=default
-      - CONSUMER_NAME=scraper-prioritiser-1
+
+  services:
+    # --- INFRASTRUCTURE ---
+    redis:
+      container_name: sentinel-redis-container
+      image: "redis:alpine"
+      ports:
+        - "${REDIS_PORT}:6379"
+      volumes:
+        - redis_data:/data
+      restart: unless-stopped
+      networks:
+        - sentinel-net
+
+    # postgres:
+    #   container_name: sentinel-postgres-container
+    #   image: pgvector/pgvector:pg15
+    #   ports:
+    #     - "${POSTGRES_PORT}:5432"
+    #   volumes:
+    #     - postgres_data:/var/lib/postgresql/data
+    #     - ../../microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    #   healthcheck:
+    #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+    #     interval: 10s
+    #     timeout: 5s
+    #     retries: 5
+    #   <<: *common-env
+    #   restart: unless-stopped
+    #   networks:
+    #     - sentinel-net
+    #   command: postgres -c shared_preload_libraries=vector
+
+    # --- MICROSERVICES ---
+    # db-service:
+    #   container_name: sentinel-db-service-container
+    #   image: sentinel/db-service:1.0
+    #   build:
+    #     context: ../../
+    #     dockerfile: ./microservices/db/Dockerfile
+
+    #   depends_on:
+    #     postgres:
+    #       condition: service_healthy
+    #     redis:
+    #       condition: service_started
+
+    #   volumes:
+    #     - db_service_logs:/var/log
+    #   ports:
+    #     - "${DB_SERVICE_PORT}:8001"
+
+    #   <<: *common-env
+    #   restart: unless-stopped
+    #   networks:
+    #     - sentinel-net
+
+    ingestor-service:
+      container_name: sentinel-ingestor-service-container
+      image: sentinel/ingestor-service:1.0
+      build: 
+        context: ../../
+        dockerfile: ./microservices/ingestor/Dockerfile
+      depends_on:
+        - redis
+
+      volumes:
+        - ingestor_service_logs:/var/log
+      <<: *common-env
+      restart: unless-stopped
+      networks:
+        - sentinel-net
+      environment:
+        - REDIS_DUPLICATE_FILTER_KEY=ingestor:seen.articles
+        - OUTPUT_STREAM=ingestor:to.be.scraped
 
 
-  # nlp-prioritiser:  
-  #   <<: [ *common-env, *prioritiser-service ]
-  #   container_name: sentinel-nlp-prioritiser-service-container
-  #   environment:
-  #     - INPUT_STREAMS=user-nlp-jobs, background-nlp-jobs
-  #     - OUTPUT_STREAM=nlp-priority-queue
-  #     - CONSUMER_NAME=scraper-prioritiser-1
+    scraper-prioritiser:  
+      <<: [ *common-env, *prioritiser-service ]
+      container_name: sentinel-scraper-prioritiser-service-container
+      environment:
+        - INPUT_STREAMS=ingestor:to.be.scraped, user:to.be.scraped
+        - OUTPUT_STREAM=prioritised:to.be.scraped
+        - GROUP_NAME=default
+        - CONSUMER_NAME=scraper-prioritiser-1
+        - BATCH_SIZE=10
+        - MAX_WORKERS=40
+      depends_on:
+        - ingestor-service
+      volumes:
+        - scraper-prioritiser_service_logs:/var/log
 
-volumes:
-  redis_data: {}
-  ingestor_service_logs: {}
-  web-scraper_service_logs: {}
-  db_service_logs: {}
-  postgres_data: {}
 
-networks:
-  sentinel-net:
-    driver: bridge
+        
+    web_scraper-service:
+      container_name: sentinel-web-scraper-service-container
+      image: sentinel/web-scraper-service:1.0
+      build: 
+        context: ../../
+        dockerfile: ./microservices/web_scraper/Dockerfile
+      
+      depends_on:
+        # - postgres
+        - redis
+        - ingestor-service
+        - scraper-prioritiser
+      
+      volumes:
+        - web-scraper_service_logs:/var/log
+
+      <<: *common-env 
+      restart: unless-stopped
+      networks:
+        - sentinel-net
+
+      environment:
+        - INPUT_STREAM=prioritised:to.be.scraped
+        - USER_OUTPUT_STREAM=user:to.be.nlp
+        - BACKGROUND_OUTPUT_STREAM=background:to.be.nlp
+        - FAILURE_OUTPUT_STREAM=failure:to.be.scraped
+        - BATCH_SIZE=10
+        - GROUP_NAME=default
+        - CONSUMER_NAME=web-scraper-1
+        - SCRAPER_MAX_WORKERS=100
+        - PROXY_VALIDATION_MAX_WORKERS=100
+      
+    # nlp-prioritiser:  
+    #   <<: [ *common-env, *prioritiser-service ]
+    #   container_name: sentinel-nlp-prioritiser-service-container
+    #   environment:
+    #     - INPUT_STREAMS=user-nlp-jobs, background-nlp-jobs
+    #     - OUTPUT_STREAM=nlp-priority-queue
+    #     - CONSUMER_NAME=scraper-prioritiser-1
+
+  volumes:
+    redis_data: {}
+    ingestor_service_logs: {}
+    scraper-prioritiser_service_logs: {}
+    web-scraper_service_logs: {}
+    db_service_logs: {}
+    postgres_data: {}
+
+  networks:
+    sentinel-net:
+      driver: bridge
