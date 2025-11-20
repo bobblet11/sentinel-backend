@@ -92,54 +92,54 @@
         - REDIS_DUPLICATE_FILTER_KEY=ingestor:seen.articles
         - OUTPUT_STREAM=ingestor:to.be.scraped
 
-    scraper-prioritiser:  
-      <<: [ *common-env, *prioritiser-service ]
-      container_name: sentinel-scraper-prioritiser-service-container
-      environment:
-        - INPUT_STREAMS=ingestor:to.be.scraped, user:to.be.scraped
-        - OUTPUT_STREAM=prioritised:to.be.scraped
-        - GROUP_NAME=default
-        - CONSUMER_NAME=scraper-prioritiser-1
-        - BATCH_SIZE=10
-        - MAX_WORKERS=40
-      depends_on:
-        - ingestor-service
-      volumes:
-        - scraper-prioritiser_service_logs:/var/log
+    # scraper-prioritiser:  
+    #   <<: [ *common-env, *prioritiser-service ]
+    #   container_name: sentinel-scraper-prioritiser-service-container
+    #   environment:
+    #     - INPUT_STREAMS=ingestor:to.be.scraped, user:to.be.scraped
+    #     - OUTPUT_STREAM=prioritised:to.be.scraped
+    #     - GROUP_NAME=default
+    #     - CONSUMER_NAME=scraper-prioritiser-1
+    #     - BATCH_SIZE=100
+    #     - MAX_WORKERS=10
+    #   depends_on:
+    #     - ingestor-service
+    #   volumes:
+    #     - scraper-prioritiser_service_logs:/var/log
 
 
         
-    web_scraper-service:
-      container_name: sentinel-web-scraper-service-container
-      image: sentinel/web-scraper-service:latest
-      build: 
-        context: ../../
-        dockerfile: ./microservices/web_scraper/Dockerfile
+    # web_scraper-service:
+    #   container_name: sentinel-web-scraper-service-container
+    #   image: sentinel/web-scraper-service:latest
+    #   build: 
+    #     context: ../../
+    #     dockerfile: ./microservices/web_scraper/Dockerfile
       
-      depends_on:
-        # - postgres
-        - redis
-        - ingestor-service
-        - scraper-prioritiser
+    #   depends_on:
+    #     # - postgres
+    #     - redis
+    #     - ingestor-service
+    #     - scraper-prioritiser
       
-      volumes:
-        - web-scraper_service_logs:/var/log
+    #   volumes:
+    #     - web-scraper_service_logs:/var/log
 
-      <<: *common-env 
-      restart: unless-stopped
-      networks:
-        - sentinel-net
+    #   <<: *common-env 
+    #   restart: unless-stopped
+    #   networks:
+    #     - sentinel-net
 
-      environment:
-        - INPUT_STREAM=prioritised:to.be.scraped
-        - USER_OUTPUT_STREAM=user:to.be.nlp
-        - BACKGROUND_OUTPUT_STREAM=background:to.be.nlp
-        - FAILURE_OUTPUT_STREAM=failure:to.be.scraped
-        - BATCH_SIZE=10
-        - GROUP_NAME=default
-        - CONSUMER_NAME=web-scraper-1
-        - SCRAPER_MAX_WORKERS=100
-        - PROXY_VALIDATION_MAX_WORKERS=100
+    #   environment:
+    #     - INPUT_STREAM=prioritised:to.be.scraped
+    #     - USER_OUTPUT_STREAM=user:to.be.nlp
+    #     - BACKGROUND_OUTPUT_STREAM=background:to.be.nlp
+    #     - FAILURE_OUTPUT_STREAM=failure:to.be.scraped
+    #     - BATCH_SIZE=50
+    #     - GROUP_NAME=default
+    #     - CONSUMER_NAME=web-scraper-1
+    #     - SCRAPER_MAX_WORKERS=5
+    #     - PROXY_VALIDATION_MAX_WORKERS=100
       
     # nlp-prioritiser:  
     #   <<: [ *common-env, *prioritiser-service ]
