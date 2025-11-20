@@ -73,7 +73,7 @@ class FetchManager:
         This method is wrapped by a retry decorator. It is responsible for
         a SINGLE fetch attempt and for reporting bad proxies.
         """
-        proxies = proxy_manager.get_random_proxy()
+        proxies = proxy_manager.get_next_proxy()
         if not proxies:
             raise RequestException("No proxies available in the pool.")
 
@@ -85,7 +85,9 @@ class FetchManager:
             response = requests.get(
                 url, headers=headers, proxies=proxies, timeout=self.timeout
             )
+ 
             response.raise_for_status()
+            
             print(f"[SUCCESS] Successfully fetched {url}")
             return response.text
 
