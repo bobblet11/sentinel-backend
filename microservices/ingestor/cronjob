@@ -1,2 +1,2 @@
 # The command to run will be provided by a wrapper script 
-0 * * * * root /app/microservices/ingestor/run-ingestor.sh >> /var/log/service.log 2>&1
+* * * * * PYTHONPATH=/app /usr/local/bin/python3 -m microservices.ingestor.main >> /var/log/service.log 2>&1

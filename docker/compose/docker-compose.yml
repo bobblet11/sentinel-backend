@@ -5,7 +5,7 @@
       - ../../.env
 
   x-prioritiser-service: &prioritiser-service
-    image: sentinel/job-prioritiser:1.0 
+    image: sentinel/job-prioritiser:latest
     build:
       context: ../../
       dockerfile: ./microservices/job_prioritiser/Dockerfile
@@ -50,7 +50,7 @@
     # --- MICROSERVICES ---
     # db-service:
     #   container_name: sentinel-db-service-container
-    #   image: sentinel/db-service:1.0
+    #   image: sentinel/db-service:latest
     #   build:
     #     context: ../../
     #     dockerfile: ./microservices/db/Dockerfile
@@ -73,7 +73,7 @@
 
     ingestor-service:
       container_name: sentinel-ingestor-service-container
-      image: sentinel/ingestor-service:1.0
+      image: sentinel/ingestor-service:latest
       build: 
         context: ../../
         dockerfile: ./microservices/ingestor/Dockerfile
@@ -82,14 +82,15 @@
 
       volumes:
         - ingestor_service_logs:/var/log
+
       <<: *common-env
       restart: unless-stopped
       networks:
         - sentinel-net
+
       environment:
         - REDIS_DUPLICATE_FILTER_KEY=ingestor:seen.articles
         - OUTPUT_STREAM=ingestor:to.be.scraped
-
 
     scraper-prioritiser:  
       <<: [ *common-env, *prioritiser-service ]
@@ -110,7 +111,7 @@
         
     web_scraper-service:
       container_name: sentinel-web-scraper-service-container
-      image: sentinel/web-scraper-service:1.0
+      image: sentinel/web-scraper-service:latest
       build: 
         context: ../../
         dockerfile: ./microservices/web_scraper/Dockerfile
