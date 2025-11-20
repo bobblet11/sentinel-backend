@@ -45,8 +45,7 @@ class PrioritiserService:
         """
 
         def get_priority(message):
-            message_type = message.get("header", {}).get("type")
-            print(message_type)
+            message_type = message.get("data", {}).get("header", {}).get("type")
             return PRIORITY_MAP.get(message_type, LOWEST_PRIORITY)
 
         return sorted(messages, key=get_priority)
