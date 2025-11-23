@@ -31,10 +31,10 @@ class ProxiflyHttpSource(HttpProxySource):
         https = self._fetch_from_url(
             f"{self.BASE_URL}/https/data.txt", bootstrap_proxies, line_parser
         )
-        socks4 = self._fetch_from_url(
-            f"{self.BASE_URL}/socks4/data.txt", bootstrap_proxies, line_parser
-        )
+        # socks4 = self._fetch_from_url(
+        #     f"{self.BASE_URL}/socks4/data.txt", bootstrap_proxies, line_parser
+        # )
         socks5 = self._fetch_from_url(
             f"{self.BASE_URL}/socks5/data.txt", bootstrap_proxies, line_parser
         )
-        return {"https": https, "socks4": socks4, "socks5": socks5}
+        return {"https": https, "socks4": [], "socks5": socks5}
