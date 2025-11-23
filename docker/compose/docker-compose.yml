@@ -135,10 +135,10 @@
         - USER_OUTPUT_STREAM=user:to.be.nlp
         - BACKGROUND_OUTPUT_STREAM=background:to.be.nlp
         - FAILURE_OUTPUT_STREAM=failure:to.be.scraped
-        - BATCH_SIZE=50
+        - BATCH_SIZE=1
         - GROUP_NAME=default
         - CONSUMER_NAME=web-scraper-1
-        - SCRAPER_MAX_WORKERS=5
+        - SCRAPER_MAX_WORKERS=1
         - PROXY_VALIDATION_MAX_WORKERS=400
       
     # nlp-prioritiser:  

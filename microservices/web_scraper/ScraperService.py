@@ -16,7 +16,7 @@ from microservices.web_scraper.config import (
     USER_OUTPUT_STREAM,
 )
 from microservices.web_scraper.managers.fetch_manager import fetch_manager
-
+from microservices.web_scraper.managers.parse_manager import parse_manager
 
 class ScraperService:
     """ """
@@ -136,7 +136,7 @@ class ScraperService:
             print(f"  [ERROR] Worker failed for message {redis_msg_id}: {e}")
             raise e
 
-    def _attempt_fetch_article(self, message):
+    def _attempt_fetch_article(self, message:Dict[str,Any]):
 
         try:
             url = message.get("data", {}).get("data", {}).get("url", None)
@@ -146,11 +146,25 @@ class ScraperService:
             page_html = fetch_manager.fetch_article_html(url)
             print(f"-> SUCCESS: Received HTML for {url}, length: {len(page_html)}")
             updated_message = message.copy()
-            updated_message["data"]["payload"]["html"] = page_html
+            updated_message["data"]["data"]["html"] = page_html
             return updated_message
         except Exception:
             print(f"\n[!!!] ULTIMATE FAILURE to fetch {url} after all retries.")
             return None
 
     def _attempt_parse_article(self, message):
-        return message
+        try:
+            url = message.get("data", {}).get("data", {}).get("url", None)
+            html = message.get("data", {}).get("data",{}).get("html", None)
+            if not url or not html:
+                print(message)
+            print(f"Attemping to parse {url}")
+            
+            parse_content = parse_manager.parse_article_html(html, url)
+            print(f"-> SUCCESS: Parsed text for {url}, length: {len(parse_content)}")
+            updated_message = message.copy()
+            updated_message["data"]["data"]["parsed"] = parse_content
+            return updated_message
+        except Exception:
+            print(f"\n[!!!] ULTIMATE FAILURE to parse {url} after all retries.")
+            return None
