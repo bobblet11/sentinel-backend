@@ -8,15 +8,21 @@ from typing import Dict, List, Optional, Set, Tuple
 import requests
 
 from microservices.web_scraper.config import PROXY_VALIDATION_MAX_WORKERS
-from microservices.web_scraper.managers.proxy_class import (
-    JsonFileSource,
-    ProxiflyHttpSource,
-    ProxiNetHttpSource,
+from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
+from microservices.web_scraper.proxy_sources.base_classes import (
     ProxySource,
-    WebshareIOFileSource,
     normalize_proxy_scheme,
 )
-from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
+from microservices.web_scraper.proxy_sources.file_based.json_file import JsonFileSource
+from microservices.web_scraper.proxy_sources.file_based.webshareio_file import (
+    WebshareIOFileSource,
+)
+from microservices.web_scraper.proxy_sources.web_based.proxifly_http import (
+    ProxiflyHttpSource,
+)
+from microservices.web_scraper.proxy_sources.web_based.proxinet_http import (
+    ProxiNetHttpSource,
+)
 
 ONE_DAY_IN_SECONDS = 86400
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -54,7 +60,7 @@ class ProxyManager:
             "https://www.reuters.com/",
             "https://www.espn.com",
         ],
-        timeout: Tuple[float, float] = (10.0, 12.0),
+        timeout: Tuple[float, float] = (5.0, 7.0),
         max_workers: int = PROXY_VALIDATION_MAX_WORKERS,
     ):
 
@@ -64,8 +70,8 @@ class ProxyManager:
         with self._init_lock:
             if getattr(self, "_initialized", False):
                 return
-
-            print("Initializing ProxyManager state for the first time...")
+            self.name = type(self).__name__
+            print(f"Initializing [{self.name}] state for the first time...")
 
             # --- State ---
             self.proxies: ProxyDict = {"https": set(), "socks4": set(), "socks5": set()}
@@ -74,26 +80,27 @@ class ProxyManager:
             self.rotate_index: int = 0
 
             # Config
-            self.refresh_interval_seconds = refresh_interval_seconds
-            self.test_urls = test_urls
-            self.timeout = timeout
-            self.max_workers = max_workers
+            self.refresh_interval_seconds: int = refresh_interval_seconds
+            self.test_urls: List[str] = test_urls
+            self.timeout: Tuple[float, float] = timeout
+            self.max_workers: int = max_workers
 
             # Concurrency
-            self._refresh_lock = threading.Lock()
+            self._refresh_lock: threading.Lock = threading.Lock()
 
             # --- Dependency Injection for Sources ---
-            script_dir = os.path.dirname(os.path.abspath(__file__))
+            script_dir: str = os.path.dirname(os.path.abspath(__file__))
+            file_sources_dir: str = os.path.join(script_dir, "..", "proxy_sources")
 
-            self.saved_json_source = JsonFileSource(
-                "Saved Proxies", os.path.join(script_dir, "saved_proxies.json")
+            self.saved_json_source: JsonFileSource = JsonFileSource(
+                "Saved Proxies", os.path.join(file_sources_dir, "saved_proxies.json")
             )
-            self.saved_webshareio_source = WebshareIOFileSource(
-                os.path.join(script_dir, "webshareio_proxies.json")
+            self.saved_webshareio_source: WebshareIOFileSource = WebshareIOFileSource(
+                os.path.join(file_sources_dir, "webshareio_proxies.json")
             )
 
             if sources is None:
-                self.sources = [
+                self.sources: List[ProxySource] = [
                     ProxiNetHttpSource(timeout=self.timeout),
                     ProxiflyHttpSource(timeout=self.timeout),
                 ]
@@ -103,15 +110,15 @@ class ProxyManager:
             self._load_and_validate_initial_proxies()
             self._perform_full_refresh()
             self._initialized = True
-            print("[*] ProxyManager Initialisation complete!")
+            print(f"[*] {self.name} Initialisation complete!")
 
     def _load_and_validate_initial_proxies(self):
         """Loads proxies from the persistent cache and validates them on startup."""
-        print("[*] Loading and validating saved proxies...")
-        saved_proxies = self.saved_json_source.get_proxies()
-        saved_webshareio_https_proxies = self.saved_webshareio_source.get_proxies()[
-            "https"
-        ]
+        print("[*] Loading saved proxies...")
+        saved_proxies: ProxyDict = self.saved_json_source.get_proxies()
+        saved_webshareio_https_proxies: ProxyDict = (
+            self.saved_webshareio_source.get_proxies()["https"]
+        )
         # Convert lists to sets for validation
         candidates = {
             "https": set(saved_proxies.get("https", [])),
@@ -120,8 +127,8 @@ class ProxyManager:
         }
 
         candidates["https"].update(saved_webshareio_https_proxies)
-
-        self.proxies = self._validate_proxies(candidates)
+        print("[*] Validating saved proxies...")
+        self.proxies: ProxyDict = self._validate_proxies(candidates)
         self._log_proxy_counts("Validated saved proxies")
         return
 
@@ -148,7 +155,7 @@ class ProxyManager:
             print("[!] CRITICAL: No usable proxies available after refresh attempt.")
             return None
 
-        chosen_proxy = random.choice(list(all_usable_proxies))
+        chosen_proxy: str = random.choice(list(all_usable_proxies))
         return self._create_proxy_dict(chosen_proxy)
 
     def get_next_proxy(self) -> ProxyRequestDict:
@@ -248,22 +255,50 @@ class ProxyManager:
         """Tests proxies concurrently and returns a dictionary of valid ones."""
         validated: ProxyDict = {"https": set(), "socks4": set(), "socks5": set()}
 
+        # --- IMPROVEMENT: Setup for progress bar ---
+
+        progress_lock = threading.Lock()
+        completed_count = 0
+        tasks_to_submit = []
+
+        for p_type, proxy_set in candidates.items():
+            for proxy in proxy_set:
+                tasks_to_submit.append((proxy, p_type))
+
+        total_tasks = len(tasks_to_submit)
+        if total_tasks == 0:
+            print("[*] No new proxies to validate.")
+            return validated
+
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            # Create a list of (proxy, type) tuples
-            tasks = []
-            for p_type, proxy_set in candidates.items():
-                for proxy in proxy_set:
-                    target_url = random.choice(self.test_urls)
-                    tasks.append(
-                        executor.submit(self._test_proxy, proxy, p_type, target_url)
-                    )
+            futures = []
 
-            # Collect valid results
-            for future in as_completed(tasks):
-                proxy, p_type = future.result()
-                if proxy:
-                    validated[p_type].add(proxy)
+            for proxy, p_type in tasks_to_submit:
+                target_url = random.choice(self.test_urls)
+                future = executor.submit(self._test_proxy, proxy, p_type, target_url)
+                futures.append(future)
 
+            for future in as_completed(futures):
+                with progress_lock:
+                    completed_count += 1
+
+                # Get the result from the completed future
+                proxy_result, p_type_result = future.result()
+                if proxy_result:
+                    validated[p_type_result].add(proxy_result)
+
+                # --- Dynamic progress printing ---
+                progress = (completed_count / total_tasks) * 100
+                working_count = (
+                    len(validated["https"])
+                    + len(validated["socks4"])
+                    + len(validated["socks5"])
+                )
+                print(
+                    f"\r[*] Validating: {completed_count}/{total_tasks} ({progress:.2f}%) | Found: {working_count}"
+                )
+
+        print("\n[*] Validation finished.")
         return validated
 
     def _test_proxy(
@@ -320,6 +355,6 @@ class ProxyManager:
         return {"http": proxy_url, "https": proxy_url}
 
 
-proxinet_source = ProxiNetHttpSource("ProxiNetHttpSource", timeout=(20, 22))
-proxifly_source = ProxiflyHttpSource("ProxiflyHttpSource", timeout=(20, 22))
+proxinet_source = ProxiNetHttpSource("ProxiNetHttpSource", timeout=(20.0, 22.0))
+proxifly_source = ProxiflyHttpSource("ProxiflyHttpSource", timeout=(20.0, 22.0))
 proxy_manager = ProxyManager(sources=[proxinet_source, proxifly_source])

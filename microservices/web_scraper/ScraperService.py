@@ -25,6 +25,7 @@ class ScraperService:
 
     def __init__(self):
         print("Initializing Redis clients...")
+        self.name = type(self).__name__
         self.consumer = RedisConsumer(INPUT_STREAM, GROUP_NAME, CONSUMER_NAME)
         self.successful_publisher = RedisPublisherRouter(
             routing_key="type", routing_map=self.routing_map
@@ -65,7 +66,7 @@ class ScraperService:
                 print(f"--> Fetched {len(messages)} messages. Processing...")
                 self.process_messages(executor, messages)
 
-        print("SHUTTING DOWN")
+        print(f"[{self.name}] SHUTTING DOWN")
 
     def shutdown(self, signum, frame):
         """Signal handler to initiate a graceful shutdown."""

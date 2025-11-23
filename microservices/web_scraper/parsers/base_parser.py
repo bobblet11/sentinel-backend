@@ -56,7 +56,7 @@ class BaseParser:
                 tag.decompose()
             except Exception:
                 pass
-        # remove comments
+
         for c in container(text=lambda t: isinstance(t, Comment)):
             try:
                 c.extract()

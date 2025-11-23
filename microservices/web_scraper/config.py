@@ -74,17 +74,19 @@ PRIORITY_MAP = {
 
 LOWEST_PRIORITY: Optional[float] = float("inf")
 
-BATCH_SIZE: int = int(os.getenv("BATCH_SIZE"))
+BATCH_SIZE: Optional[int] = int(os.getenv("BATCH_SIZE"))
 if not BATCH_SIZE:
     print("FATAL: BATCH_SIZE environment variable is not set. Exiting.")
     sys.exit(1)
 
-SCRAPER_MAX_WORKERS: int = int(os.getenv("SCRAPER_MAX_WORKERS"))
+SCRAPER_MAX_WORKERS: Optional[int] = int(os.getenv("SCRAPER_MAX_WORKERS"))
 if not SCRAPER_MAX_WORKERS:
     print("FATAL: SCRAPER_MAX_WORKERS environment variable is not set. Exiting.")
     sys.exit(1)
 
-PROXY_VALIDATION_MAX_WORKERS: int = int(os.getenv("SCRAPER_MAX_WORKERS"))
+PROXY_VALIDATION_MAX_WORKERS: Optional[int] = int(
+    os.getenv("PROXY_VALIDATION_MAX_WORKERS")
+)
 if not PROXY_VALIDATION_MAX_WORKERS:
     print(
         "FATAL: PROXY_VALIDATION_MAX_WORKERS environment variable is not set. Exiting."

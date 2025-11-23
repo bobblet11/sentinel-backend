@@ -1,31 +1,32 @@
+# washington_scraper.py
+import re
 from typing import Dict, Optional
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
-from ..base_parser import BaseParser
+from microservices.web_scraper.parsers.base_parser import BaseParser
+
+# Washington Post
 
 
-class WSJScraper(BaseParser):
+class WpParser(BaseParser):
     def matches(self, url: str) -> bool:
         try:
             net = urlparse(url).netloc.lower()
-            return (
-                "wsj.com" in net
-                or "dowjones" in net
-                or "feeds.content.dowjones.io" in net
-            )
+            return "washingtonpost.com" in net or "feeds.washingtonpost.com" in net
         except Exception:
             return False
 
     def extract(self, soup: BeautifulSoup, url: str) -> Optional[Dict]:
-        # WSJ uses article tags and .wsj-article-body etc.
+        # WashingtonPost uses div[data-test-id="article-body"] or article tag
         container = (
-            soup.find("div", {"id": "article-content"}) or soup.find("article") or soup
+            soup.find("div", {"data-test-id": "article-body"})
+            or soup.find("article")
+            or soup
         )
         self._remove_unwanted(container)
 
-        # paragraphs (some WSJ pages use .article-content p)
         paragraphs = container.find_all("p")
         text = self._clean_paragraphs(paragraphs)
         if not text:
@@ -43,19 +44,26 @@ class WSJScraper(BaseParser):
 
         # author
         author = None
-        meta_author = soup.find("meta", {"name": "author"})
-        if meta_author and meta_author.get("content"):
-            author = meta_author["content"]
+        author_meta = soup.find("meta", {"name": "author"})
+        if author_meta and author_meta.get("content"):
+            author = author_meta["content"].strip()
+        if not author:
+            # look for byline
+            by = soup.find(class_=re.compile(r"(author|byline)", re.I))
+            if by:
+                author = by.get_text(strip=True)
 
         # date
         published_at = None
         meta_date = soup.find(
             "meta", {"property": "article:published_time"}
-        ) or soup.find("time")
+        ) or soup.find("meta", {"name": "date"})
         if meta_date and meta_date.get("content"):
-            published_at = meta_date["content"]
-        elif meta_date and meta_date.get("datetime"):
-            published_at = meta_date["datetime"]
+            published_at = meta_date["content"].strip()
+        if not published_at:
+            t = soup.find("time")
+            if t and t.get("datetime"):
+                published_at = t["datetime"]
 
         return {
             "title": title,
