@@ -1,10 +1,12 @@
+import json
+import re
+from typing import Any, Dict, Optional
+
 import trafilatura
 from bs4 import BeautifulSoup
-import re
-import json
-from typing import Optional, Dict, Any
 
 from .scraper_registry import ScraperRegistry
+
 
 class ParseManager:
     """
@@ -18,7 +20,12 @@ class ParseManager:
     def __init__(self):
         self.registry = ScraperRegistry()
 
-    def parse_article_html(self, html: str, url: Optional[str] = None, rss_meta: Optional[Dict[str, Any]] = None) -> Dict:
+    def parse_article_html(
+        self,
+        html: str,
+        url: Optional[str] = None,
+        rss_meta: Optional[Dict[str, Any]] = None,
+    ) -> Dict:
         """
         html: raw HTML string
         url: optional; used to select hardcoded scrapers
@@ -33,7 +40,7 @@ class ParseManager:
                 "title": rss_meta.get("title"),
                 "text": rss_meta.get("content") or rss_meta.get("description"),
                 "author": rss_meta.get("author") or rss_meta.get("creator"),
-                "published_at": rss_meta.get("published") or rss_meta.get("pubDate")
+                "published_at": rss_meta.get("published") or rss_meta.get("pubDate"),
             }
             # If RSS contains full content, return
             if out.get("text") and len(out["text"].strip()) > 100:
@@ -70,12 +77,14 @@ class ParseManager:
             "title": self._extract_title(html),
             "text": text,
             "author": self._extract_author(html),
-            "published_at": self._extract_date(html)
+            "published_at": self._extract_date(html),
         }
 
     def _extract_with_trafilatura(self, html: str) -> Optional[str]:
         try:
-            text = trafilatura.extract(html, include_comments=False, include_tables=False)
+            text = trafilatura.extract(
+                html, include_comments=False, include_tables=False
+            )
             if text:
                 print("[ParseManager] Using Trafilatura extraction")
             return text
@@ -89,13 +98,31 @@ class ParseManager:
         # prefer article or main
         container = soup.find(["article", "main"]) or soup
         # remove elements likely to be noise
-        for tag in container(["script", "style", "noscript", "header", "footer", "svg", "meta", "aside", "nav", "iframe", "figure"]):
+        for tag in container(
+            [
+                "script",
+                "style",
+                "noscript",
+                "header",
+                "footer",
+                "svg",
+                "meta",
+                "aside",
+                "nav",
+                "iframe",
+                "figure",
+            ]
+        ):
             try:
                 tag.decompose()
             except Exception:
                 pass
         # extract paragraph text only
-        paragraphs = [p.get_text(strip=True) for p in container.find_all("p") if p.get_text(strip=True)]
+        paragraphs = [
+            p.get_text(strip=True)
+            for p in container.find_all("p")
+            if p.get_text(strip=True)
+        ]
         return "\n\n".join(paragraphs)
 
     def _extract_title(self, html: str) -> Optional[str]:
@@ -119,7 +146,7 @@ class ParseManager:
         patterns = [
             {"name": "meta", "attrs": {"name": "author"}},
             {"name": "meta", "attrs": {"property": "article:author"}},
-            {"name": "meta", "attrs": {"property": "og:author"}}
+            {"name": "meta", "attrs": {"property": "og:author"}},
         ]
         for p in patterns:
             tag = soup.find(p["name"], p["attrs"])
@@ -143,7 +170,7 @@ class ParseManager:
             {"name": "pubdate"},
             {"name": "publishdate"},
             {"name": "timestamp"},
-            {"property": "og:updated_time"}
+            {"property": "og:updated_time"},
         ]
         for attrs in date_tags:
             tag = soup.find("meta", attrs=attrs)

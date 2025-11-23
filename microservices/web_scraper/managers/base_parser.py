@@ -1,7 +1,8 @@
+from typing import Dict, Optional
+
 from bs4 import BeautifulSoup
 from bs4.element import Comment
-from typing import Dict, Optional
-import re
+
 
 class BaseParser:
     """
@@ -36,7 +37,21 @@ class BaseParser:
 
     @staticmethod
     def _remove_unwanted(container):
-        for tag in container(["script", "style", "noscript", "header", "footer", "svg", "meta", "aside", "nav", "iframe", "figure"]):
+        for tag in container(
+            [
+                "script",
+                "style",
+                "noscript",
+                "header",
+                "footer",
+                "svg",
+                "meta",
+                "aside",
+                "nav",
+                "iframe",
+                "figure",
+            ]
+        ):
             try:
                 tag.decompose()
             except Exception:

@@ -161,15 +161,12 @@ class RedisConsumerCombiner:
             print(f"An error occurred in RedisConsumerCombiner.consume_many: {e}")
             return all_messages
 
-
-    def consume_pending(
-        self
-    ) -> Optional[List[Dict[str, Any]]]:
+    def consume_pending(self) -> Optional[List[Dict[str, Any]]]:
         """
         Consumes messages that are pending for this specific consumer.
         This should be called on startup to recover from a previous crash.
         """
-        
+
         try:
             all_messages: List[Dict[str, Any]] = []
 
@@ -200,9 +197,6 @@ class RedisConsumerCombiner:
         except Exception as e:
             print(f"Error consuming from stream '{self.stream_name}': {e}")
             raise
-
-
-
 
     def acknowledge(self, stream_name: str, redis_message_id: str):
         """

@@ -244,11 +244,15 @@ class ProxiflyHttpSource(HttpProxySource):
 
     def get_proxies(self, bootstrap_proxies: ProxyRequestDict = None) -> ProxyDict:
         """Fetches HTTPS, SOCKS4, and SOCKS5 proxies from Proxifly."""
-        line_parser = lambda text: [
-            normalize_proxy_scheme(line.strip())
-            for line in text.splitlines()
-            if line.strip()
-        ]
+
+        def parse_line_fun(text):
+            lines = text.splitlines()
+            return [
+                normalize_proxy_scheme(line.strip()) for line in lines if line.strip()
+            ]
+
+        line_parser = parse_line_fun
+
         https = self._fetch_from_url(
             f"{self.BASE_URL}/https/data.txt", bootstrap_proxies, line_parser
         )

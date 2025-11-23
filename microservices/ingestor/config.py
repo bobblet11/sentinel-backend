@@ -1,7 +1,9 @@
 import os
 import sys
 from typing import Optional
+
 from dotenv import load_dotenv
+
 
 def print_env(
     REDIS_DUPLICATE_FILTER_KEY: str,
@@ -14,6 +16,7 @@ def print_env(
     print("    |    \n    V    ")
     print("-" * 9)
     print(OUTPUT_STREAM)
+
 
 load_dotenv()
 

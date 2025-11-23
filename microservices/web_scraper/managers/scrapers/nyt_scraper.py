@@ -1,9 +1,12 @@
 # nyt_scraper.py
-from bs4 import BeautifulSoup
-from typing import Dict, Optional
 import re
-from ..base_parser import BaseParser
+from typing import Dict, Optional
 from urllib.parse import urlparse
+
+from bs4 import BeautifulSoup
+
+from ..base_parser import BaseParser
+
 
 class NYTScraper(BaseParser):
     def matches(self, url: str) -> bool:
@@ -15,7 +18,11 @@ class NYTScraper(BaseParser):
 
     def extract(self, soup: BeautifulSoup, url: str) -> Optional[Dict]:
         # NYTimes often uses <section name="articleBody"> or article > div[data-testid="article-body"]
-        container = soup.find("section", {"name": "articleBody"}) or soup.find("section", {"itemprop": "articleBody"}) or soup.find("article")
+        container = (
+            soup.find("section", {"name": "articleBody"})
+            or soup.find("section", {"itemprop": "articleBody"})
+            or soup.find("article")
+        )
         if not container:
             container = soup
 
@@ -50,7 +57,9 @@ class NYTScraper(BaseParser):
 
         # published date
         published_at = None
-        meta_date = soup.find("meta", {"property": "article:published_time"}) or soup.find("meta", {"name": "ptime"})
+        meta_date = soup.find(
+            "meta", {"property": "article:published_time"}
+        ) or soup.find("meta", {"name": "ptime"})
         if meta_date and meta_date.get("content"):
             published_at = meta_date["content"].strip()
         # fallback to <time datetime=...>
@@ -59,4 +68,9 @@ class NYTScraper(BaseParser):
             if t and t.get("datetime"):
                 published_at = t["datetime"]
 
-        return {"title": title, "text": text, "author": author, "published_at": published_at}
+        return {
+            "title": title,
+            "text": text,
+            "author": author,
+            "published_at": published_at,
+        }

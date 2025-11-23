@@ -6,8 +6,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Set, Tuple
 
 import requests
+
 from microservices.web_scraper.config import PROXY_VALIDATION_MAX_WORKERS
-from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
 from microservices.web_scraper.managers.proxy_class import (
     JsonFileSource,
     ProxiflyHttpSource,
@@ -16,6 +16,7 @@ from microservices.web_scraper.managers.proxy_class import (
     WebshareIOFileSource,
     normalize_proxy_scheme,
 )
+from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
 
 ONE_DAY_IN_SECONDS = 86400
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -48,7 +49,11 @@ class ProxyManager:
         self,
         sources: Optional[List[ProxySource]],
         refresh_interval_seconds: int = ONE_DAY_IN_SECONDS,
-        test_urls: str = ["https://www.bbc.com/news", "https://www.reuters.com/", "https://www.espn.com"],
+        test_urls: str = [
+            "https://www.bbc.com/news",
+            "https://www.reuters.com/",
+            "https://www.espn.com",
+        ],
         timeout: Tuple[float, float] = (10.0, 12.0),
         max_workers: int = PROXY_VALIDATION_MAX_WORKERS,
     ):
@@ -249,7 +254,9 @@ class ProxyManager:
             for p_type, proxy_set in candidates.items():
                 for proxy in proxy_set:
                     target_url = random.choice(self.test_urls)
-                    tasks.append(executor.submit(self._test_proxy, proxy, p_type, target_url))
+                    tasks.append(
+                        executor.submit(self._test_proxy, proxy, p_type, target_url)
+                    )
 
             # Collect valid results
             for future in as_completed(tasks):
@@ -259,7 +266,9 @@ class ProxyManager:
 
         return validated
 
-    def _test_proxy(self, proxy: str, p_type: str, test_url: str) -> Optional[Tuple[str, str]]:
+    def _test_proxy(
+        self, proxy: str, p_type: str, test_url: str
+    ) -> Optional[Tuple[str, str]]:
         """Tests a single proxy against the test URL."""
 
         schemes = {"https": "http", "socks4": "socks4", "socks5": "socks5h"}
@@ -302,7 +311,7 @@ class ProxyManager:
             print(
                 f"[*] Reported bad proxy: {proxy_url}. Removed from active pool. Remaining: {len(self._get_all_usable_proxies())}"
             )
-            
+
         self._refresh_proxies_if_needed()
 
     @staticmethod

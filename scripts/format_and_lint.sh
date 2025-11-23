@@ -25,7 +25,7 @@ black . --exclude "$EXCLUDE_REGEX"
 echo "==> Formatting complete."
 
 echo "==> Finding errors in code"
-flake8 . --extend-exclude "$EXCLUDE_GLOB" --max-line-length=88 --ignore=E501,E203
+flake8 . --extend-exclude "$EXCLUDE_GLOB" --max-line-length=88 --ignore=E501,E203,W503
 
 echo "==> Checking type hints in code"
 mypy . --exclude "$EXCLUDE_REGEX"

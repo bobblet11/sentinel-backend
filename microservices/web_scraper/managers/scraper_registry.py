@@ -1,8 +1,9 @@
 # scraper_registry.py
 from typing import Optional
-from bs4 import BeautifulSoup
-from .base_parser import BaseParser
 
+from bs4 import BeautifulSoup
+
+from .base_parser import BaseParser
 from .scrapers.nyt_scraper import NYTScraper
 from .scrapers.washington_scraper import WashingtonPostScraper
 from .scrapers.wsj_scraper import WSJScraper

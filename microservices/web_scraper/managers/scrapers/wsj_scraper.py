@@ -1,20 +1,28 @@
-from bs4 import BeautifulSoup
 from typing import Dict, Optional
-import re
-from ..base_parser import BaseParser
 from urllib.parse import urlparse
+
+from bs4 import BeautifulSoup
+
+from ..base_parser import BaseParser
+
 
 class WSJScraper(BaseParser):
     def matches(self, url: str) -> bool:
         try:
             net = urlparse(url).netloc.lower()
-            return "wsj.com" in net or "dowjones" in net or "feeds.content.dowjones.io" in net
+            return (
+                "wsj.com" in net
+                or "dowjones" in net
+                or "feeds.content.dowjones.io" in net
+            )
         except Exception:
             return False
 
     def extract(self, soup: BeautifulSoup, url: str) -> Optional[Dict]:
-        # WSJ uses article tags and .wsj-article-body etc. 
-        container = soup.find("div", {"id": "article-content"}) or soup.find("article") or soup
+        # WSJ uses article tags and .wsj-article-body etc.
+        container = (
+            soup.find("div", {"id": "article-content"}) or soup.find("article") or soup
+        )
         self._remove_unwanted(container)
 
         # paragraphs (some WSJ pages use .article-content p)
@@ -41,10 +49,17 @@ class WSJScraper(BaseParser):
 
         # date
         published_at = None
-        meta_date = soup.find("meta", {"property": "article:published_time"}) or soup.find("time")
+        meta_date = soup.find(
+            "meta", {"property": "article:published_time"}
+        ) or soup.find("time")
         if meta_date and meta_date.get("content"):
             published_at = meta_date["content"]
         elif meta_date and meta_date.get("datetime"):
             published_at = meta_date["datetime"]
 
-        return {"title": title, "text": text, "author": author, "published_at": published_at}
+        return {
+            "title": title,
+            "text": text,
+            "author": author,
+            "published_at": published_at,
+        }
