@@ -15,7 +15,7 @@ def print_env(
     CONSUMER_NAME: str,
     PRIORITY_MAP: Dict[str, int],
     SCRAPER_MAX_WORKERS: int,
-    PROXY_VALIDATION_MAX_WORKERS
+    PROXY_VALIDATION_MAX_WORKERS,
 ) -> None:
     print(f"Batch size {BATCH_SIZE}")
     print(f"Consumer name {CONSUMER_NAME}")
@@ -78,17 +78,18 @@ BATCH_SIZE: int = int(os.getenv("BATCH_SIZE"))
 if not BATCH_SIZE:
     print("FATAL: BATCH_SIZE environment variable is not set. Exiting.")
     sys.exit(1)
-    
+
 SCRAPER_MAX_WORKERS: int = int(os.getenv("SCRAPER_MAX_WORKERS"))
 if not SCRAPER_MAX_WORKERS:
     print("FATAL: SCRAPER_MAX_WORKERS environment variable is not set. Exiting.")
     sys.exit(1)
-    
+
 PROXY_VALIDATION_MAX_WORKERS: int = int(os.getenv("SCRAPER_MAX_WORKERS"))
 if not PROXY_VALIDATION_MAX_WORKERS:
-    print("FATAL: PROXY_VALIDATION_MAX_WORKERS environment variable is not set. Exiting.")
+    print(
+        "FATAL: PROXY_VALIDATION_MAX_WORKERS environment variable is not set. Exiting."
+    )
     sys.exit(1)
-    
 
 
 print_env(
@@ -101,5 +102,5 @@ print_env(
     CONSUMER_NAME,
     PRIORITY_MAP,
     SCRAPER_MAX_WORKERS,
-    PROXY_VALIDATION_MAX_WORKERS
+    PROXY_VALIDATION_MAX_WORKERS,
 )

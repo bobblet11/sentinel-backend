@@ -2,9 +2,8 @@ import datetime
 import json
 import os
 
-from common.io.redirect_and_modify import redirect_and_modify
-from common.io.utils import indent_with_tab
 from microservices.ingestor.rss_ingestor import RssIngestor
+
 
 def exec():
     script_dir = os.path.dirname(os.path.abspath(__file__))

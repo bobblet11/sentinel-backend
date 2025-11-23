@@ -1,9 +1,12 @@
 # washington_scraper.py
-from bs4 import BeautifulSoup
-from typing import Dict, Optional
 import re
-from ..base_parser import BaseParser
+from typing import Dict, Optional
 from urllib.parse import urlparse
+
+from bs4 import BeautifulSoup
+
+from ..base_parser import BaseParser
+
 
 class WashingtonPostScraper(BaseParser):
     def matches(self, url: str) -> bool:
@@ -15,7 +18,11 @@ class WashingtonPostScraper(BaseParser):
 
     def extract(self, soup: BeautifulSoup, url: str) -> Optional[Dict]:
         # WashingtonPost uses div[data-test-id="article-body"] or article tag
-        container = soup.find("div", {"data-test-id": "article-body"}) or soup.find("article") or soup
+        container = (
+            soup.find("div", {"data-test-id": "article-body"})
+            or soup.find("article")
+            or soup
+        )
         self._remove_unwanted(container)
 
         paragraphs = container.find_all("p")
@@ -46,7 +53,9 @@ class WashingtonPostScraper(BaseParser):
 
         # date
         published_at = None
-        meta_date = soup.find("meta", {"property": "article:published_time"}) or soup.find("meta", {"name": "date"})
+        meta_date = soup.find(
+            "meta", {"property": "article:published_time"}
+        ) or soup.find("meta", {"name": "date"})
         if meta_date and meta_date.get("content"):
             published_at = meta_date["content"].strip()
         if not published_at:
@@ -54,4 +63,9 @@ class WashingtonPostScraper(BaseParser):
             if t and t.get("datetime"):
                 published_at = t["datetime"]
 
-        return {"title": title, "text": text, "author": author, "published_at": published_at}
+        return {
+            "title": title,
+            "text": text,
+            "author": author,
+            "published_at": published_at,
+        }

@@ -36,7 +36,7 @@ class RedisConsumer:
         print(
             f"Redis consumer initialised and listening to {stream_name}, group {group_name} under the name {consumer_name}"
         )
-        
+
         self._create_group()
 
     def _create_group(self):
@@ -157,14 +157,12 @@ class RedisConsumer:
             print(f"Error consuming from stream '{self.stream_name}': {e}")
             raise
 
-    def consume_pending(
-        self
-    ) -> Optional[List[Dict[str, Any]]]:
+    def consume_pending(self) -> Optional[List[Dict[str, Any]]]:
         """
         Consumes messages that are pending for this specific consumer.
         This should be called on startup to recover from a previous crash.
         """
-        
+
         try:
             all_messages: List[Dict[str, Any]] = []
 
@@ -195,8 +193,6 @@ class RedisConsumer:
         except Exception as e:
             print(f"Error consuming from stream '{self.stream_name}': {e}")
             raise
-
-
 
     def acknowledge(self, redis_message_id: str):
         """

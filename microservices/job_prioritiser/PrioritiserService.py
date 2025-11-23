@@ -113,7 +113,7 @@ class PrioritiserService:
                         print(
                             f"  - Successfully published and acknowledged Msg ID {redis_msg_id}"
                         )
-                    except Exception as e:
+                    except Exception:
                         print(
                             f"  - Final failure for Msg ID {redis_msg_id}. It was NOT acknowledged and will be retried by another consumer later."
                         )

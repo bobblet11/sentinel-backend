@@ -85,14 +85,15 @@ class FetchManager:
             response = requests.get(
                 url, headers=headers, proxies=proxies, timeout=self.timeout
             )
- 
+
             response.raise_for_status()
-            
+
             print(f"[SUCCESS] Successfully fetched {url}")
             return response.text
 
         except requests.exceptions.RequestException as e:
             proxy_manager.report_bad_proxy(proxy_url_for_reporting)
             raise e
+
 
 fetch_manager = FetchManager()
