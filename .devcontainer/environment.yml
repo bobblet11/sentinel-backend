@@ -10,6 +10,7 @@ dependencies:
   - pysocks
 
   - beautifulsoup4
+  - trafilatura
   - user-agents
   - psutil
   
