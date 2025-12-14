@@ -2,19 +2,20 @@ from typing import Any, Dict, List, Optional
 
 from common.redis_client.publisher import RedisPublisher
 
+
 class RedisPublisherRouter:
     """
-        A higher-level publisher that acts as a router, forwarding messages
-        to different Redis streams based on a specific key within the message.
+    A higher-level publisher that acts as a router, forwarding messages
+    to different Redis streams based on a specific key within the message.
 
-        This class creates and manages multiple RedisPublisher instances, one for
-        each destination stream defined in the routing map.
-        
-        Example:
-            splitter = RedisPublisherRouter({'user':'123', 'background' : '456'}, 'type')
-            splitter.publish_one({'type':'user'})           //publishes to 123
-            splitter.publish_one({'type':'background'})     //publishes to 456
-            splitter.publish_one({'type':'unknown'})        //fails, unknown mapping
+    This class creates and manages multiple RedisPublisher instances, one for
+    each destination stream defined in the routing map.
+
+    Example:
+        splitter = RedisPublisherRouter({'user':'123', 'background' : '456'}, 'type')
+        splitter.publish_one({'type':'user'})           //publishes to 123
+        splitter.publish_one({'type':'background'})     //publishes to 456
+        splitter.publish_one({'type':'unknown'})        //fails, unknown mapping
     """
 
     def __init__(self, routing_map: Dict[str, str], routing_key: str):
@@ -26,7 +27,7 @@ class RedisPublisherRouter:
                                          message types (e.g., "user", "background")
                                          and values are the target Redis stream names
                                          (e.g., "user-nlp-jobs", "background-nlp-jobs").
-                                         
+
             routing_key (str): The key within an incoming message dictionary that
                                contains the message type string.
         """
@@ -35,19 +36,20 @@ class RedisPublisherRouter:
             raise ValueError("routing_map must be a non-empty dictionary.")
         if not isinstance(routing_key, str) or not routing_key:
             raise ValueError("routing_key must be a non-empty string.")
-        
+
         self.routing_map = routing_map
         self.routing_key = routing_key
         self.publishers: Dict[str, RedisPublisher] = {}
 
         print("--- Initializing RedisPublisherSplit ---")
-        
+
         # For each route, create and store a dedicated RedisPublisher instance
         for message_type, stream_name in self.routing_map.items():
-            print(f"  - Mapping message type '{message_type}' -> stream '{stream_name}'")
+            print(
+                f"  - Mapping message type '{message_type}' -> stream '{stream_name}'"
+            )
             self.publishers[message_type] = RedisPublisher(stream_name)
         print("--------------------------------------")
-
 
     def publish_one(self, message: Dict[str, Any]) -> Optional[str]:
         """
@@ -65,27 +67,34 @@ class RedisPublisherRouter:
             # 1. Determine the route
             message_type = message.get(self.routing_key)
             if message_type is None:
-                print(f"ERROR: Routing key '{self.routing_key}' not found in message. Message not published.")
+                print(
+                    f"ERROR: Routing key '{self.routing_key}' not found in message. Message not published."
+                )
                 return None
 
             print(f"MessageType: {message_type}")
-            
+
             # 2. Find the correct publisher for that route
             publisher = self.publishers.get(message_type)
             if publisher is None:
-                print(f"ERROR: No publisher configured for message type '{message_type}'. Message not published.")
+                print(
+                    f"ERROR: No publisher configured for message type '{message_type}'. Message not published."
+                )
                 return None
-            
+
             print(f"Publisher: {publisher}")
-            
+
             # 3. Use the dedicated publisher to send the message
-            print(f"Routing message of type '{message_type}' to stream '{publisher.stream_name}'...")
-            # return publisher.publish_one(message)
+            print(
+                f"Routing message of type '{message_type}' to stream '{publisher.stream_name}'..."
+            )
+            return publisher.publish_one(message)
 
         except Exception as e:
-            print(f"An unexpected error occurred in RedisPublisherSplit.publish_one: {e}")
+            print(
+                f"An unexpected error occurred in RedisPublisherSplit.publish_one: {e}"
+            )
             return None
-
 
     def publish_many(self, messages: List[Dict[str, Any]]) -> Dict[str, int]:
         """
@@ -102,7 +111,7 @@ class RedisPublisherRouter:
         grouped_messages: Dict[str, List[Dict[str, Any]]] = {
             message_type: [] for message_type in self.publishers.keys()
         }
-        
+
         unroutable_count = 0
         for message in messages:
             message_type = message.get(self.routing_key)
@@ -110,18 +119,22 @@ class RedisPublisherRouter:
                 grouped_messages[message_type].append(message)
             else:
                 unroutable_count += 1
-        
+
         if unroutable_count > 0:
-            print(f"Warning: {unroutable_count} messages had an unknown or missing route and were ignored.")
+            print(
+                f"Warning: {unroutable_count} messages had an unknown or missing route and were ignored."
+            )
 
         # 2. Publish each group using the appropriate publisher's batch method
         summary = {}
         for message_type, message_list in grouped_messages.items():
             if not message_list:
                 continue
-            
+
             publisher = self.publishers[message_type]
-            print(f"Batch publishing {len(message_list)} messages of type '{message_type}'...")
+            print(
+                f"Batch publishing {len(message_list)} messages of type '{message_type}'..."
+            )
             result_ids = publisher.publish_many(message_list)
             if result_ids:
                 summary[publisher.stream_name] = len(result_ids)

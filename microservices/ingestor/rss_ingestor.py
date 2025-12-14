@@ -48,7 +48,7 @@ class RssIngestor(BaseIngestor):
             print(f"\tError fetching or parsing feed {url}: {e}")
             return None
 
-    def fetch_articles(self) -> Iterator[Dict[str, str]]:
+    def fetch_articles(self) -> Iterator[Dict[str, str | None]]:
         """
         Concurrently fetches all RSS feeds using a thread pool and yields
         article dictionaries in a standardized format.

@@ -13,6 +13,8 @@ from utils.cache import get_cache, set_cache
 from utils.helpers import httpx_encode, url_key
 from utils.requests import fetch_json
 
+# Add parent directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 logger = logging.getLogger("api_gateway.analysis")
 
