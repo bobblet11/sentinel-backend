@@ -4,6 +4,7 @@ import hashlib
 from common.models.api.redis_models import Message, MessageHeader, MessageURLPayload
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
+from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
 
 
 class BaseIngestor:
@@ -14,8 +15,8 @@ class BaseIngestor:
     """
 
     def __init__(self):
-        self.duplicate_filter = RedisDuplicateFilter("ingestor:seen.articles")
-        self.publisher = RedisPublisher("ingestor:to.be.scraped")
+        self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY)
+        self.publisher = RedisPublisher(OUTPUT_STREAM)
 
     def fetch_articles(self):
         """
@@ -67,7 +68,7 @@ class BaseIngestor:
                 header=MessageHeader(
                     message_id=hashlib.md5(link.encode()).hexdigest(),
                     timestamp=datetime.datetime.now().isoformat(),
-                    type="background"
+                    type="background",
                 ),
                 data=payload,
             )
@@ -87,7 +88,7 @@ class BaseIngestor:
             return
 
         self.duplicate_filter.add_many(unseen_article_links)
-        print(f"--- Ingestion cycle finished ---")
+        print("--- Ingestion cycle finished ---")
         print(f"\tNew: {unseen}")
         print(f"\tSeen: {total_fetched - unseen}")
         print(f"\tTotal: {total_fetched}")
