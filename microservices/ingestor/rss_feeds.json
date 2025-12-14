@@ -1,36 +1,238 @@
 [
-	"https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/Africa.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/Americas.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/AsiaPacific.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/Europe.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/MiddleEast.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/US.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/Education.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/Upshot.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/EnergyEnvironment.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/MostViewed.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/MostShared.xml",
-	"https://rss.nytimes.com/services/xml/rss/nyt/recent.xml",
+	{
+		"name" : "BBC",
+		"paywall" : "None",
+		"feeds" : [
+			"https://feeds.bbci.co.uk/news/rss.xml",
+			"https://feeds.bbci.co.uk/news/world/rss.xml",
+			"https://feeds.bbci.co.uk/news/world/rss.xml",
+			"https://feeds.bbci.co.uk/news/business/rss.xml",
+			"https://feeds.bbci.co.uk/news/politics/rss.xml",
+			"https://feeds.bbci.co.uk/news/health/rss.xml",
+			"https://feeds.bbci.co.uk/news/education/rss.xml",
+			"https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
+			"https://feeds.bbci.co.uk/news/technology/rss.xml",
+			"https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml",
 
-	
-	"http://feeds.washingtonpost.com/rss/rss_the-fix",
-	"https://feeds.washingtonpost.com/rss/business/technology",
-	"http://feeds.washingtonpost.com/rss/national",
-	"https://feeds.washingtonpost.com/rss/world",
-	"http://feeds.washingtonpost.com/rss/business",
+			"https://feeds.bbci.co.uk/news/world/africa/rss.xml",
+			"https://feeds.bbci.co.uk/news/world/asia/rss.xml",
+			"https://feeds.bbci.co.uk/news/world/europe/rss.xml",
+			"https://feeds.bbci.co.uk/news/world/latin_america/rss.xml",
+			"https://feeds.bbci.co.uk/news/world/middle_east/rss.xml",
+			"https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml",
+			"https://feeds.bbci.co.uk/news/england/rss.xml",
+			"https://feeds.bbci.co.uk/news/northern_ireland/rss.xml",
+			"https://feeds.bbci.co.uk/news/scotland/rss.xml",
+			"https://feeds.bbci.co.uk/news/wales/rss.xml",
 
+			"https://feeds.bbci.co.uk/news/stories/rss.xml",
+			"https://feeds.bbci.co.uk/news/in_pictures/rss.xml",
 
-	"https://feeds.content.dowjones.io/public/rss/RSSWorldNews",
-	"https://feeds.content.dowjones.io/public/rss/WSJcomUSBusiness",
-	"https://feeds.content.dowjones.io/public/rss/RSSMarketsMain",
-	"https://feeds.content.dowjones.io/public/rss/RSSWSJD",
-	"https://feeds.content.dowjones.io/public/rss/RSSUSnews",
-	"https://feeds.content.dowjones.io/public/rss/socialpoliticsfeed",
-	"https://feeds.content.dowjones.io/public/rss/socialeconomyfeed",
-	"https://feeds.content.dowjones.io/public/rss/socialhealth"
+			"https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
+			"https://feeds.bbci.co.uk/news/rss.xml?edition=us",
+			"https://feeds.bbci.co.uk/news/rss.xml?edition=int"
+
+		]
+	},
+	{
+		"name" : "The Guardian",
+		"paywall" : "None",
+		"feeds" : [
+			"https://www.theguardian.com/world/rss",
+			"https://www.theguardian.com/us-news/rss",
+			"https://www.theguardian.com/uk-news/rss",
+			"https://www.theguardian.com/australia-news/rss",
+			"https://www.theguardian.com/world/asia/rss",
+			"https://www.theguardian.com/world/europe-news/rss",
+			"https://www.theguardian.com/world/americas/rss",
+			"https://www.theguardian.com/uk/rss",
+			"https://www.theguardian.com/world/middleeast/rss",
+			"https://www.theguardian.com/global-development/rss",
+
+			"https://www.theguardian.com/inequality/rss",
+			"https://www.theguardian.com/uk/technology/rss",
+			"https://www.theguardian.com/science/rss",
+			"https://www.theguardian.com/lifeandstyle/health-and-wellbeing/rss",
+			"https://www.theguardian.com/environment/climate-crisis/rss",
+			"https://www.theguardian.com/environment/pollution/rss",
+			"https://www.theguardian.com/environment/wildlife/rss",
+			"https://www.theguardian.com/uk/environment/rss",
+			"https://www.theguardian.com/world/coronavirus-outbreak/rss",
+
+			"https://www.theguardian.com/uk/sport/rss",
+			"https://www.theguardian.com/football/rss",
+			"https://www.theguardian.com/uk/tv-and-radio/rss",
+			"https://www.theguardian.com/uk/travel/rss",
+
+			"https://www.theguardian.com/tone/obituaries/rss",
+			"https://www.theguardian.com/uk/money/rss",
+			"https://www.theguardian.com/uk/business/rss"
+		]
+	},
+
+	{
+		"name" : "CBC",
+		"paywall" : "None",
+		"feeds" : [
+			"https://www.cbc.ca/webfeed/rss/rss-topstories",
+			"https://www.cbc.ca/webfeed/rss/rss-world",
+			"https://www.cbc.ca/webfeed/rss/rss-canada",
+			"https://www.cbc.ca/webfeed/rss/rss-politics",
+			"https://www.cbc.ca/webfeed/rss/rss-business",
+			"https://www.cbc.ca/webfeed/rss/rss-health",
+			"https://www.cbc.ca/webfeed/rss/rss-arts",
+			"https://www.cbc.ca/webfeed/rss/rss-technology",
+			"https://www.cbc.ca/webfeed/rss/rss-Indigenous"
+		]
+	},
+	{
+		"name" : "Euronews",
+		"paywall" : "None",
+		"feeds" : [
+			"https://www.euronews.com/rss",
+			"https://www.euronews.com/rss?format=mrss&level=theme&name=news",
+			"https://www.euronews.com/rss?format=mrss&level=vertical&name=my-europe",
+			"https://www.euronews.com/rss?format=mrss&level=program&name=nocomment",
+			"https://www.euronews.com/rss?format=mrss&level=vertical&name=green",
+			"https://www.euronews.com/rss?format=mrss&level=vertical&name=next",
+			"https://www.euronews.com/rss?level=program&name=world",
+			"https://feeds.feedburner.com/euronews/en/home/"
+		]
+	},
+	{
+		"name" : "ABC",
+		"paywall" : "None",
+		"feeds" : [
+			"https://feeds.abcnews.com/abcnews/topstories",
+			"https://feeds.abcnews.com/abcnews/usheadlines",
+			"https://feeds.abcnews.com/abcnews/internationalheadlines",
+			"https://feeds.abcnews.com/abcnews/politicsheadlines",
+			"https://feeds.abcnews.com/abcnews/moneyheadlines",
+			"https://feeds.abcnews.com/abcnews/technologyheadlines",
+			"https://feeds.abcnews.com/abcnews/healthheadlines",
+			"https://feeds.abcnews.com/abcnews/entertainmentheadlines",
+			"https://feeds.abcnews.com/abcnews/travelheadlines",
+			"https://feeds.abcnews.com/abcnews/worldnewsheadlines",
+			"https://feeds.abcnews.com/abcnews/gmaheadlines",
+			"https://feeds.abcnews.com/abcnews/2020headlines",
+			"https://feeds.abcnews.com/abcnews/primetimeheadlines",
+			"https://feeds.abcnews.com/abcnews/nightlineheadlines",
+			"https://feeds.abcnews.com/abcnews/thisweekheadlines",
+			"https://feeds.abcnews.com/abcnews/mostreadstories"
+		]
+	},
+	{
+		"name" : "CBS",
+		"paywall" : "None",
+		"feeds" : [
+			"https://www.cbsnews.com/latest/rss/main",
+			"https://www.cbsnews.com/latest/rss/us",
+			"https://www.cbsnews.com/latest/rss/politics",
+			"https://www.cbsnews.com/latest/rss/world",
+			"https://www.cbsnews.com/latest/rss/health",
+			"https://www.cbsnews.com/latest/rss/moneywatch",
+			"https://www.cbsnews.com/latest/rss/science",
+			"https://www.cbsnews.com/latest/rss/technology",
+			"https://www.cbsnews.com/latest/rss/entertainment",
+			"https://www.cbsnews.com/latest/rss/space",
+			"https://www.cbsnews.com/latest/rss/evening-news/cbs-news-investigates",
+
+			"https://www.cbsnews.com/latest/rss/daily-report-clips",
+			"https://www.cbsnews.com/latest/rss/cbs-reports-custom"
+
+		]
+	},
+	{
+		"name" : "NBC",
+		"paywall" : "None",
+		"feeds" : [
+			"https://feeds.nbcnews.com/nbcnews/public/news",
+			"https://feeds.nbcnews.com/nbcnews/public/us-news",
+			"https://feeds.nbcnews.com/nbcnews/public/politics",
+			"https://feeds.nbcnews.com/nbcnews/public/world",
+			"https://feeds.nbcnews.com/nbcnews/public/health",
+			"https://feeds.nbcnews.com/nbcnews/public/business",
+			"https://feeds.nbcnews.com/nbcnews/public/investigations",
+			"https://feeds.nbcnews.com/nbcnews/public/science",
+			"https://feeds.nbcnews.com/nbcnews/public/tech",
+			"https://feeds.nbcnews.com/nbcnews/public/weather"
+		]
+	},
+	{
+		"name" : "NPR",
+		"paywall" : "None",
+		"feeds" : [
+			"https://feeds.npr.org/1001/rss.xml",
+			"https://feeds.npr.org/1002/rss.xml",
+			"https://feeds.npr.org/1003/rss.xml",
+			"https://feeds.npr.org/1004/rss.xml",
+			"https://feeds.npr.org/1006/rss.xml",
+			"https://feeds.npr.org/1007/rss.xml",
+			"https://feeds.npr.org/1008/rss.xml",
+			"https://feeds.npr.org/1009/rss.xml",
+			"https://feeds.npr.org/1012/rss.xml",
+			"https://feeds.npr.org/1013/rss.xml",
+			"https://feeds.npr.org/1014/rss.xml",
+			"https://feeds.npr.org/1015/rss.xml",
+			"https://feeds.npr.org/1016/rss.xml",
+			"https://feeds.npr.org/1017/rss.xml",
+			"https://feeds.npr.org/1018/rss.xml",
+			"https://feeds.npr.org/1019/rss.xml",
+			"https://feeds.npr.org/1020/rss.xml",
+			"https://feeds.npr.org/1024/rss.xml",
+			"https://feeds.npr.org/1025/rss.xml",
+			"https://feeds.npr.org/1026/rss.xml",
+			"https://feeds.npr.org/1027/rss.xml",
+			"https://feeds.npr.org/1028/rss.xml",
+
+			"https://feeds.npr.org/1029/rss.xml",
+			"https://feeds.npr.org/1030/rss.xml",
+			"https://feeds.npr.org/1031/rss.xml",
+			"https://feeds.npr.org/1039/rss.xml",
+			"https://feeds.npr.org/1056/rss.xml",
+			"https://feeds.npr.org/1059/rss.xml",
+			"https://feeds.npr.org/1062/rss.xml",
+			"https://feeds.npr.org/1066/rss.xml",
+			"https://feeds.npr.org/1070/rss.xml",
+			"https://feeds.npr.org/1076/rss.xml",
+
+			"https://feeds.npr.org/1122/rss.xml",
+			"https://feeds.npr.org/1124/rss.xml",
+			"https://feeds.npr.org/1125/rss.xml",
+			"https://feeds.npr.org/1126/rss.xml",
+			"https://feeds.npr.org/1127/rss.xml",
+			"https://feeds.npr.org/1128/rss.xml",
+			"https://feeds.npr.org/1131/rss.xml",
+			"https://feeds.npr.org/1132/rss.xml",
+			"https://feeds.npr.org/1133/rss.xml",
+			"https://feeds.npr.org/1136/rss.xml",
+			"https://feeds.npr.org/1150/rss.xml",
+			"https://feeds.npr.org/1162/rss.xml",
+			"https://feeds.npr.org/1167/rss.xml",
+
+			"https://feeds.npr.org/2007/rss.xml",
+			"https://feeds.npr.org/2008/rss.xml",
+			"https://feeds.npr.org/2009/rss.xml",
+			"https://feeds.npr.org/2010/rss.xml",
+			"https://feeds.npr.org/2014/rss.xml",
+			"https://feeds.npr.org/2015/rss.xml"
+		]
+	},
+	{
+		"name" : "Associated Press",
+		"paywall" : "None",
+		"feeds" : []
+	},
+		{
+		"name" : "CNN",
+		"paywall" : "Metered",
+		"feeds" : []
+	},
+	{
+		"name" : "Reuters",
+		"paywall" : "Metered",
+		"feeds" : []
+	}
+
 
 ]
