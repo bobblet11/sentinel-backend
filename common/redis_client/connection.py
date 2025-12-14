@@ -42,7 +42,12 @@ class RedisConnection:
             # print("RedisConnection Singleton created.")
             return cls._instance
 
-    @exponential_retry(max_attempts=MAX_RETRIES, initial_delay_s=INITIAL_DELAY)
+    @exponential_retry(
+        max_attempts=5,
+        initial_delay_s=1.0,
+        # Tell the decorator to retry ONLY on these errors
+        on_exceptions=(redis.exceptions.ConnectionError, redis.exceptions.TimeoutError),
+    )
     def connect(self):
         """
         Idempotently attempts to establish a connection to the Redis server.
@@ -61,7 +66,7 @@ class RedisConnection:
             self._client = client
             return True
         else:
-            print("Failed to ping Redis.")
+            # raise error to let the retry mechanism catch it
             raise redis.exceptions.ConnectionError("Redis ping returned False.")
 
     def get_client(self):

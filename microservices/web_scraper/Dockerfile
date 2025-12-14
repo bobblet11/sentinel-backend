@@ -1,0 +1,22 @@
+# Step 1: Start from our base image
+FROM sentinel/base-image:1.0
+
+# Step 2: Set a working directory inside the container.
+WORKDIR /app
+
+# Step 3: Copy the dependencies file first.
+COPY microservices/web_scraper/requirements.txt .
+
+# Step 4: Install cron and python packages
+RUN apt-get update && apt-get install -y cron && \
+    pip install --no-cache-dir -r requirements.txt && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Step 5: Copy the rest of your application's source code.
+COPY microservices/web_scraper/ /app/microservices/web_scraper
+
+# Step 6: Give correct permissions and create log file.
+RUN touch /var/log/service.log
+
+# Step 7: Define the command to run your application.
+CMD ["python", "-m", "microservices.web_scraper.main", ">>", "/var/log/service.log", "2>&1"]
