@@ -22,7 +22,8 @@ dependencies:
 
     # Application runtime (pip only)
     - fake_useragent
-
+    - selenium
+    
     # Testing
     - pytest
     - pytest-cov
