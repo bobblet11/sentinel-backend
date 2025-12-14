@@ -2,7 +2,7 @@ import concurrent.futures
 from typing import Dict, Iterator, List
 
 import feedparser
-
+from common.requests.user_agent_manager import user_agent_manager
 from .base_ingestor import BaseIngestor
 
 
@@ -37,7 +37,7 @@ class RssIngestor(BaseIngestor):
         """
         try:
             # print(f"\tFetching RSS feed: {url}")
-            feed = feedparser.parse(url)
+            feed = feedparser.parse(url,agent=user_agent_manager.get_random_agent())
 
             if feed.bozo:
                 raise feed.bozo_exception
