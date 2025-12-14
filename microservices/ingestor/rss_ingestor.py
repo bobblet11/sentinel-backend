@@ -24,6 +24,11 @@ class RssIngestor(BaseIngestor):
         if not isinstance(feed_urls, list) or not feed_urls:
             raise ValueError("feed_urls must be a non-empty list of strings.")
         self.feed_urls = feed_urls
+        
+        print("Testing feed list")
+        results = self._test_rss_feeds()
+        print(f"Success: {results.successful}")
+        print(f"Fail: {results.fail}")
 
     def _fetch_and_parse_feed(self, url: str) -> feedparser.FeedParserDict | None:
         """
@@ -48,6 +53,15 @@ class RssIngestor(BaseIngestor):
             print(f"\tError fetching or parsing feed {url}: {e}")
             return None
 
+    def _test_rss_feeds(self) -> Dict[str, int]:
+        failed_feeds_count = 0
+        successful_feeds_count = 0
+        for feed_url in self.feed_urls:
+            if not self._fetch_and_parse_feed(feed_url):
+                failed_feeds_count+=1
+            successful_feeds_count+=1
+        return {"success" : successful_feeds_count, "fail" : failed_feeds_count} 
+    
     def fetch_articles(self) -> Iterator[Dict[str, str]]:
         """
         Concurrently fetches all RSS feeds using a thread pool and yields
