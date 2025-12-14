@@ -8,7 +8,7 @@ WORKDIR /app
 COPY microservices/ingestor/requirements.txt .
 
 # Step 4: Install cron and python packages
-RUN apt-get update && apt-get install -y cron && \
+RUN apt-get update && apt-get install -y cron dos2unix && \
     pip install --no-cache-dir -r requirements.txt && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -18,13 +18,14 @@ COPY microservices/ingestor/ /app/microservices/ingestor
 # Step 6: Copy the cronjob file into the container.
 COPY microservices/ingestor/cronjob /tmp/app-cronjob
 
-# Step 7: Give correct permissions and create log file.
-RUN sed -i 's/\r$//' /tmp/app-cronjob && \
-    echo "" >> /tmp/app-cronjob && \
-    crontab /tmp/app-cronjob && \
-    rm /tmp/app-cronjob && \
-    touch /var/log/cron.log
+# Step 6: Format and permission
+RUN echo "" >> /tmp/app-cronjob
+RUN chmod 0644 /tmp/app-cronjob
+RUN dos2unix /tmp/app-cronjob
+RUN crontab /tmp/app-cronjob
+RUN rm /tmp/app-cronjob
 
-# Step 8: Define the command to run your application.
-
-CMD ["/bin/sh", "-c", "cron && tail -f /var/log/cron.log"]
+# Step 7: Create log file
+RUN touch /var/log/service.log
+# # Step 8: Define the command to run your application.
+CMD ["/bin/sh", "-c", "printenv > /etc/environment && cron -f & tail -f /var/log/service.log"]
