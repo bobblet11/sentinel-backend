@@ -2,3 +2,6 @@
 __pycache__
 **/__pycache__/
 webshareio_proxies.json
+microservices/web_scraper/proxy_sources/webshareio_proxies.json
+webshareio_proxies.json
+saved_proxies.json
