@@ -135,19 +135,22 @@
         - USER_OUTPUT_STREAM=user:to.be.nlp
         - BACKGROUND_OUTPUT_STREAM=background:to.be.nlp
         - FAILURE_OUTPUT_STREAM=failure:to.be.scraped
-        - BATCH_SIZE=1
+        - BATCH_SIZE=10
         - GROUP_NAME=default
         - CONSUMER_NAME=web-scraper-1
-        - SCRAPER_MAX_WORKERS=1
-        - PROXY_VALIDATION_MAX_WORKERS=400
+        - SCRAPER_MAX_WORKERS=10
+        - PROXY_VALIDATION_MAX_WORKERS=1
+        - MAX_FETCH_RETRIES=3
+        - INITIAL_FETCH_DELAY_S=1
+        - FETCH_DELAY_GROWTH_RATE=1.2
       
-    nlp-prioritiser:  
-      <<: [ *common-env, *prioritiser-service ]
-      container_name: sentinel-nlp-prioritiser-service-container
-      environment:
-        - INPUT_STREAMS=user-nlp-jobs, background-nlp-jobs
-        - OUTPUT_STREAM=nlp-priority-queue
-        - CONSUMER_NAME=scraper-prioritiser-1
+    # nlp-prioritiser:  
+    #   <<: [ *common-env, *prioritiser-service ]
+    #   container_name: sentinel-nlp-prioritiser-service-container
+    #   environment:
+    #     - INPUT_STREAMS=user-nlp-jobs, background-nlp-jobs
+    #     - OUTPUT_STREAM=nlp-priority-queue
+    #     - CONSUMER_NAME=scraper-prioritiser-1
 
   volumes:
     redis_data: {}

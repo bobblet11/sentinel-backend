@@ -15,7 +15,10 @@ def print_env(
     CONSUMER_NAME: str,
     PRIORITY_MAP: Dict[str, int],
     SCRAPER_MAX_WORKERS: int,
-    PROXY_VALIDATION_MAX_WORKERS,
+    PROXY_VALIDATION_MAX_WORKERS:int,
+    MAX_FETCH_RETRIES:int,
+    INITIAL_FETCH_DELAY_S:float,
+    FETCH_DELAY_GROWTH_RATE:float
 ) -> None:
     print(f"Batch size {BATCH_SIZE}")
     print(f"Consumer name {CONSUMER_NAME}")
@@ -23,6 +26,12 @@ def print_env(
     print(f"Scraper Max workers: {SCRAPER_MAX_WORKERS}")
     print(f"Proxy Max workers: {PROXY_VALIDATION_MAX_WORKERS}")
     print(f"Priority map: {PRIORITY_MAP}")
+    print(f"Scraper Max workers: {SCRAPER_MAX_WORKERS}")
+    print(f"Proxy Max workers: {PROXY_VALIDATION_MAX_WORKERS}")
+    print(f"Priority map: {PRIORITY_MAP}")
+    print(f"Max fetch retries: {MAX_FETCH_RETRIES}")
+    print(f"Initial fetch delay: {INITIAL_FETCH_DELAY_S}")
+    print(f"Fetch delay growth rate: {FETCH_DELAY_GROWTH_RATE}")
     print("-" * 9)
     print(INPUT_STREAM)
     print("-" * 9)
@@ -92,7 +101,44 @@ if not PROXY_VALIDATION_MAX_WORKERS:
         "FATAL: PROXY_VALIDATION_MAX_WORKERS environment variable is not set. Exiting."
     )
     sys.exit(1)
+    
+    
+MAX_FETCH_RETRIES: Optional[int] = int(
+    os.getenv("MAX_FETCH_RETRIES")
+)
+if not MAX_FETCH_RETRIES:
+    print(
+        "FATAL: MAX_FETCH_RETRIES environment variable is not set. Exiting."
+    )
+    sys.exit(1)
+    
+INITIAL_FETCH_DELAY_S: Optional[float] = float(
+    os.getenv("INITIAL_FETCH_DELAY_S")
+)
+if not INITIAL_FETCH_DELAY_S:
+    print(
+        "FATAL: INITIAL_FETCH_DELAY_S environment variable is not set. Exiting."
+    )
+    sys.exit(1)
+    
+FETCH_DELAY_GROWTH_RATE: Optional[float] = float(
+    os.getenv("FETCH_DELAY_GROWTH_RATE")
+)
+if not FETCH_DELAY_GROWTH_RATE:
+    print(
+        "FATAL: FETCH_DELAY_GROWTH_RATE environment variable is not set. Exiting."
+    )
+    sys.exit(1)
 
+
+WEBSHARIO_URL: Optional[str] = str(
+    os.getenv("WEBSHARIO_URL")
+)
+if not WEBSHARIO_URL:
+    print(
+        "FATAL: WEBSHARIO_URL environment variable is not set. Exiting."
+    )
+    sys.exit(1)
 
 print_env(
     INPUT_STREAM,
@@ -105,4 +151,7 @@ print_env(
     PRIORITY_MAP,
     SCRAPER_MAX_WORKERS,
     PROXY_VALIDATION_MAX_WORKERS,
+    MAX_FETCH_RETRIES,
+    INITIAL_FETCH_DELAY_S,
+    FETCH_DELAY_GROWTH_RATE
 )
