@@ -74,7 +74,7 @@ class ProxyManager:
             print(f"Initializing [{self.name}] state for the first time...")
 
             # --- State ---
-            self.proxies: ProxyDict = {"https": set(), "socks4": set(), "socks5": set()}
+            self.proxies = {"https": set(), "socks4": set(), "socks5": set()}
             self.datetime_last_fetched: Optional[datetime.datetime] = None
             self._refresh_lock = threading.Lock()
             self.rotate_index: int = 0
@@ -106,12 +106,11 @@ class ProxyManager:
                 ]
             else:
                 self.sources = sources
-
             self._load_and_validate_initial_proxies()
-            self._perform_full_refresh()
             self._initialized = True
             print(f"[*] {self.name} Initialisation complete!")
 
+        
     def _load_and_validate_initial_proxies(self):
         """Loads proxies from the persistent cache and validates them on startup."""
         print("[*] Loading saved proxies...")
@@ -355,6 +354,6 @@ class ProxyManager:
         return {"http": proxy_url, "https": proxy_url}
 
 
-proxinet_source = ProxiNetHttpSource("ProxiNetHttpSource", timeout=(20.0, 22.0))
-proxifly_source = ProxiflyHttpSource("ProxiflyHttpSource", timeout=(20.0, 22.0))
-proxy_manager = ProxyManager(sources=[proxinet_source, proxifly_source])
+# proxinet_source = ProxiNetHttpSource("ProxiNetHttpSource", timeout=(20.0, 22.0))
+# proxifly_source = ProxiflyHttpSource("ProxiflyHttpSource", timeout=(20.0, 22.0))
+# proxy_manager = ProxyManager(sources=[proxinet_source, proxifly_source])

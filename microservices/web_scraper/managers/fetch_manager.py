@@ -6,9 +6,9 @@ from requests.exceptions import RequestException
 
 from common.requests.retry_request import exponential_retry
 from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
-from microservices.web_scraper.managers.proxy_manager import proxy_manager, ProxyManager
+from microservices.web_scraper.managers.proxy_manager import ProxyManager
 from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
-
+from microservices.web_scraper.config import MAX_FETCH_RETRIES, INITIAL_FETCH_DELAY_S, FETCH_DELAY_GROWTH_RATE
 
 class FetchManager:
     """
@@ -29,7 +29,7 @@ class FetchManager:
     def __init__(
         self,
         default_timeout: Tuple[float, float] = (15.0, 20.0),  # (connect, read)
-        proxy_manager: ProxyManagerPaid | ProxyManager = proxy_manager
+        proxy_manager: ProxyManagerPaid | ProxyManager = proxy_manager_paid
     ):
 
         if getattr(self, "_initialized", False):
@@ -63,9 +63,9 @@ class FetchManager:
         }
 
     @exponential_retry(
-        max_attempts=5,
-        initial_delay_s=1.0,
-        growth_rate=0.5,
+        max_attempts=MAX_FETCH_RETRIES,
+        initial_delay_s=INITIAL_FETCH_DELAY_S,
+        growth_rate=FETCH_DELAY_GROWTH_RATE,
         jitter=True,
         on_exceptions=(RequestException,),
     )
@@ -75,15 +75,16 @@ class FetchManager:
         This method is wrapped by a retry decorator. It is responsible for
         a SINGLE fetch attempt and for reporting bad proxies.
         """
-        proxies = self.proxy_manager.get_next_proxy()
-        if not proxies:
-            raise RequestException("No proxies available in the pool.")
-
-        user_agent = user_agent_manager.get_random_agent()
-        headers = self._create_enhanced_headers(user_agent)
-        proxy_url_for_reporting = proxies.get("https", proxies.get("http"))
 
         try:
+            proxies = self.proxy_manager.get_next_proxy()
+            if not proxies:
+                raise RequestException("No proxies available in the pool.")
+
+            user_agent = user_agent_manager.get_random_agent()
+            headers = self._create_enhanced_headers(user_agent)
+            proxy_url_for_reporting = proxies.get("https", proxies.get("http"))
+            
             response = requests.get(
                 url, headers=headers, proxies=proxies, timeout=self.timeout
             )

@@ -5,6 +5,9 @@ from typing import Dict, List, Optional, Set
 from microservices.web_scraper.proxy_sources.file_based.webshareio_file import (
     WebshareIOFileSource,
 )
+from microservices.web_scraper.proxy_sources.web_based.webshareio_http import (
+    WebshareIOHttpSource,
+)
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]
@@ -40,7 +43,7 @@ class ProxyManagerPaid:
             print(f"Initializing [{self.name}] state for the first time...")
 
             # --- State ---
-            self.proxies: ProxyDict = {"https": set(), "socks4": set(), "socks5": set()}
+            self.proxies = {"https": set(), "socks4": set(), "socks5": set()}
             self._refresh_lock = threading.Lock()
             self.rotate_index: int = 0
 
@@ -48,15 +51,9 @@ class ProxyManagerPaid:
             self._refresh_lock: threading.Lock = threading.Lock()
 
             # --- Dependency Injection for Sources ---
-            script_dir: str = os.path.dirname(os.path.abspath(__file__))
-            file_sources_dir: str = os.path.join(script_dir, "..", "proxy_sources")
-            
-            self.saved_webshareio_source: WebshareIOFileSource = WebshareIOFileSource(
-                os.path.join(file_sources_dir, "webshareio_proxies.json")
-            )
-            
-            self.proxies: ProxyDict = self.saved_webshareio_source.get_proxies()
-            
+            self.paid_webshareio_source: WebshareIOHttpSource = WebshareIOHttpSource("WebshareIoHttp", timeout=(20.0, 22.0))
+            webshareio_https_proxies: ProxyDict = self.paid_webshareio_source.get_proxies()["https"]
+            self.proxies["https"].update(webshareio_https_proxies)
             self._initialized = True
             print(f"[*] {self.name} Initialisation complete!")
 
@@ -94,19 +91,9 @@ class ProxyManagerPaid:
         return self._create_proxy_dict(chosen_proxy)
     
     def report_bad_proxy(self, proxy_url: str) -> None:
-        """Removes a failing proxy from all active sets."""
-        if not proxy_url:
-            return
-
-        with self._refresh_lock:
-            self.proxies["https"].discard(proxy_url)
-            self.proxies["socks4"].discard(proxy_url)
-            self.proxies["socks5"].discard(proxy_url)
-            print(
-                f"[*] Reported bad proxy: {proxy_url}. Removed from active pool. Remaining: {len(self._get_all_usable_proxies())}"
-            )
-
-        self._refresh_proxies_if_needed()
+        """Does not need to do anything for paid proxies"""
+        return
+    
     def _get_all_usable_proxies(self) -> Set[str]:
         """Returns a unified set of all valid proxies."""
         return self.proxies["https"] | self.proxies["socks4"] | self.proxies["socks5"]
