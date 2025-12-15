@@ -5,7 +5,8 @@ import requests
 from requests.exceptions import RequestException
 
 from common.requests.retry_request import exponential_retry
-from microservices.web_scraper.managers.proxy_manager import proxy_manager
+from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
+from microservices.web_scraper.managers.proxy_manager import proxy_manager, ProxyManager
 from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
 
 
@@ -28,6 +29,7 @@ class FetchManager:
     def __init__(
         self,
         default_timeout: Tuple[float, float] = (15.0, 20.0),  # (connect, read)
+        proxy_manager: ProxyManagerPaid | ProxyManager = proxy_manager
     ):
 
         if getattr(self, "_initialized", False):
@@ -41,7 +43,7 @@ class FetchManager:
 
             # State
             self.timeout = default_timeout
-
+            self.proxy_manager = proxy_manager
             print("[*] FetchManager Initialisation complete!")
 
     def _create_enhanced_headers(self, user_agent: str) -> Dict[str, str]:
@@ -73,7 +75,7 @@ class FetchManager:
         This method is wrapped by a retry decorator. It is responsible for
         a SINGLE fetch attempt and for reporting bad proxies.
         """
-        proxies = proxy_manager.get_next_proxy()
+        proxies = self.proxy_manager.get_next_proxy()
         if not proxies:
             raise RequestException("No proxies available in the pool.")
 
@@ -92,8 +94,8 @@ class FetchManager:
             return response.text
 
         except requests.exceptions.RequestException as e:
-            proxy_manager.report_bad_proxy(proxy_url_for_reporting)
+            self.proxy_manager.report_bad_proxy(proxy_url_for_reporting)
             raise e
 
 
-fetch_manager = FetchManager()
+fetch_manager = FetchManager(proxy_manager=proxy_manager_paid)
