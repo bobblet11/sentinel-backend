@@ -1,0 +1,51 @@
+{
+	"html_examples" : {
+		"register_close_button" : [
+			"<div view=\"offer\" class=\"view view-offer view-show view-showed\" id=\"view-offer\">",
+			"  <div error-list=\"\">",
+			"    <div class=\"message-block error-messages-block ng-hide\" ng-show=\"hasErrors()\">",
+			"      <div class=\"icon-attention\"></div>",
+			"      <!-- ngIf: !hasOneError() -->",
+			"      <span ng-if=\"!hasOneError()\" class=\"errors-title errors-header ng-scope\">",
+			"        <t><span class=\"ng-scope\">We found a few errors:</span></t>",
+			"      </span>",
+			"      <!-- end ngIf: !hasOneError() -->",
+			"      <ul class=\"errors\">",
+			"        <!-- ngRepeat: error in errors -->",
+			"      </ul>",
+			"      <div class=\"btn-close\" ng-click=\"reset()\"></div>",
+			"    </div>",
+			"  </div>",
+			"  <div class=\"lazy-transclude\">",
+			"    <config width=\"722\" class=\"ng-scope\"></config>",
+			"    <article class=\"pn-article ng-scope\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"modal-header\" aria-describedby=\"modal-description\">",
+			"      <button class=\"pn-article__close\" ng-click=\"close()\" ng-show=\"true\" external-event=\"close-btn\" aria-label=\"Close modal\">",
+			"        <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\">",
+			"          <path d=\"M13.0605 12L19.5 5.5605L18.4395 4.5L12 10.9395L5.5605 4.5L4.5 5.5605L10.9395 12L4.5 18.4395L5.5605 19.5L12 13.0605L18.4395 19.5L19.5 18.4395L13.0605 12Z\" fill=\"#FFFFFF\"></path>",
+			"        </svg>",
+			"      </button>",
+			"      <img class=\"pn-article__logo\" src=\"https://i.piano.io/managedservices/bbc/bbc-logo-inverted.svg\" alt=\"BBC Logo\" width=\"134\" height=\"38\">",
+			"      <h3 class=\"pn-article__header\" id=\"modal-header\">Register for a free BBC account.</h3>",
+			"      <div class=\"pn-article__wrapper\" id=\"modal-description\">",
+			"        <button class=\"pn-article__btn\" external-event=\"register-cta\" type=\"button\">",
+			"          <a href=\"https://session.bbc.com/session?action=register&amp;userOrigin=BBCS_BBC_TEST&amp;at_medium=display&amp;ptrt=https%3A%2F%2Fwww.bbc.com%2Fnews%2Farticles%2Fcm20ppy0rreo&amp;at_campaign=EXKR83WQK0Y0-A\" noptid=\"\" target=\"_parent\">Register</a>",
+			"        </button>",
+			"        <p class=\"pn-article__text\">Already have an account? <br>",
+			"          <button external-event=\"signin-cta\" type=\"button\">",
+			"            <a href=\"https://session.bbc.com/session?userOrigin=BBCS_BBC_TEST&amp;at_medium=display&amp;ptrt=https%3A%2F%2Fwww.bbc.com%2Fnews%2Farticles%2Fcm20ppy0rreo&amp;at_campaign=EXKR83WQK0Y0-A\" noptid=\"\" target=\"_parent\">Sign in</a>",
+			"          </button>",
+			"        </p>",
+			"      </div>",
+			"    </article>",
+			"  </div>",
+			"  <div class=\"clearfix\"></div>",
+			"</div>"
+		]
+	},
+	"selectors" : {
+		"register_close_button" : {
+			"class" : "pn-article__close",
+			"tag" : "button"
+		}	
+	}
+}
