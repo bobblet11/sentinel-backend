@@ -1,5 +1,5 @@
 # Step 1: Start from our base image
-FROM sentinel/base-image:1.0
+FROM sentinel/base-image:1.1
 
 # Step 2: Set a working directory inside the container.
 WORKDIR /app

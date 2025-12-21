@@ -53,6 +53,7 @@ class ProxyManagerPaid:
             # --- Dependency Injection for Sources ---
             self.paid_webshareio_source: WebshareIOHttpSource = WebshareIOHttpSource("WebshareIoHttp", timeout=(20.0, 22.0))
             webshareio_https_proxies: ProxyDict = self.paid_webshareio_source.get_proxies()["https"]
+            self.ip_country_mapping = self.paid_webshareio_source.ip_country_mapping
             self.proxies["https"].update(webshareio_https_proxies)
             self._initialized = True
             print(f"[*] {self.name} Initialisation complete!")

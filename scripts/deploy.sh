@@ -72,8 +72,11 @@ fi
 log_warn "Pruning any remaining dangling Docker images..."
 run_and_log sudo -E docker image prune -f
 
-log_warn "Building base Docker image..."
-run_and_log sudo -E docker build --pull -t sentinel/base-image:1.0 -f docker/base/Dockerfile .
+log_warn "Building base Docker image 1..."
+run_and_log sudo -E docker build --pull -t sentinel/base-image:1.0 -f docker/base/base1/Dockerfile .
+
+log_warn "Building base Docker image 2..."
+run_and_log sudo -E docker build --pull -t sentinel/base-image:1.1 -f docker/base/base2/Dockerfile .
 
 log_info "Building service images..."
 run_and_log sudo -E docker-compose build

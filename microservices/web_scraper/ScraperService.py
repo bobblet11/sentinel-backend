@@ -15,7 +15,7 @@ from microservices.web_scraper.config import (
     SCRAPER_MAX_WORKERS,
     USER_OUTPUT_STREAM,
 )
-from microservices.web_scraper.managers.fetch_manager import fetch_manager
+from microservices.web_scraper.managers.fetch_manager_selenium import fetch_manager
 from microservices.web_scraper.managers.parse_manager import parse_manager
 
 class ScraperService:

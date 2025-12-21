@@ -10,7 +10,7 @@ from microservices.web_scraper.managers.proxy_manager import ProxyManager
 from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
 from microservices.web_scraper.config import MAX_FETCH_RETRIES, INITIAL_FETCH_DELAY_S, FETCH_DELAY_GROWTH_RATE
 
-class FetchManager:
+class FetchManagerHTML:
     """
     A thread-safe Singleton class that fetches news URLs.
     """
@@ -99,4 +99,4 @@ class FetchManager:
             raise e
 
 
-fetch_manager = FetchManager(proxy_manager=proxy_manager_paid)
+fetch_manager = FetchManagerHTML(proxy_manager=proxy_manager_paid)
