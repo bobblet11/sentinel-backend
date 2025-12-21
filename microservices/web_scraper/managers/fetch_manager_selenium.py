@@ -99,55 +99,57 @@ class FetchManagerSelenium:
         
 
     def get_clean_driver(self, proxy_url, user_agent, custom_headers):
-        
+        # --- ISOLATION STEP 1: Unique Port & Dirs ---
         wire_port = self.find_free_port()
-        debug_port = self.find_free_port() 
-        
+        debug_port = self.find_free_port()
         user_data_dir = tempfile.mkdtemp(prefix="chrome_profile_")
         wire_tmp_dir = tempfile.mkdtemp(prefix="wire_")
         
+        # --- ISOLATION STEP 2: Unique Driver Binary (THE FIX) ---
+        # Create a unique folder and COPY the system chromedriver into it.
+        # This prevents UC from colliding on the patched file.
+        driver_executable_dir = tempfile.mkdtemp(prefix="driver_exe_")
+        # Note: Ensure the path matches where Chrome/Chromedriver is installed in your Dockerfile
+        base_driver_path = "/usr/bin/chromedriver" 
+        unique_driver_path = os.path.join(driver_executable_dir, "chromedriver")
+        shutil.copy2(base_driver_path, unique_driver_path)
+        os.chmod(unique_driver_path, 0o755) # Make executable
+
         options = uc.ChromeOptions()
-        options.add_argument('--headless') # Most news sites require headless in Docker
+        options.add_argument('--headless')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--ignore-certificate-errors')
-        
         options.add_argument(f'--remote-debugging-port={debug_port}')
         options.add_argument(f'--user-data-dir={user_data_dir}')
-        
         options.add_argument(f'--user-agent={user_agent}')
         options.binary_location = "/usr/bin/google-chrome"
-                
+
         proxy_options = {
             'proxy': {'http': proxy_url, 'https': proxy_url},
             'port': wire_port,
             'request_storage_base_dir': wire_tmp_dir,
             'request_storage': 'memory',
-            'verify_ssl': False,
+            'verify_ssl': False
         }
-        
+
+        # --- ISOLATION STEP 3: Strict Creation Lock ---
         with self._startup_lock:
-            try:
-                driver = uc.Chrome(
-                    options=options, 
-                    seleniumwire_options=proxy_options,
-                    headless=True, 
-                    use_subprocess=True, # Recommended for Docker
-                    # This prevents threads from fighting over the same driver file
-                    driver_executable_path=None 
-                )
-                # CRITICAL: Wait for the session to actually be "ready"
-                time.sleep(4) 
-            except Exception as e:
-                # Cleanup immediately if boot fails
-                shutil.rmtree(user_data_dir, ignore_errors=True)
-                shutil.rmtree(wire_tmp_dir, ignore_errors=True)
-                raise e
-                
-        driver.set_page_load_timeout(60)
-        driver.thread_dirs = [user_data_dir, wire_tmp_dir]
+            driver = uc.Chrome(
+                options=options,
+                seleniumwire_options=proxy_options,
+                # Point UC to our private copy of the driver
+                driver_executable_path=unique_driver_path, 
+                headless=True,
+                # use_subprocess is buggy in some multi-threaded Docker setups; 
+                # let's set it to False to see if stability improves.
+                use_subprocess=False 
+            )
+            time.sleep(3) # Give the OS time to bind the ports
+
+        # Store all 3 directories for cleanup
+        driver._thread_dirs = [user_data_dir, wire_tmp_dir, driver_executable_dir]
         driver.request_interceptor = self.generate_interceptor_function(custom_headers)
-        
         return driver
     
     def handle_scroll(driver):
@@ -212,19 +214,19 @@ class FetchManagerSelenium:
             print(f"[ERROR] Fetching {url}: {e}")
             traceback.print_exc()
             raise e
+        
         finally:
             if driver:
-                # Get the tmp dir we created
-                dirs_to_clean = getattr(driver, 'thread_dirs', [])
-
-                # Clean up the folder after driver closes
+                # Use the name with the underscore
+                dirs_to_clean = getattr(driver, '_thread_dirs', [])
                 try:
                     driver.quit()
+                    time.sleep(2) # Buffer for OS to release file locks
                     for d in dirs_to_clean:
                         if os.path.exists(d):
                             shutil.rmtree(d, ignore_errors=True)
                 except Exception as cleanup_err:
-                    print(f"Cleanup error: {cleanup_err}")
+                    print(f"Cleanup Error: {cleanup_err}")
 
 
 fetch_manager = FetchManagerSelenium(proxy_manager=proxy_manager_paid)
