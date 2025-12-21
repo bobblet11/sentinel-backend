@@ -12,3 +12,24 @@ dependencies:
     # --- Core Data Science Libraries ---
   - numpy
   - pandas
+
+
+  - pip:
+    # Code Quality & Formatting
+    - autoflake
+    - black       # The uncompromising code formatter
+    - black[jupyter]
+    - isort       # Sorts imports automatically
+    - flake8      # A great linter for catching errors
+    - mypy        # For static type checking
+
+    # Testing
+    - pytest
+    - pytest-cov
+    - httpx      
+
+    # Debugging & IDE Integration
+    - debugpy   
+
+    # Pre-commit hooks to automate code quality checks
+    - pre-commit
