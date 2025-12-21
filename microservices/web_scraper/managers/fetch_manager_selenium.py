@@ -17,7 +17,10 @@ from seleniumwire import undetected_chromedriver as uc
 from selenium.common.exceptions import WebDriverException
 import time
 import traceback
-
+from seleniumwire import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 class FetchManagerSelenium:
     """
     A thread-safe Singleton class that fetches news URLs.
@@ -152,12 +155,27 @@ class FetchManagerSelenium:
         driver.request_interceptor = self.generate_interceptor_function(custom_headers)
         return driver
     
-    def handle_scroll(driver):
+    def handle_scroll(self, driver):
+        print("Scrolling down...")
+        last_height = driver.execute_script("return document.body.scrollHeight")
+        while True:
+            driver.execute_script("window.scrollBy(0, 800);")
+            time.sleep(1.5) 
+            
+            new_height = driver.execute_script("return document.body.scrollHeight")
+            if new_height == last_height:
+                break
+            last_height = new_height
+        print("Reached the bottom!")
+    
+    def handle_pop_ups(self, driver):
         pass
     
-    def handle_pop_ups(driver):
+    def collect_failure_screenshots(self, driver):
         pass
     
+    def save_screenshots(self, data):
+        pass
     
     @exponential_retry(
         max_attempts=MAX_FETCH_RETRIES,
@@ -177,7 +195,7 @@ class FetchManagerSelenium:
         
         try:
             
-            proxies = self.proxy_manager.get_next_proxy()
+            proxies = self.proxy_manager.get_next_proxy(url)
             if proxies is None:
                 raise Exception("Proxy manager returned None - Pool might be empty")
             
@@ -200,10 +218,16 @@ class FetchManagerSelenium:
             driver = self.get_clean_driver(proxy_url, user_agent, custom_headers)
             driver.get(url)
             
+            try:
+                WebDriverWait(driver, 2)   
+                self.handle_pop_ups(driver)
+                WebDriverWait(driver, 2)   
+                self.handle_scroll(driver)
+            except Exception as e:
+                data = self.collect_failure_screenshots()
+                self.save_screenshots(data)
+                raise Exception(f"Failed to navigate page: {e}")
             
-            # Optional: Add your scroll/popup logic here
-            # self.handle_pop_ups(driver)
-            # self.handle_scroll(driver)
             html = driver.page_source
             if "ERR_CERT_AUTHORITY_INVALID" in html:
                 raise Exception("SSL Bypass failed")

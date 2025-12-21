@@ -54,10 +54,21 @@ class ProxyManagerPaid:
             self.paid_webshareio_source: WebshareIOHttpSource = WebshareIOHttpSource("WebshareIoHttp", timeout=(20.0, 22.0))
             webshareio_https_proxies: ProxyDict = self.paid_webshareio_source.get_proxies()["https"]
             self.ip_country_mapping = self.paid_webshareio_source.ip_country_mapping
+            self.country_ip_mapping = self.reverse_dict(self.ip_country_mapping)
             self.proxies["https"].update(webshareio_https_proxies)
             self._initialized = True
             print(f"[*] {self.name} Initialisation complete!")
 
+    @staticmethod
+    def reverse_dict(dictionary_to_reverse):
+        reversed_dict = {}
+        for key, value in dictionary_to_reverse:
+            if value in reversed_dict:
+                reversed_dict[value].append(key)
+            else:
+                reversed_dict[value] = [key]
+        return reversed_dict
+    
     def reset(self):
         """Testing aid: clear caches and force next call to rebuild."""
         with self._refresh_lock:
@@ -77,7 +88,7 @@ class ProxyManagerPaid:
         chosen_proxy: str = random.choice(list(all_usable_proxies))
         return self._create_proxy_dict(chosen_proxy)
 
-    def get_next_proxy(self) -> ProxyRequestDict:
+    def get_next_proxy(self, url="") -> ProxyRequestDict:
         """
         Public method to get a proxy and rotate to next proxy.
         Triggers a refresh if the proxy pool is stale or too small.
@@ -87,9 +98,16 @@ class ProxyManagerPaid:
             print("[!] CRITICAL: No usable proxies available after refresh attempt.")
             return None
 
+        if "bbc" in url:
+            # shouldnt use US proxy since they have stricter paywall
+            index = self.rotate_index % len(self.country_ip_mapping)
+            chosen_proxy = self.country_ip_mapping["GB"][index]
+            return self._create_proxy_dict(chosen_proxy)
+        
         chosen_proxy = list(all_usable_proxies)[self.rotate_index]
         self.rotate_index = (self.rotate_index + 1) % len(all_usable_proxies)
         return self._create_proxy_dict(chosen_proxy)
+
     
     def report_bad_proxy(self, proxy_url: str) -> None:
         """Does not need to do anything for paid proxies"""
