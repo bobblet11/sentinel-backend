@@ -1,0 +1,136 @@
+{
+	"html_examples" : {
+		"cookies_close_button" : [
+			"<div id=\"onetrust-banner-sdk\" class=\"otFlat bottom ot-wo-title vertical-align-content\" tabindex=\"0\" role=\"region\" aria-label=\"Cookie banner\" style=\"bottom: 0px;\">",
+			"  <div role=\"alertdialog\" aria-describedby=\"onetrust-policy-text\" aria-modal=\"true\" aria-label=\"Privacy\">",
+			"    <div class=\"ot-sdk-container\">",
+			"      <div class=\"ot-sdk-row\">",
+			"        <div id=\"onetrust-group-container\" class=\"ot-sdk-eight ot-sdk-columns\">",
+			"          <div class=\"banner_logo\"></div>",
+			"          <div id=\"onetrust-policy\">",
+			"            <div id=\"onetrust-policy-text\">By clicking “Accept All Cookies” or continuing, you agree to the use of cookies, similar tracking and storage technologies, and information about your device to enhance your viewing, listening and user experience, personalize content, personalize messages from NPR’s sponsors, provide social media features, and analyze NPR’s traffic. This information is shared with social media, sponsorship, analytics, and other vendors or service providers. You may customize which cookies you accept in \"Cookie Settings.\"</div>",
+			"          </div>",
+			"        </div>",
+			"        <div id=\"onetrust-button-group-parent\" class=\"ot-sdk-three ot-sdk-columns\">",
+			"          <div id=\"onetrust-button-group\">",
+			"            <button id=\"onetrust-pc-btn-handler\">Cookies Settings</button>",
+			"            <button id=\"onetrust-accept-btn-handler\">Accept All Cookies</button>",
+			"          </div>",
+			"        </div>",
+			"      </div>",
+			"    </div>",
+			"  </div>",
+			"  <!-- Close Button -->",
+			"  <div id=\"onetrust-close-btn-container\">",
+			"    <button class=\"onetrust-close-btn-handler onetrust-close-btn-ui banner-close-button ot-close-icon\" style=\"background-image: url(&quot;https://cdn.cookielaw.org/logos/static/ot_close.svg&quot;);\" aria-label=\"Close\"></button>",
+			"  </div>",
+			"  <!-- Close Button END-->",
+			"</div>"
+		],
+		"create_account_close_button" : [
+			"<div class=\"pn-ribbon__wrapper\">",
+			"  <div class=\"pn-ribbon__logo-wrap\">",
+			"    <img class=\"pn-ribbon__logo\" src=\"https://static-assets.npr.org/chrome_svg/npr-logo-2025.svg\" alt=\"NPR logo\">",
+			"  </div>",
+			"  <div class=\"pn-ribbon__copy-wrapper\">",
+			"    <strong class=\"pn-ribbon__title pn-title\">",
+			"      Choose your local station",
+			"    </strong>",
+			"    <p class=\"pn-ribbon__copy pn-copy\">",
+			"      Create an account and designate a local station to get more stories from your area.",
+			"    </p>",
+			"  </div>",
+			"  <a href=\"https://www.npr.org/account/login?_ptid=%7Bkpdx%7DAAAAwP9CKKTzgwoKOUVOeEtRNThwdRIQbWpnNzlubTg1dzI0c3JhYxoMRVgyVTZBU1g0R0szIiUxODA3OXA4MGJjLTAwMDAzNnEybDBvaHFpbDJiamtlbHJvOGpjKhpzaG93VGVtcGxhdGVUSUJKVzNNQVE4SU4xNjABOgxPVEs3VTBaSFpOUE5CDU9UVldGSE8zOU0wSElSEnYthADwGGd2ZDhoaGUxaVoNMTE5LjIzNi44NC41MGIDbWFjaLXbpsoGcCR4BA\" class=\"pn-button pn-ribbon__create\" external-event=\"create-account-clicked\" external-event-params=\"{&quot;aid&quot;:&quot;9ENxKQ58pu&quot;,&quot;displayMode&quot;:&quot;modal&quot;,&quot;iframeId&quot;:&quot;offer_4a6cd0375285d682ea0c-0&quot;,&quot;offerId&quot;:&quot;fakeOfferId&quot;,&quot;tags&quot;:&quot;1002&quot;,&quot;templateId&quot;:&quot;OTK7U0ZHZNPN&quot;,&quot;templateVariantId&quot;:&quot;OTVWFHO39M0HI&quot;,&quot;url&quot;:&quot;https://www.npr.org/&quot;,&quot;width&quot;:812,&quot;trackingId&quot;:&quot;{kpdx}AAAAwP9CKKTzgwoKOUVOeEtRNThwdRIQbWpnNzlubTg1dzI0c3JhYxoMRVgyVTZBU1g0R0szIiUxODA3OXA4MGJjLTAwMDAzNnEybDBvaHFpbDJiamtlbHJvOGpjKhpzaG93VGVtcGxhdGVUSUJKVzNNQVE4SU4xNjABOgxPVEs3VTBaSFpOUE5CDU9UVldGSE8zOU0wSElSEnYthADwGGd2ZDhoaGUxaVoNMTE5LjIzNi44NC41MGIDbWFjaLXbpsoGcCR4BA&quot;,&quot;experienceId&quot;:&quot;EX2U6ASX4GK3&quot;,&quot;experienceExecutionId&quot;:&quot;18079p80bc-000036q2l0ohqil2bjkelro8jc&quot;,&quot;experienceActionId&quot;:&quot;showTemplateTIBJW3MAQ8IN16&quot;}\" target=\"_blank\">",
+			"    Create Account",
+			"  </a>",
+			"  <p class=\"pn-ribbon__footer\">",
+			"    Already have an account?",
+			"    <a href=\"https://www.npr.org/account/login?_ptid=%7Bkpdx%7DAAAAwP9CKKTzgwoKOUVOeEtRNThwdRIQbWpnNzlubTg1dzI0c3JhYxoMRVgyVTZBU1g0R0szIiUxODA3OXA4MGJjLTAwMDAzNnEybDBvaHFpbDJiamtlbHJvOGpjKhpzaG93VGVtcGxhdGVUSUJKVzNNQVE4SU4xNjABOgxPVEs3VTBaSFpOUE5CDU9UVldGSE8zOU0wSElSEnYthADwGGd2ZDhoaGUxaVoNMTE5LjIzNi44NC41MGIDbWFjaLXbpsoGcCR4BA\" external-event=\"sign-in-clicked\" external-event-params=\"{&quot;aid&quot;:&quot;9ENxKQ58pu&quot;,&quot;displayMode&quot;:&quot;modal&quot;,&quot;iframeId&quot;:&quot;offer_4a6cd0375285d682ea0c-0&quot;,&quot;offerId&quot;:&quot;fakeOfferId&quot;,&quot;tags&quot;:&quot;1002&quot;,&quot;templateId&quot;:&quot;OTK7U0ZHZNPN&quot;,&quot;templateVariantId&quot;:&quot;OTVWFHO39M0HI&quot;,&quot;url&quot;:&quot;https://www.npr.org/&quot;,&quot;width&quot;:812,&quot;trackingId&quot;:&quot;{kpdx}AAAAwP9CKKTzgwoKOUVOeEtRNThwdRIQbWpnNzlubTg1dzI0c3JhYxoMRVgyVTZBU1g0R0szIiUxODA3OXA4MGJjLTAwMDAzNnEybDBvaHFpbDJiamtlbHJvOGpjKhpzaG93VGVtcGxhdGVUSUJKVzNNQVE4SU4xNjABOgxPVEs3VTBaSFpOUE5CDU9UVldGSE8zOU0wSElSEnYthADwGGd2ZDhoaGUxaVoNMTE5LjIzNi44NC41MGIDbWFjaLXbpsoGcCR4BA&quot;,&quot;experienceId&quot;:&quot;EX2U6ASX4GK3&quot;,&quot;experienceExecutionId&quot;:&quot;18079p80bc-000036q2l0ohqil2bjkelro8jc&quot;,&quot;experienceActionId&quot;:&quot;showTemplateTIBJW3MAQ8IN16&quot;}\" target=\"_blank\">Sign In</a>",
+			"  </p>",
+			"  <button class=\"pn-ribbon__close\" type=\"button\" ng-click=\"close()\" external-event=\"close-button\" ng-show=\"true\">",
+			"    <svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">",
+			"      <path d=\"M15.6451 0.367067C15.4183 0.139835 15.1105 0.012135 14.7895 0.012135C14.4685 0.012135 14.1607 0.139835 13.934 0.367067L8 6.28895L2.06598 0.354932C1.83926 0.1277 1.53146 0 1.21047 0C0.889474 0 0.581669 0.1277 0.354949 0.354932C-0.118316 0.828197 -0.118316 1.5927 0.354949 2.06597L6.28896 7.99999L0.354949 13.934C-0.118316 14.4073 -0.118316 15.1718 0.354949 15.6451C0.828214 16.1183 1.59272 16.1183 2.06598 15.6451L8 9.71103L13.934 15.6451C14.4073 16.1183 15.1718 16.1183 15.6451 15.6451C16.1183 15.1718 16.1183 14.4073 15.6451 13.934L9.71103 7.99999L15.6451 2.06597C16.1062 1.60484 16.1062 0.828197 15.6451 0.367067Z\" fill=\"#222222\"></path>",
+			"    </svg>",
+			"  </button>",
+			"  <button id=\"remove-modal\" type=\"button\" ng-click=\"close()\" external-event=\"esc-close\" style=\"display:none;\"></button>",
+			"</div>"
+		],
+		"donation_close_button" : [
+			"<article class=\"pn-modal\">",
+			"  <div class=\"pn-modal__copy-wrapper\">",
+			"    <strong class=\"pn-modal__title pn-title\">",
+			"      You are the “public” in public&nbsp;media.",
+			"    </strong>",
+			"    <!-- ngIf: subtitle -->",
+			"    <p class=\"pn-modal__copy pn-copy ng-scope\" ng-if=\"subtitle\">",
+			"      Our journalists are proud to bring you the news you need and the stories you love. It's a constant, ongoing effort.",
+			"      <br><br>",
+			"      Federal funding has been eliminated, and now the NPR Network relies more on your financial support.",
+			"      <br><br>",
+			"      Our freely accessible, factual journalism makes a difference. And so, we proudly ask: can you donate to support this&nbsp;service?",
+			"    </p>",
+			"    <!-- end ngIf: subtitle -->",
+			"  </div>",
+			"  <a class=\"pn-modal__button pn-button\" href=\"https://contribute.npr.org/secure/stand-public-media-npr?trackingId=%7Bkpdx%7DAAAAwl9k45nyhQoKOUVOeEtRNThwdRIQbWpnNzV1cnQ5NDE5b2E0cRoMRVhWNzQ5NEtJQk9CIiUxODA4OHBvMGJrLTAwMDAzNnEya2x2azc1NzU1dnJxNHR2M3BnKhxzaG93VGVtcGxhdGVaNVpDRFAyRkhTQkExNjI3MAE6DE9UTTk4OEhPR0tDTUINT1RWRlY3Tlk2UzE1V1ISdi2GAPAZczRxaDhpeW5vMVoNMTE5LjIzNi44NC41MGIDbWFjaPTapsoGcA94BA&amp;_ptid=%7Bkpdx%7DAAAAwl9k45nyhQoKOUVOeEtRNThwdRIQbWpnNzV1cnQ5NDE5b2E0cRoMRVhWNzQ5NEtJQk9CIiUxODA4OHBvMGJrLTAwMDAzNnEya2x2azc1NzU1dnJxNHR2M3BnKhxzaG93VGVtcGxhdGVaNVpDRFAyRkhTQkExNjI3MAE6DE9UTTk4OEhPR0tDTUINT1RWRlY3Tlk2UzE1V1ISdi2GAPAZczRxaDhpeW5vMVoNMTE5LjIzNi44NC41MGIDbWFjaPTapsoGcA94BA\" target=\"_blank\" external-event=\"general-cta\" external-event-params=\"{&quot;aid&quot;:&quot;9ENxKQ58pu&quot;,&quot;displayMode&quot;:&quot;modal&quot;,&quot;iframeId&quot;:&quot;offer_a1c437dc042739be57dc-0&quot;,&quot;offerId&quot;:&quot;fakeOfferId&quot;,&quot;tags&quot;:&quot;1001,1002,1031,1128,327351768,1088064845,g-s1-141,g-s1-21265&quot;,&quot;templateId&quot;:&quot;OTM988HOGKCM&quot;,&quot;templateVariantId&quot;:&quot;OTVFV7NY6S15W&quot;,&quot;url&quot;:&quot;https://www.npr.org/sections/goats-and-soda/2025/12/21/g-s1-102866/health-care-lessons-bangladesh-winter-coat-health&quot;,&quot;width&quot;:985,&quot;trackingId&quot;:&quot;{kpdx}AAAAwl9k45nyhQoKOUVOeEtRNThwdRIQbWpnNzV1cnQ5NDE5b2E0cRoMRVhWNzQ5NEtJQk9CIiUxODA4OHBvMGJrLTAwMDAzNnEya2x2azc1NzU1dnJxNHR2M3BnKhxzaG93VGVtcGxhdGVaNVpDRFAyRkhTQkExNjI3MAE6DE9UTTk4OEhPR0tDTUINT1RWRlY3Tlk2UzE1V1ISdi2GAPAZczRxaDhpeW5vMVoNMTE5LjIzNi44NC41MGIDbWFjaPTapsoGcA94BA&quot;,&quot;experienceId&quot;:&quot;EXV7494KIBOB&quot;,&quot;experienceExecutionId&quot;:&quot;18088po0bk-000036q2klvk75755vrq4tv3pg&quot;,&quot;experienceActionId&quot;:&quot;showTemplateZ5ZCDP2FHSBA1627&quot;}\">",
+			"    <svg ng-show=\"true\" width=\"17\" height=\"16\" viewBox=\"0 0 17 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" class=\"\">",
+			"      <path d=\"M2.94067 9.04917L7.761 13.5494C7.96107 13.7361 8.22516 13.8402 8.49992 13.8402C8.77468 13.8402 9.03877 13.7361 9.23884 13.5494L14.0592 9.04917C14.8701 8.29425 15.3289 7.23521 15.3289 6.12817V5.97345C15.3289 4.1088 13.9818 2.51892 12.1438 2.21215C10.9274 2.00941 9.68966 2.40688 8.82003 3.27652L8.49992 3.59663L8.17981 3.27652C7.31017 2.40688 6.07241 2.00941 4.856 2.21215C3.01803 2.51892 1.6709 4.1088 1.6709 5.97345V6.12817C1.6709 7.23521 2.12972 8.29425 2.94067 9.04917Z\" fill=\"#FFFFFF\"></path>",
+			"    </svg>",
+			"    Yes, I'm Proud to Help ➔",
+			"  </a>",
+			"  <button class=\"pn-modal__close\" type=\"button\" ng-click=\"close()\" ng-show=\"true\" external-event=\"general-close-button\" external-event-params=\"{&quot;aid&quot;:&quot;9ENxKQ58pu&quot;,&quot;displayMode&quot;:&quot;modal&quot;,&quot;iframeId&quot;:&quot;offer_a1c437dc042739be57dc-0&quot;,&quot;offerId&quot;:&quot;fakeOfferId&quot;,&quot;tags&quot;:&quot;1001,1002,1031,1128,327351768,1088064845,g-s1-141,g-s1-21265&quot;,&quot;templateId&quot;:&quot;OTM988HOGKCM&quot;,&quot;templateVariantId&quot;:&quot;OTVFV7NY6S15W&quot;,&quot;url&quot;:&quot;https://www.npr.org/sections/goats-and-soda/2025/12/21/g-s1-102866/health-care-lessons-bangladesh-winter-coat-health&quot;,&quot;width&quot;:985,&quot;trackingId&quot;:&quot;{kpdx}AAAAwl9k45nyhQoKOUVOeEtRNThwdRIQbWpnNzV1cnQ5NDE5b2E0cRoMRVhWNzQ5NEtJQk9CIiUxODA4OHBvMGJrLTAwMDAzNnEya2x2azc1NzU1dnJxNHR2M3BnKhxzaG93VGVtcGxhdGVaNVpDRFAyRkhTQkExNjI3MAE6DE9UTTk4OEhPR0tDTUINT1RWRlY3Tlk2UzE1V1ISdi2GAPAZczRxaDhpeW5vMVoNMTE5LjIzNi44NC41MGIDbWFjaPTapsoGcA94BA&quot;,&quot;experienceId&quot;:&quot;EXV7494KIBOB&quot;,&quot;experienceExecutionId&quot;:&quot;18088po0bk-000036q2klvk75755vrq4tv3pg&quot;,&quot;experienceActionId&quot;:&quot;showTemplateZ5ZCDP2FHSBA1627&quot;}\">",
+			"    <svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">",
+			"      <path d=\"M15.6451 0.367067C15.4183 0.139835 15.1105 0.012135 14.7895 0.012135C14.4685 0.012135 14.1607 0.139835 13.934 0.367067L8 6.28895L2.06598 0.354932C1.83926 0.1277 1.53146 0 1.21047 0C0.889474 0 0.581669 0.1277 0.354949 0.354932C-0.118316 0.828197 -0.118316 1.5927 0.354949 2.06597L6.28896 7.99999L0.354949 13.934C-0.118316 14.4073 -0.118316 15.1718 0.354949 15.6451C0.828214 16.1183 1.59272 16.1183 2.06598 15.6451L8 9.71103L13.934 15.6451C14.4073 16.1183 15.1718 16.1183 15.6451 15.6451C16.1183 15.1718 16.1183 14.4073 15.6451 13.934L9.71103 7.99999L15.6451 2.06597C16.1062 1.60484 16.1062 0.828197 15.6451 0.367067Z\" fill=\"#222222\"></path>",
+			"    </svg>",
+			"  </button>",
+			"</article>"
+		]
+	},
+	"selectors" : {
+		"cookies_close_button" : {
+			"parents" : [
+				{
+					"id":"onetrust-close-btn-container",
+					"tag":"div"
+				},
+				{
+					"id":"onetrust-banner-sdk",
+					"tag":"div",
+					"aria-label" : "Cookie banner"
+				}
+			],
+			"tag" : "button",
+			"class": "onetrust-close-btn-handler onetrust-close-btn-ui banner-close-button ot-close-icon",
+			"aria_label" : "Close"
+		},
+		"create_account_close_button" : {
+			"parents" : [
+				{
+					"tag":"div",
+					"class":"pn-ribbon__footer"
+				},
+				{
+					"tag":"article",
+					"class" : "pn-ribbon"
+				},
+				{
+					"tag":"div",
+					"ng-show":"!terminalError"
+				}
+			],
+			"type" : "button",
+			"class" : "pn-ribbon__close",
+			"external-event" : "close-button",
+			"ng-click" : "close()",
+			"ng-show" : "true"
+
+		},
+		"donation_close_button" : {
+			"tag" : "button",
+			"class" : "pn-modal__close",
+			"type" : "button",
+			"external-event" : "general-close-button",
+			"ng-click" : "close()",
+			"ng-show" : "true"
+		}
+	}
+}
