@@ -53,8 +53,8 @@ class ProxyManagerPaid:
             # --- Dependency Injection for Sources ---
             self.paid_webshareio_source: WebshareIOHttpSource = WebshareIOHttpSource("WebshareIoHttp", timeout=(20.0, 22.0))
             webshareio_https_proxies: ProxyDict = self.paid_webshareio_source.get_proxies()["https"]
-            self.ip_country_mapping = self.paid_webshareio_source.ip_country_mapping
-            self.country_ip_mapping = self.reverse_dict(self.ip_country_mapping)
+            self.ip_country_mapping: Dict[str,str] = self.paid_webshareio_source.ip_country_mapping
+            self.country_ip_mapping: Dict[str,str] = self.reverse_dict(self.ip_country_mapping)
             self.proxies["https"].update(webshareio_https_proxies)
             self._initialized = True
             print(f"[*] {self.name} Initialisation complete!")
@@ -62,7 +62,7 @@ class ProxyManagerPaid:
     @staticmethod
     def reverse_dict(dictionary_to_reverse):
         reversed_dict = {}
-        for key, value in dictionary_to_reverse:
+        for key, value in dictionary_to_reverse.items():
             if value in reversed_dict:
                 reversed_dict[value].append(key)
             else:
