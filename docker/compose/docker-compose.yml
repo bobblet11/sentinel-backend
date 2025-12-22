@@ -125,7 +125,7 @@
       
       volumes:
         - web-scraper_service_logs:/var/log
-
+        
       <<: *common-env 
       restart: always
       networks:
@@ -139,7 +139,7 @@
         - BATCH_SIZE=10
         - GROUP_NAME=default
         - CONSUMER_NAME=web-scraper-1
-        - SCRAPER_MAX_WORKERS=5
+        - SCRAPER_MAX_WORKERS=1
         - PROXY_VALIDATION_MAX_WORKERS=100
         - MAX_FETCH_RETRIES=3
         - INITIAL_FETCH_DELAY_S=1

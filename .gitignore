@@ -5,3 +5,6 @@ webshareio_proxies.json
 microservices/web_scraper/proxy_sources/webshareio_proxies.json
 webshareio_proxies.json
 saved_proxies.json
+/workspaces/sentinel-backend/microservices/web_scraper/screenshots
+./microservices/web_scraper/screenshots
+microservices/web_scraper/screenshots

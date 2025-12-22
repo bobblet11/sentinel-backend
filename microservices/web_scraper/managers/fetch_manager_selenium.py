@@ -1,10 +1,10 @@
 import threading
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 
 import requests
 from requests.exceptions import RequestException
 import socket
- 
+import json
 from common.requests.retry_request import exponential_retry
 from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
 from microservices.web_scraper.managers.proxy_manager import ProxyManager
@@ -21,6 +21,8 @@ from seleniumwire import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
+
 class FetchManagerSelenium:
     """
     A thread-safe Singleton class that fetches news URLs.
@@ -38,11 +40,17 @@ class FetchManagerSelenium:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, default_timeout=(15.0, 20.0), proxy_manager=None):
+    def __init__(self, default_timeout=(15.0, 20.0), proxy_manager=None, hint_path:str="./combined_hints.json", screenshots_path="./"):
         if getattr(self, "_initialized", False): return
         self.proxy_manager = proxy_manager
         # Pre-create the selenium-wire CA folder to prevent the 'PEM routines' error
         os.makedirs(os.path.expanduser("~/.seleniumwire"), exist_ok=True)
+        
+        with open(hint_path, 'r') as f:
+            hint_config: Dict[str,str] = json.load(f)
+            self.x_paths: Dict[str, List[str]] = self.generate_xpath_dict(hint_config)
+            
+        self.screenshots_path = screenshots_path
         self._initialized = True
 
     @staticmethod
@@ -155,12 +163,86 @@ class FetchManagerSelenium:
         driver.request_interceptor = self.generate_interceptor_function(custom_headers)
         return driver
     
+    def extract_source_name(self, url:str):
+        source_map: Dict[str,str] = {
+            ("abcnews", "abcnews.go.com"):"ABC",
+            ("bbc", "www.bbc.com"):"BBC",
+            ("cbc", "www.cbc.ca"):"CBC",
+            ("cbs", "www.cbsnews.com"):"CBS",
+            ("euronews", "www.euronews.com"):"Euronews",
+            ("nbcnews", "www.nbcnews.com"):"NBC",
+            ("npr","www.npr.org"):"NPR",
+            ("theguardian","www.theguardian.com"):"The_Guardian",
+        }
+        
+        for url_patterns, source_name in source_map.items():
+            for pattern in url_patterns:
+                if pattern in url:
+                    return source_name
+                
+        return None
+    
+    def _build_xpath(self, rule_name, rule_data):
+        """
+        Converts the JSON rule into a valid XPath string.
+        """
+        
+        print(f"Creating xpath for {rule_name}")
+        xpath_parts = []
+
+        # 1. Handle Parents (Ancestors)
+        # Your JSON lists immediate parent first, so we reverse it to build XPath Top-Down
+        if "parents" in rule_data:
+            for parent in reversed(rule_data["parents"]):
+                tag = parent.get("tag", "*")
+                attrs = self._get_attribute_predicates(parent)
+                
+                # Combine tag and attributes, e.g., //div[@id='onetrust']
+                xpath_parts.append(f"//{tag}{attrs}")
+
+        # 2. Handle the Target Element
+        tag = rule_data.get("tag", "*")
+        attrs = self._get_attribute_predicates(rule_data)
+        xpath_parts.append(f"//{tag}{attrs}")
+        print(f"Xpath for {rule_name} = {xpath_parts}")
+        # Join parts to form full path: //ancestor//parent//target
+        return "".join(xpath_parts)
+    
+    def _get_attribute_predicates(self, data):
+        """
+        Helper to turn a dictionary {"class": "foo", "id": "bar"} 
+        into XPath string "[contains(@class, 'foo') and @id='bar']"
+        """
+        predicates = []
+        
+        # Keys to ignore (not HTML attributes)
+        ignore_keys = ["tag", "parents"]
+
+        for key, value in data.items():
+            if key in ignore_keys:
+                continue
+            
+            # Special handling for 'class' to allow partial matches
+            if key == "class":
+                predicates.append(f"contains(@class, '{value}')")
+            elif key == "text_contains":
+                # This generates XPath: //button[contains(text(), 'Maybe later')]
+                predicates.append(f"contains(., '{value}')") 
+            else:
+                # specific attributes like ng-click, external-event, etc.
+                predicates.append(f"@{key}='{value}'")
+
+        if not predicates:
+            return ""
+        
+        return "[" + " and ".join(predicates) + "]"
+    
     def handle_scroll(self, driver):
         print("Scrolling down...")
         last_height = driver.execute_script("return document.body.scrollHeight")
         while True:
             driver.execute_script("window.scrollBy(0, 800);")
-            time.sleep(1.5) 
+            time.sleep(5) 
             
             new_height = driver.execute_script("return document.body.scrollHeight")
             if new_height == last_height:
@@ -168,14 +250,98 @@ class FetchManagerSelenium:
             last_height = new_height
         print("Reached the bottom!")
     
-    def handle_pop_ups(self, driver):
-        pass
+    def generate_xpath_dict(self, hint_config):
+        """
+        Generates a map of all the close buttons needed to be pressed for each source.
+        """
+        xpath_dict = {}
+        for source_name, source_rules in hint_config.items():
+            xpath_dict[source_name] = []
+            
+            for rule_name, rule_data in source_rules.get("selectors", {}).items():
+                print(rule_name, rule_data)
+                xpath = self._build_xpath(rule_name, rule_data)
+                xpath_dict[source_name].append(xpath)
+        
+        return xpath_dict
+            
+    def handle_pop_ups(self, source_name:str, driver):
+        print(f"Looking for pop ups for {source_name}")
+        x_paths = self.x_paths.get(source_name, [])
+        
+        if not x_paths:
+            print(f"No xpath rules found for {source_name}")
+            return
+        
+        def try_click(context_driver, xpath):
+            print(f"trying to click {xpath}")
+            try:
+                # Reduced timeout to 1s because we iterate iframes, don't want to wait long per frame
+                element = WebDriverWait(context_driver, 1).until(
+                    EC.presence_of_element_located((By.XPATH, xpath))
+                )
+                if element.is_displayed():
+                    print(f"   Found popup [{xpath}]. Clicking...")
+                    try:
+                        element.click()
+                    except ElementClickInterceptedException:
+                        context_driver.execute_script("arguments[0].click();", element)
+                    print(f"   ✅ Closed [{xpath}]")
+                    return True
+            except TimeoutException:
+                pass
+            except Exception as e:
+                print(f"   ⚠️ Error interacting: {e}")
+            return False
+        
+        for x_path_to_close in x_paths:
+            # 1. Try Main Content
+            driver.switch_to.default_content()
+            if try_click(driver, x_path_to_close):
+                time.sleep(1)
+                continue # Move to next rule
+
+            # 2. If not found, iterate ALL iframes
+            iframes = driver.find_elements(By.TAG_NAME, "iframe")
+            for i, iframe in enumerate(iframes):
+                try:
+                    driver.switch_to.default_content() # Reset
+                    driver.switch_to.frame(iframe)     # Enter iframe
+                    if try_click(driver, x_path_to_close):
+                        time.sleep(1)
+                        break # Stop looking through iframes for this rule
+                except Exception:
+                    # Iframes sometimes unload or deny access, just skip
+                    continue
+            
+            # Always reset to default after finishing a rule
+            driver.switch_to.default_content()
+            
+            
+    def save_screenshot(self, driver, url):
+        if not driver:
+            return None
+        
+        try:
+            print("Taking screenshot")
+            png_data = driver.get_screenshot_as_png()
+        except Exception as e:
+            print(f"Could not take screenshot: {e}")
+            return
+        
+        print("Saving screenshot")
+        try:            
+            timestamp = int(time.time())
+            filename = f"{timestamp}.png"
+            file_path = os.path.join(self.screenshots_path, filename)
+        
+            with open(file_path, "wb") as f:
+                f.write(png_data)
+            print(f"📸 Screenshot saved to: {file_path}")
+        except Exception as e:
+            print(f"❌ Failed to write screenshot file: {e}")
+        
     
-    def collect_failure_screenshots(self, driver):
-        pass
-    
-    def save_screenshots(self, data):
-        pass
     
     @exponential_retry(
         max_attempts=MAX_FETCH_RETRIES,
@@ -213,26 +379,30 @@ class FetchManagerSelenium:
             custom_headers = self._create_enhanced_headers(lang_string)
             user_agent = user_agent_manager.get_random_agent()
             
-            
+            source_name:str = self.extract_source_name(url)
+            print(f"DEBUG: Identified source as: '{source_name}' for URL: {url}")
             
             driver = self.get_clean_driver(proxy_url, user_agent, custom_headers)
             driver.get(url)
-            
+           
             try:
-                WebDriverWait(driver, 2)   
-                self.handle_pop_ups(driver)
-                WebDriverWait(driver, 2)   
+                time.sleep(2)
                 self.handle_scroll(driver)
+                self.save_screenshot(driver,url)
+                self.handle_pop_ups(source_name, driver)
+                self.save_screenshot(driver,url)
+                self.handle_scroll(driver)
+                self.save_screenshot(driver,url)
             except Exception as e:
                 data = self.collect_failure_screenshots()
-                self.save_screenshots(data)
+                self.save_screenshot(data)
                 raise Exception(f"Failed to navigate page: {e}")
             
-            html = driver.page_source
-            if "ERR_CERT_AUTHORITY_INVALID" in html:
+            body_element = driver.find_element(By.TAG_NAME, "main").get_attribute("innerHTML")
+            if "ERR_CERT_AUTHORITY_INVALID" in body_element:
                 raise Exception("SSL Bypass failed")
             print(f"[SUCCESS] Successfully fetched {url}")
-            return html
+            return body_element
 
         except Exception as e:
             print(f"[ERROR] Fetching {url}: {e}")
@@ -252,5 +422,8 @@ class FetchManagerSelenium:
                 except Exception as cleanup_err:
                     print(f"Cleanup Error: {cleanup_err}")
 
-
-fetch_manager = FetchManagerSelenium(proxy_manager=proxy_manager_paid)
+script_dir: str = os.path.dirname(os.path.abspath(__file__))
+combined_hints_file_path: str = os.path.abspath(os.path.join(script_dir, "../", "page_structure_hints", "combined_hints.json"))
+screenshots_folder_path: str = "/app/microservices/web_scraper/screenshots"
+os.makedirs(screenshots_folder_path, exist_ok=True)
+fetch_manager = FetchManagerSelenium(proxy_manager=proxy_manager_paid, hint_path=combined_hints_file_path, screenshots_path = screenshots_folder_path)
