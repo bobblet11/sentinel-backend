@@ -1,13 +1,11 @@
 import threading
-from typing import Dict, Tuple, List
+from typing import Dict, List
 
-import requests
 from requests.exceptions import RequestException
 import socket
 import json
 from common.requests.retry_request import exponential_retry
-from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
-from microservices.web_scraper.managers.proxy_manager import ProxyManager
+from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid
 from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
 from microservices.web_scraper.config import MAX_FETCH_RETRIES, INITIAL_FETCH_DELAY_S, FETCH_DELAY_GROWTH_RATE
 import tempfile
@@ -21,7 +19,7 @@ from seleniumwire import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementClickInterceptedException
+from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 
 class FetchManagerSelenium:
     """
