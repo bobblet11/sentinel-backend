@@ -1,6 +1,7 @@
 import random
 import threading
 from typing import Dict, List, Optional, Set
+
 from microservices.web_scraper.proxy_sources.web_based.webshareio_http import (
     WebshareIOHttpSource,
 )
@@ -9,9 +10,10 @@ from microservices.web_scraper.proxy_sources.web_based.webshareio_http import (
 ProxyDict = Dict[str, List[str]]
 ProxyRequestDict = Optional[Dict[str, str]]
 
+
 class ProxyManagerPaid:
     """
-    A thread-safe Singleton class that uses paid for proxies only. 
+    A thread-safe Singleton class that uses paid for proxies only.
     """
 
     _instance = None
@@ -25,9 +27,7 @@ class ProxyManagerPaid:
                     cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(
-        self
-    ):
+    def __init__(self):
 
         if getattr(self, "_initialized", False):
             return
@@ -47,10 +47,18 @@ class ProxyManagerPaid:
             self._refresh_lock: threading.Lock = threading.Lock()
 
             # --- Dependency Injection for Sources ---
-            self.paid_webshareio_source: WebshareIOHttpSource = WebshareIOHttpSource("WebshareIoHttp", timeout=(20.0, 22.0))
-            webshareio_https_proxies: ProxyDict = self.paid_webshareio_source.get_proxies()["https"]
-            self.ip_country_mapping: Dict[str,str] = self.paid_webshareio_source.ip_country_mapping
-            self.country_ip_mapping: Dict[str,str] = self.reverse_dict(self.ip_country_mapping)
+            self.paid_webshareio_source: WebshareIOHttpSource = WebshareIOHttpSource(
+                "WebshareIoHttp", timeout=(20.0, 22.0)
+            )
+            webshareio_https_proxies: ProxyDict = (
+                self.paid_webshareio_source.get_proxies()["https"]
+            )
+            self.ip_country_mapping: Dict[str, str] = (
+                self.paid_webshareio_source.ip_country_mapping
+            )
+            self.country_ip_mapping: Dict[str, str] = self.reverse_dict(
+                self.ip_country_mapping
+            )
             self.proxies["https"].update(webshareio_https_proxies)
             self._initialized = True
             print(f"[*] {self.name} Initialisation complete!")
@@ -64,7 +72,7 @@ class ProxyManagerPaid:
             else:
                 reversed_dict[value] = [key]
         return reversed_dict
-    
+
     def reset(self):
         """Testing aid: clear caches and force next call to rebuild."""
         with self._refresh_lock:
@@ -99,16 +107,15 @@ class ProxyManagerPaid:
             index = self.rotate_index % len(self.country_ip_mapping)
             chosen_proxy = self.country_ip_mapping["GB"][index]
             return self._create_proxy_dict(chosen_proxy)
-        
+
         chosen_proxy = list(all_usable_proxies)[self.rotate_index]
         self.rotate_index = (self.rotate_index + 1) % len(all_usable_proxies)
         return self._create_proxy_dict(chosen_proxy)
 
-    
     def report_bad_proxy(self, proxy_url: str) -> None:
         """Does not need to do anything for paid proxies"""
         return
-    
+
     def _get_all_usable_proxies(self) -> Set[str]:
         """Returns a unified set of all valid proxies."""
         return self.proxies["https"] | self.proxies["socks4"] | self.proxies["socks5"]
@@ -117,5 +124,6 @@ class ProxyManagerPaid:
     def _create_proxy_dict(proxy_url: str) -> ProxyRequestDict:
         """Creates a correctly formatted proxy dictionary for `requests`."""
         return {"http": proxy_url, "https": proxy_url}
+
 
 proxy_manager_paid = ProxyManagerPaid()

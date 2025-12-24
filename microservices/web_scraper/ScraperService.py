@@ -18,6 +18,7 @@ from microservices.web_scraper.config import (
 from microservices.web_scraper.managers.fetch_manager_selenium import fetch_manager
 from microservices.web_scraper.managers.parse_manager import parse_manager
 
+
 class ScraperService:
     """ """
 
@@ -136,7 +137,7 @@ class ScraperService:
             print(f"  [ERROR] Worker failed for message {redis_msg_id}: {e}")
             raise e
 
-    def _attempt_fetch_article(self, message:Dict[str,Any]):
+    def _attempt_fetch_article(self, message: Dict[str, Any]):
 
         try:
             url = message.get("data", {}).get("data", {}).get("url", None)
@@ -155,11 +156,11 @@ class ScraperService:
     def _attempt_parse_article(self, message):
         try:
             url = message.get("data", {}).get("data", {}).get("url", None)
-            html = message.get("data", {}).get("data",{}).get("html", None)
+            html = message.get("data", {}).get("data", {}).get("html", None)
             if not url or not html:
                 print(message)
             print(f"Attemping to parse {url}")
-            
+
             parse_content = parse_manager.parse_article_html(html, url)
             print(f"-> SUCCESS: Parsed text for {url}, length: {len(parse_content)}")
             updated_message = message.copy()

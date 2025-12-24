@@ -13,7 +13,7 @@ ProxyRequestDict = Optional[Dict[str, str]]
 
 def normalize_proxy_scheme(proxy_str: str, scheme: str = "http") -> str:
     """Ensures a proxy string has a scheme, defaulting if missing."""
-    
+
     if scheme == "socks5":
         scheme = "socks5h"
 
