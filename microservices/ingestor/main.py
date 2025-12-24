@@ -32,7 +32,7 @@ def exec():
     rss_feeds = sum([x["feeds"] for x in available_structured_rss_feeds], [])
     num_feeds = len(rss_feeds)
 
-    print(f"Feeds")
+    print("Feeds")
     print("-" * 20)
     print(
         f"Number of Free Outlets: {len(free_outlets)} ({num_free_feeds} feeds) [{100 * (num_free_feeds / num_feeds)}]"

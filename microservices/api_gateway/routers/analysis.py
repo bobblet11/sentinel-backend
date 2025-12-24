@@ -1,18 +1,19 @@
 # routers/analysis.py
+
+
 import logging
 import os
 import sys
 
+from config import CACHE_TTL, NLP_URL, WEB_SCRAPER_URL
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
-
-# Allow running this module directly or via relative import
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from config import CACHE_TTL, NLP_URL, WEB_SCRAPER_URL
 from utils.cache import get_cache, set_cache
 from utils.helpers import httpx_encode, url_key
 from utils.requests import fetch_json
+
+# Allow running this module directly or via relative import
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
