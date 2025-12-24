@@ -1,7 +1,8 @@
 # routers/analysis.py
+import logging
 import os
 import sys
-import logging
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 

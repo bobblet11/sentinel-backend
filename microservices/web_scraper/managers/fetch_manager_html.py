@@ -5,10 +5,18 @@ import requests
 from requests.exceptions import RequestException
 
 from common.requests.retry_request import exponential_retry
-from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
+from microservices.web_scraper.config import (
+    FETCH_DELAY_GROWTH_RATE,
+    INITIAL_FETCH_DELAY_S,
+    MAX_FETCH_RETRIES,
+)
 from microservices.web_scraper.managers.proxy_manager import ProxyManager
+from microservices.web_scraper.managers.proxy_manager_paid import (
+    ProxyManagerPaid,
+    proxy_manager_paid,
+)
 from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
-from microservices.web_scraper.config import MAX_FETCH_RETRIES, INITIAL_FETCH_DELAY_S, FETCH_DELAY_GROWTH_RATE
+
 
 class FetchManagerHTML:
     """
@@ -29,7 +37,7 @@ class FetchManagerHTML:
     def __init__(
         self,
         default_timeout: Tuple[float, float] = (15.0, 20.0),  # (connect, read)
-        proxy_manager: ProxyManagerPaid | ProxyManager = proxy_manager_paid
+        proxy_manager: ProxyManagerPaid | ProxyManager = proxy_manager_paid,
     ):
 
         if getattr(self, "_initialized", False):
@@ -84,7 +92,7 @@ class FetchManagerHTML:
             user_agent = user_agent_manager.get_random_agent()
             headers = self._create_enhanced_headers(user_agent)
             proxy_url_for_reporting = proxies.get("https", proxies.get("http"))
-            
+
             response = requests.get(
                 url, headers=headers, proxies=proxies, timeout=self.timeout
             )

@@ -2,7 +2,9 @@ import concurrent.futures
 from typing import Dict, Iterator, List
 
 import feedparser
+
 from common.requests.user_agent_manager import user_agent_manager
+
 from .base_ingestor import BaseIngestor
 
 
@@ -37,7 +39,7 @@ class RssIngestor(BaseIngestor):
         """
         try:
             # print(f"\tFetching RSS feed: {url}")
-            feed = feedparser.parse(url,agent=user_agent_manager.get_random_agent())
+            feed = feedparser.parse(url, agent=user_agent_manager.get_random_agent())
 
             if feed.bozo:
                 raise feed.bozo_exception
@@ -49,7 +51,7 @@ class RssIngestor(BaseIngestor):
             return None
 
     # def _test_rss_feeds(self) -> Dict[str, int]:
-        
+
     #     failed_feeds_count = 0
     #     successful_feeds_count = 0
     #     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -59,8 +61,8 @@ class RssIngestor(BaseIngestor):
     #                 failed_feeds_count+=1
     #             successful_feeds_count+=1
 
-    #     return {"success" : successful_feeds_count, "fail" : failed_feeds_count} 
-    
+    #     return {"success" : successful_feeds_count, "fail" : failed_feeds_count}
+
     def fetch_articles(self) -> Iterator[Dict[str, str]]:
         """
         Concurrently fetches all RSS feeds using a thread pool and yields

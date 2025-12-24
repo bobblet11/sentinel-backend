@@ -110,7 +110,6 @@ class ProxyManager:
             self._initialized = True
             print(f"[*] {self.name} Initialisation complete!")
 
-        
     def _load_and_validate_initial_proxies(self):
         """Loads proxies from the persistent cache and validates them on startup."""
         print("[*] Loading saved proxies...")
