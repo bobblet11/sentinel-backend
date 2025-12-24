@@ -1,10 +1,6 @@
-import os
 import random
 import threading
 from typing import Dict, List, Optional, Set
-from microservices.web_scraper.proxy_sources.file_based.webshareio_file import (
-    WebshareIOFileSource,
-)
 from microservices.web_scraper.proxy_sources.web_based.webshareio_http import (
     WebshareIOHttpSource,
 )
