@@ -1,5 +1,5 @@
-from typing import Any, Union
-
+from typing import Any, Union, Dict
+from dataclasses import dataclass
 from pydantic import BaseModel
 
 """
@@ -50,3 +50,19 @@ class Message(BaseModel):
 
     header: MessageHeader
     data: Union[MessageURLPayload, Any]  # Fixed for Python 3.9
+
+@dataclass
+class StreamMessage:
+    stream: str
+    redis_id: str
+    data: Dict[str, Any]
+    priority: int
+
+    @property
+    def type(self) -> str:
+        return self.data.get("header", {}).get("type", "unknown")
+    
+    #fix later
+    @property
+    def link(self) -> str:
+        return self.data.get("header", {}).get("type", "unknown")
