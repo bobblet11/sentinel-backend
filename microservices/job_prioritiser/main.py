@@ -1,25 +1,15 @@
-import datetime
 import signal
+from logging import Logger, getLogger
+from common.io.logging import setup_logging
+from microservices.job_prioritiser.prioritiser_service import PrioritiserService
+from microservices.job_prioritiser.config import CONSUMER_NAME
 
-from microservices.job_prioritiser.PrioritiserService import PrioritiserService
-
-
-def exec():
-    """
-    Main execution loop. Fetches a batch of messages, prioritizes them,
-    and then processes them one by one.
-    """
-
+if __name__ == "__main__":
+    setup_logging(container_name=CONSUMER_NAME)
+    main_logger: Logger = getLogger("__main__")
     prioritiser = PrioritiserService()
 
-    # Register signal handlers for graceful shutdown (Ctrl+C)
     signal.signal(signal.SIGINT, prioritiser.shutdown)
     signal.signal(signal.SIGTERM, prioritiser.shutdown)
 
     prioritiser.run()
-
-
-if __name__ == "__main__":
-    print(f"\n\nmain.py is being run. It is currently {datetime.datetime.now()}")
-    exec()
-    print(f"\n\nmain.py is finished. It is currently {datetime.datetime.now()}")

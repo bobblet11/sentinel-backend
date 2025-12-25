@@ -1,7 +1,4 @@
-import json
-import os
 import logging 
-
 from pydantic import TypeAdapter
 from typing import Dict, List
 from pathlib import Path
@@ -11,6 +8,7 @@ from dataclasses import field
 from dataclasses import dataclass
 from enum import StrEnum
 
+SERVICE_NAME:str = "ingestor"
 RSS_FEED_FILE_NAME:str = "rss_feeds.json"
 PATH_TO_RSS_FEED_FILE: Path = Path(__file__).resolve().parent / RSS_FEED_FILE_NAME
 class PaymentTier(StrEnum):
@@ -45,7 +43,7 @@ def categorise_rss_sources_by_payment_tier(sources:List[RssSourceEntry]) -> Dict
 
 
 if __name__ == "__main__":
-    setup_logging(container_name="ingestor")
+    setup_logging(container_name=SERVICE_NAME)
     main_logger: logging.Logger = logging.getLogger("__main__")
     
     try:
