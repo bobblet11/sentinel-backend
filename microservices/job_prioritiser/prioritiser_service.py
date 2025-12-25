@@ -18,13 +18,6 @@ from .config import (
     PRIORITY_MAP,
 )
 
-# message_dict = {
-#     'stream': stream_name.decode('utf-8'),
-#     'redis_message_id': redis_message_id.decode('utf-8'),
-#     'data': message_data
-# }
-
-
 class PrioritiserService:
 
     def __init__(self):
@@ -35,7 +28,7 @@ class PrioritiserService:
         )
         self.publisher = RedisPublisher(stream_name=OUTPUT_STREAM)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Signal handler to initiate a graceful shutdown."""
         self.logger.info("\nShutdown signal received. Finishing current batch...")
         self.keep_running = False
@@ -55,22 +48,42 @@ class PrioritiserService:
             priority=priority
         )
     
+    def _process_batch(self, raw_messages: List[Dict[str, Any]]) -> int:
+        # 2. Parse and Prioritize
+        self.logger.info(f"Fetched {len(raw_messages)} messages. Prioritising...")
+        parsed_messages: List[StreamMessage] = [self._parse_message(m) for m in raw_messages]
+        parsed_messages.sort(key=lambda m: m.priority)
+        
+        
+        self.logger.info(f"Publishing {len(parsed_messages)} messages concurrently...")
+
+        # 3. Publish and Ack
+        total_count:int = len(parsed_messages)
+        success_count:int = 0
+        
+        if parsed_messages:
+            parsed_message_data: List[Dict, Any] = [message.data for message in parsed_messages]
+            published_ids: List[str] = self.publisher.publish_many(parsed_message_data)
+            if published_ids:
+                ack_count = 0
+            
+            for original_msg in parsed_messages:
+                self.combiner.acknowledge(original_msg.stream, original_msg.redis_id)
+                ack_count += 1
+            
+            self.logger.info(
+                f"Batch Complete: Published and Acked {ack_count} messages."
+            )
+        else:
+            self.logger.error(
+                "Batch Publish Failed. RedisPublisher returned None. "
+                "Messages will NOT be acknowledged and will be re-delivered."
+            )
     
-    def _process_message(self, message: StreamMessage) -> str:
-        """
-        Worker function: Publishes to output and Acks the input.
-        Returns the Redis ID on success, raises exception on failure.
-        """
-        # 1. Publish to new stream
-        success = self.publisher.publish_one(message.data)
-        if not success:
-            raise RuntimeError(f"Redis publish failed for {message.redis_id}")
+        percentage:float = success_count/total_count if total_count > 0 else 0
+        self.logger.info(f"  - Successfully published and acknowledged {success_count} / {total_count} ({percentage:.1f}%)")
 
-        # 2. Acknowledge original message
-        self.combiner.acknowledge(message.stream, message.redis_id)
-        return message.redis_id
-
-    def run(self):
+    def run(self) -> None:
         """
         Main execution loop. Fetches and processes messages sequentially.
         """
@@ -79,6 +92,15 @@ class PrioritiserService:
         while self.keep_running:
             try:
                 
+                # 0. Check & deal with pending messagess
+                self.logger.info(f"Checking for pending messages...")
+                pending_messages = self.combiner.consume_pending()
+
+                if pending_messages:
+                    self.logger.info(f"Found {len(pending_messages)} pending messages. Processing them...")
+                    self._process_batch(pending_messages)
+
+                
                 # 1. Fetch
                 self.logger.info(f"Waiting for up to {BATCH_SIZE} messages...")
                 raw_messages:List[Dict[str, Any]] = self.combiner.consume_many(
@@ -86,42 +108,11 @@ class PrioritiserService:
                 )
                 if not raw_messages:
                     continue
-
-                # 2. Parse and Prioritize
-                self.logger.info(f"Fetched {len(raw_messages)} messages. Prioritising...")
-                parsed_messages = [self._parse_message(m) for m in raw_messages]
-                parsed_messages.sort(key=lambda m: m.priority)
                 
-                
-                self.logger.info(f"Publishing {len(parsed_messages)} messages concurrently...")
-
-                # 3. Publish and Ack
-                total_count = len(parsed_messages)
-                success_count:int = 0
-                
-                if parsed_messages:
-                    parsed_message_data = [message.data for message in parsed_messages]
-                    published_ids = self.publisher.publish_many(parsed_message_data)
-                    if published_ids:
-                        ack_count = 0
-                    
-                    for original_msg in parsed_messages:
-                        self.combiner.acknowledge(original_msg.stream, original_msg.redis_id)
-                        ack_count += 1
-                    
-                    self.logger.info(
-                        f"Batch Complete: Published and Acked {ack_count} messages."
-                    )
-                else:
-                    self.logger.error(
-                        "Batch Publish Failed. RedisPublisher returned None. "
-                        "Messages will NOT be acknowledged and will be re-delivered."
-                    )
-            
-                percentage = success_count/total_count if total_count > 0 else 0
-                self.logger.info(f"  - Successfully published and acknowledged {success_count} / {total_count} ({percentage:.1f}%)")
-            
+                self._process_batch(raw_messages)
+               
             except Exception as e:
                 self.logger.error(f"Unexpected error in main loop {e}")
                 self.shutdown()
+                
         self.logger.info("SHUTTING DOWN")
