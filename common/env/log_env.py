@@ -10,8 +10,8 @@ class EnvVariable:
 @dataclass(frozen=True)
 class Config:
         environment_variables: List[EnvVariable]
-        input_stream: str | None
-        output_stream: str | None
+        input_stream: str | List[str] | None
+        output_stream: str | List[str] | None
 
 def print_env(
 	config: Config,
