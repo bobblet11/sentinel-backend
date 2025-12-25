@@ -225,7 +225,29 @@
 			}
 		}
 	},
-	"Euronews":{},
+	"Euronews":{
+		"html_examples": {
+    		"cookie_popup_close_1": [
+      			"<div class=\"didomi-popup-view\">",
+      			"  <span class=\"didomi-continue-without-agreeing\">Continue without agreeing →</span>",
+      			"  <button id=\"didomi-notice-agree-button\">Agree and close</button>",
+      			"</div>"
+    		]
+  		},
+  		"selectors": {
+    		"cookie_popup_close_1": {
+     		"parents": [
+        		{
+          		"tag": "div",
+          		"class": "didomi-popup-view"
+        		}
+      		],
+      		"tag": "span",
+      		"class": "didomi-continue-without-agreeing",
+      		"text_contains": "Continue without agreeing"
+    		}
+  		}
+	},
 	"The_Guardian":{
 			"html_examples" : {
 				"support_close_button_1" : [
