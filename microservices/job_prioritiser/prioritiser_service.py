@@ -72,7 +72,7 @@ class PrioritiserService:
 
     def run(self):
         """
-        Main execution loop. Fetches and processes messages concurrently.
+        Main execution loop. Fetches and processes messages sequentially.
         """
         self.logger.info(f"Service started. Listening on {INPUT_STREAMS}")
 
@@ -98,17 +98,26 @@ class PrioritiserService:
                 # 3. Publish and Ack
                 total_count = len(parsed_messages)
                 success_count:int = 0
-                for message in parsed_messages:
-                    try:
-                        self._process_message(message)
-                        self.logger.debug(
-                            f"  - Successfully published and acknowledged Msg ID {message.redis_id}"
-                        )
-                        success_count+=1
-                    except RuntimeError:
-                        self.logger.error(
-                                        f"  - Failed Msg ID {message.redis_id}: {e}. Skipping Ack."
-                                    )
+                
+                if parsed_messages:
+                    parsed_message_data = [message.data for message in parsed_messages]
+                    published_ids = self.publisher.publish_many(parsed_message_data)
+                    if published_ids:
+                        ack_count = 0
+                    
+                    for original_msg in parsed_messages:
+                        self.combiner.acknowledge(original_msg.stream, original_msg.redis_id)
+                        ack_count += 1
+                    
+                    self.logger.info(
+                        f"Batch Complete: Published and Acked {ack_count} messages."
+                    )
+                else:
+                    self.logger.error(
+                        "Batch Publish Failed. RedisPublisher returned None. "
+                        "Messages will NOT be acknowledged and will be re-delivered."
+                    )
+            
                 percentage = success_count/total_count if total_count > 0 else 0
                 self.logger.info(f"  - Successfully published and acknowledged {success_count} / {total_count} ({percentage:.1f}%)")
             
