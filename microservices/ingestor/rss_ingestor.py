@@ -59,7 +59,7 @@ class RssIngestor(BaseIngestor):
                 if not feed:
                     continue
 
-                self.logger.info(f"\tProcessing entries from: {feed.feed.get('title', 'Unknown Title')}")
+                self.logger.debug(f"\tProcessing entries from: {feed.feed.get('title', 'Unknown Title')}")
 
                 for entry in feed.entries:
 
