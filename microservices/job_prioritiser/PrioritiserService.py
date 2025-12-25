@@ -11,7 +11,7 @@ from .config import (
     GROUP_NAME,
     INPUT_STREAMS,
     LOWEST_PRIORITY,
-    MAX_WORKERS,
+    MAX_PUBLISH_WORKERS,
     OUTPUT_STREAM,
     PRIORITY_MAP,
 )
@@ -78,7 +78,7 @@ class PrioritiserService:
         """
         Main execution loop. Fetches and processes messages concurrently.
         """
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        with ThreadPoolExecutor(max_workers=MAX_PUBLISH_WORKERS) as executor:
 
             while self.keep_running:
                 print(
