@@ -91,6 +91,7 @@
       environment:
         - REDIS_DUPLICATE_FILTER_KEY=ingestor:seen.articles
         - OUTPUT_STREAM=ingestor:to.be.scraped
+        - MAX_INGESTOR_WORKERS=100
 
     scraper-prioritiser:  
       <<: [ *common-env, *prioritiser-service ]

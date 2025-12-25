@@ -1,95 +1,102 @@
 import datetime
 import hashlib
+import logging
 
 from common.models.api.redis_models import Message, MessageHeader, MessageURLPayload
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
+from dataclasses import dataclass
+from typing import Iterator, Dict, Set, List, Any
 
 
+@dataclass(frozen=True)
+class Article:
+    link: str
+    source: str = "Unknown Source"
+    
 class BaseIngestor:
     """
     A base class that defines the template for an ingestion workflow.
-
     Subclasses must implement the `_fetch_articles` generator method.
     """
 
     def __init__(self):
         self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY)
         self.publisher = RedisPublisher(OUTPUT_STREAM)
+        self.logger: logging.Logger = logging.getLogger("base_ingestor")
 
-    def fetch_articles(self):
+    def fetch_articles(self) -> Iterator[Article]: 
         """
-        Generator that fetches URLs from the RSS list.
+        Generator that fetches URLs from some source.
 
-        This method MUST be a generator that yields dictionaries, where each
-        dictionary represents a single fetched article and must contain at least
-        a "link" and "source" key.
+        This method must be a generator that yields Articles, where each
+        Article represents a single fetched article and must contain at least
+        a "link".
 
-        Example: yield {"link": "http://a.com", "source": "rss.xml"}
+        Example: yield {"link": "http://a.com", "source": "BBC"}
         """
 
         raise NotImplementedError("Please Implement this method")
 
-    def run(self):
+
+    def run(self) -> None:
         """
-        Main cycle of ingestor service. Fetches, Filters, and Publishes articles from RSS list.
+        Main cycle of ingestor service. Fetches, Filters, and Publishes articles from source of urls.
         """
 
-        # Step 1: Fetch and filter articles from RSS
-        print(f"--- Starting new ingestion cycle for {self.__class__.__name__} ---")
-        unique_articles_map = {}
-        for article in self.fetch_articles():
-            link = article.get("link")
-            if link and link not in unique_articles_map:
-                unique_articles_map[link] = article
-        if not unique_articles_map:
-            print("--- Ingestion cycle finished. No articles found. ---\n\n")
+        # Step 1: Fetch articles from source
+        self.logger.info("--- Starting new ingestion cycle ---")
+        raw_articles: List[Article] = list(self.fetch_articles())
+        unique_articles: Set[Article] = set([a for a in raw_articles if a.link])
+        if len(unique_articles) == 0:
+            self.logger.info("--- Ingestion cycle finished. No articles found. ---\n\n")
             return
-        total_fetched = len(unique_articles_map)
-        # print(f"Fetched a total of {total_fetched} unique articles from sources.")
-
-        # Step 2: Check if article has already been seen
-        all_links = list(unique_articles_map.keys())
-        unseen_article_links = self.duplicate_filter.has_many(all_links)
-        if not unseen_article_links:
-            print("--- Ingestion cycle finished. Seen all articles already. ---\n\n")
+        
+        # Step 2: Check if url has already been seen
+        article_urls: List[str] = [article.link for article in unique_articles]
+        unseen_article_urls: List[str] = self.duplicate_filter.has_many(article_urls)
+        if len(unseen_article_urls) == 0:
+            self.logger.info("--- Ingestion cycle finished. Seen all articles already. ---\n\n")
             return
-
-        unseen = len(unseen_article_links)
-        # print(f"Found {unseen} new articles out of {total_fetched}.")
-
-        messages_to_publish = []
-        for link in unseen_article_links:
-            article = unique_articles_map[link]
-
-            payload = MessageURLPayload(url=link, source_rss=article.get("source"))
+        
+        # Step 3: Filter out articles that haven't been seen
+        unseen_urls_set: Set[str] = set(unseen_article_urls)
+        unseen_articles: List[Article] = [article for article in unique_articles if article.link in unseen_urls_set]
+        
+        # Step 4: Publish unseen articles
+        messages_to_publish: List[Any] = []
+        for article in unseen_articles:
+            payload = MessageURLPayload(url=article.link, source_rss=article.source)
+            
             message = Message(
                 header=MessageHeader(
-                    message_id=hashlib.md5(link.encode()).hexdigest(),
+                    message_id=hashlib.md5(article.link.encode()).hexdigest(),
                     timestamp=datetime.datetime.now().isoformat(),
                     type="background",
                 ),
                 data=payload,
             )
+            message_as_dict = message.model_dump()
+            messages_to_publish.append(message_as_dict)
 
-            messages_to_publish.append(message.model_dump())
-
-        if not messages_to_publish:
-            print(
+        if len(messages_to_publish) == 0:
+            self.logger.info(
                 "--- Ingestion cycle finished. Cannot publish for some reason. ---\n\n"
             )
             return
 
-        published_ids = self.publisher.publish_many(messages_to_publish)
-
-        if not published_ids:
-            print("--- Ingestion cycle finished. Could not publish to queue. ---\n\n")
+        published_ids:List[str] = self.publisher.publish_many(messages_to_publish)
+        number_of_published_ids: int = len(published_ids)
+        if number_of_published_ids == 0:
+            self.logger.info("--- Ingestion cycle finished. Could not publish to queue. ---\n\n")
             return
 
-        self.duplicate_filter.add_many(unseen_article_links)
-        print("--- Ingestion cycle finished ---")
-        print(f"\tNew: {unseen}")
-        print(f"\tSeen: {total_fetched - unseen}")
-        print(f"\tTotal: {total_fetched}")
-        print("-" * 10)
+        # Step 5: Add urls to cache for future cycles
+        self.duplicate_filter.add_many(unseen_article_urls)
+        
+        self.logger.info("--- Ingestion cycle finished ---")
+        self.logger.info(f"\tNew: {len(unseen_articles)}")
+        self.logger.info(f"\tSeen: {len(raw_articles) - len(unseen_articles)}")
+        self.logger.info(f"\tTotal: {len(raw_articles)}")
+        self.logger.info("-" * 10)
