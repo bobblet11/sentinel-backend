@@ -84,7 +84,7 @@ class RedisPublisher:
                 print("No messages to publish")
                 raise Exception("No messages to publish")
 
-            pipe = self.client.pipeline()
+            pipe = self.client.pipeline(transaction=True)
 
             for message_data in messages:
                 payload = {"payload": json.dumps(message_data)}
