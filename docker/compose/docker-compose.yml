@@ -103,6 +103,7 @@
         - CONSUMER_NAME=scraper-prioritiser-1
         - BATCH_SIZE=100
         - MAX_PUBLISH_WORKERS=10
+
       depends_on:
         - ingestor-service
       volumes:
