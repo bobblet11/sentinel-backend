@@ -102,7 +102,7 @@
         - GROUP_NAME=default
         - CONSUMER_NAME=scraper-prioritiser-1
         - BATCH_SIZE=100
-        - MAX_WORKERS=10
+        - MAX_PUBLISH_WORKERS=10
       depends_on:
         - ingestor-service
       volumes:
@@ -146,14 +146,6 @@
         - INITIAL_FETCH_DELAY_S=1
         - FETCH_DELAY_GROWTH_RATE=1.2
       
-    # nlp-prioritiser:  
-    #   <<: [ *common-env, *prioritiser-service ]
-    #   container_name: sentinel-nlp-prioritiser-service-container
-    #   environment:
-    #     - INPUT_STREAMS=user-nlp-jobs, background-nlp-jobs
-    #     - OUTPUT_STREAM=nlp-priority-queue
-    #     - CONSUMER_NAME=scraper-prioritiser-1
-
   volumes:
     redis_data: {}
     ingestor_service_logs: {}
