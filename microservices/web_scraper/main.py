@@ -1,6 +1,6 @@
 import signal
 
-from microservices.web_scraper.ScraperService import ScraperService
+from microservices.web_scraper.scraper_service import ScraperService
 
 if __name__ == "__main__":
     scraper_service = ScraperService()
