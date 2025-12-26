@@ -1,5 +1,3 @@
-import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List
 from logging import Logger, getLogger
 from common.redis_client.consumer_combiner import RedisConsumerCombiner
@@ -12,23 +10,30 @@ from .config import (
     CONSUMER_NAME,
     GROUP_NAME,
     INPUT_STREAMS,
-    LOWEST_PRIORITY,
-    MAX_PUBLISH_WORKERS,
+    MAX_PUBLISH_WORKERS,    #unused cse sequential now
     OUTPUT_STREAM,
-    PRIORITY_MAP,
 )
 
-class PrioritiserService:
+PRIORITY_MAP = {
+    "user": 1,
+    "admin": 1,  
+    "background": 2,
+    "logging": 3,
+}
+LOWEST_PRIORITY: float = float("inf")
+SERVICE_NAME="prioritiser"
 
-    def __init__(self):
-        self.logger: Logger = getLogger("prioritiser")
+class PrioritiserService:
+    """Sequentially prioritises messages based on whether they are user or background jobs"""
+    def __init__(self) -> None:
+        self.logger: Logger = getLogger(SERVICE_NAME)
         self.keep_running = True
         self.combiner = RedisConsumerCombiner(
             streams=INPUT_STREAMS, group_name=GROUP_NAME, consumer_name=CONSUMER_NAME
         )
         self.publisher = RedisPublisher(stream_name=OUTPUT_STREAM)
-
-    def shutdown(self) -> None:
+    
+    def shutdown(self, *args) -> None:
         """Signal handler to initiate a graceful shutdown."""
         self.logger.info("\nShutdown signal received. Finishing current batch...")
         self.keep_running = False
@@ -51,23 +56,23 @@ class PrioritiserService:
     def _process_batch(self, raw_messages: List[Dict[str, Any]]) -> int:
         # 2. Parse and Prioritize
         self.logger.info(f"Fetched {len(raw_messages)} messages. Prioritising...")
-        parsed_messages: List[StreamMessage] = [self._parse_message(m) for m in raw_messages]
-        parsed_messages.sort(key=lambda m: m.priority)
+        stream_messages: List[StreamMessage] = [self._parse_message(m) for m in raw_messages]
+        stream_messages.sort(key=lambda m: m.priority)
         
         
-        self.logger.info(f"Publishing {len(parsed_messages)} messages concurrently...")
+        self.logger.info(f"Publishing {len(stream_messages)} messages concurrently...")
 
         # 3. Publish and Ack
-        total_count:int = len(parsed_messages)
+        total_count:int = len(stream_messages)
         success_count:int = 0
         
-        if parsed_messages:
-            parsed_message_data: List[Dict, Any] = [message.data for message in parsed_messages]
+        if stream_messages:
+            parsed_message_data: List[Dict, Any] = [message.data for message in stream_messages]
             published_ids: List[str] = self.publisher.publish_many(parsed_message_data)
             if published_ids:
                 ack_count = 0
             
-            for original_msg in parsed_messages:
+            for original_msg in stream_messages:
                 self.combiner.acknowledge(original_msg.stream, original_msg.redis_id)
                 ack_count += 1
             
@@ -109,6 +114,7 @@ class PrioritiserService:
                 if not raw_messages:
                     continue
                 
+                self.logger.info(f"Found {len(raw_messages)} messages. Processing them...")
                 self._process_batch(raw_messages)
                
             except Exception as e:

@@ -6,13 +6,6 @@ from logging import Logger, getLogger
 load_dotenv()
 
 config_logger: Logger = getLogger("config")
-PRIORITY_MAP = {
-    "user": 1,
-    "admin": 1,  
-    "background": 2,
-    "logging": 3,
-}
-LOWEST_PRIORITY: float = float("inf")
 INPUT_STREAMS_: str = get_env_var("INPUT_STREAMS",str, config_logger)
 OUTPUT_STREAM: str = get_env_var("OUTPUT_STREAM",str, config_logger)
 GROUP_NAME: str = get_env_var("GROUP_NAME",str, config_logger)
@@ -22,8 +15,6 @@ BATCH_SIZE: int = get_env_var("BATCH_SIZE", int, config_logger)
 MAX_PUBLISH_WORKERS: int = get_env_var("MAX_PUBLISH_WORKERS", int, config_logger)
 
 env_variables: List[EnvVariable] = [
-    EnvVariable("LOWEST_PRIORITY", LOWEST_PRIORITY), 
-    EnvVariable("PRIORITY_MAP", PRIORITY_MAP), 
     EnvVariable("INPUT_STREAMS", INPUT_STREAMS_),
     EnvVariable("OUTPUT_STREAM", OUTPUT_STREAM), 
     EnvVariable("GROUP_NAME", GROUP_NAME), 
