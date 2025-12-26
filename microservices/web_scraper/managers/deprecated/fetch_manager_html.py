@@ -10,12 +10,12 @@ from microservices.web_scraper.config import (
     INITIAL_FETCH_DELAY_S,
     MAX_FETCH_RETRIES,
 )
-from microservices.web_scraper.managers.proxy_manager import ProxyManager
+from microservices.web_scraper.managers.deprecated.proxy_manager import ProxyManager
 from microservices.web_scraper.managers.proxy_manager_paid import (
     ProxyManagerPaid,
     proxy_manager_paid,
 )
-from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
+from common.requests.user_agent_manager import user_agent_manager
 
 
 class FetchManagerHTML:
