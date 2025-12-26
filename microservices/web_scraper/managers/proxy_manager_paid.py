@@ -1,13 +1,14 @@
 import random
 import threading
 from typing import Dict, List, Optional, Set
-
+from logging import getLogger, Logger
 from microservices.web_scraper.proxy_sources.web_based.webshareio_http import (
     WebshareIOHttpSource,
 )
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]
+ProxyDictSet = Dict[str, Set[str]]
 ProxyRequestDict = Optional[Dict[str, str]]
 
 
@@ -35,82 +36,69 @@ class ProxyManagerPaid:
         with self._init_lock:
             if getattr(self, "_initialized", False):
                 return
-            self.name = type(self).__name__
-            print(f"Initializing [{self.name}] state for the first time...")
-
+            
+            self.logger:Logger = getLogger("proxy_manager_SELENIUM")
+            
+        
             # --- State ---
-            self.proxies = {"https": set(), "socks4": set(), "socks5": set()}
-            self._refresh_lock = threading.Lock()
+            self.proxies:ProxyDictSet = {"https": set(), "socks4": set(), "socks5": set()}
             self.rotate_index: int = 0
 
-            # Concurrency
-            self._refresh_lock: threading.Lock = threading.Lock()
+            # --- Concurrency ---
+            self._refresh_lock = threading.Lock()
 
             # --- Dependency Injection for Sources ---
-            self.paid_webshareio_source: WebshareIOHttpSource = WebshareIOHttpSource(
+            self.webshareio_http_source = WebshareIOHttpSource(
                 "WebshareIoHttp", timeout=(20.0, 22.0)
             )
-            webshareio_https_proxies: ProxyDict = (
-                self.paid_webshareio_source.get_proxies()["https"]
-            )
+            
+            self.proxies["https"].update(self.webshareio_http_source.get_proxies()["https"])
             self.ip_country_mapping: Dict[str, str] = (
-                self.paid_webshareio_source.ip_country_mapping
+                self.webshareio_http_source.ip_country_mapping
             )
-            self.country_ip_mapping: Dict[str, str] = self.reverse_dict(
-                self.ip_country_mapping
+            self.country_ip_mapping: Dict[str, str] = (
+                self.webshareio_http_source.country_ip_mapping
             )
-            self.proxies["https"].update(webshareio_https_proxies)
+            
             self._initialized = True
-            print(f"[*] {self.name} Initialisation complete!")
-
-    @staticmethod
-    def reverse_dict(dictionary_to_reverse):
-        reversed_dict = {}
-        for key, value in dictionary_to_reverse.items():
-            if value in reversed_dict:
-                reversed_dict[value].append(key)
-            else:
-                reversed_dict[value] = [key]
-        return reversed_dict
+            self.logger.info(f"Initialisation complete!")
 
     def reset(self):
         """Testing aid: clear caches and force next call to rebuild."""
         with self._refresh_lock:
-            self.proxies = {"https": [], "socks4": [], "socks5": []}
+            self.proxies = {"https": set(), "socks4": set(), "socks5": set()}
 
     def get_random_proxy(self) -> ProxyRequestDict:
         """
         Public method to get a single, random, working proxy.
-        Triggers a refresh if the proxy pool is stale or too small.
-        If run multiple times, the same result may occur
         """
-        all_usable_proxies = self._get_all_usable_proxies()
+        
+        all_usable_proxies:Set[str] = self._get_all_usable_proxies()
         if not all_usable_proxies:
-            print("[!] CRITICAL: No usable proxies available after refresh attempt.")
+            self.logger.error("No usable proxies available!")
             return None
 
-        chosen_proxy: str = random.choice(list(all_usable_proxies))
-        return self._create_proxy_dict(chosen_proxy)
+        chosen_global_proxy: str = random.choice(list(all_usable_proxies))
+        return self._create_proxy_dict(chosen_global_proxy)
 
-    def get_next_proxy(self, url="") -> ProxyRequestDict:
+    def get_next_proxy(self, article_url:str="") -> ProxyRequestDict:
         """
         Public method to get a proxy and rotate to next proxy.
-        Triggers a refresh if the proxy pool is stale or too small.
         """
-        all_usable_proxies = self._get_all_usable_proxies()
+        all_usable_proxies:Set[str] = self._get_all_usable_proxies()
         if not all_usable_proxies:
-            print("[!] CRITICAL: No usable proxies available after refresh attempt.")
+            self.logger.error("No usable proxies available!")
             return None
 
-        if "bbc" in url:
-            # shouldnt use US proxy since they have stricter paywall
-            index = self.rotate_index % len(self.country_ip_mapping)
-            chosen_proxy = self.country_ip_mapping["GB"][index]
-            return self._create_proxy_dict(chosen_proxy)
+        # Should not use US proxy for BBC since they have stricter paywall
+        if "bbc" in article_url:
+            index: int = self.rotate_index % len(self.country_ip_mapping)
+            chosen_british_proxy: str = self.country_ip_mapping["GB"][index]
+            return self._create_proxy_dict(chosen_british_proxy)
 
-        chosen_proxy = list(all_usable_proxies)[self.rotate_index]
+        chosen_global_proxy = list(all_usable_proxies)[self.rotate_index]
         self.rotate_index = (self.rotate_index + 1) % len(all_usable_proxies)
-        return self._create_proxy_dict(chosen_proxy)
+        return self._create_proxy_dict(chosen_global_proxy)
 
     def report_bad_proxy(self, proxy_url: str) -> None:
         """Does not need to do anything for paid proxies"""
@@ -124,6 +112,5 @@ class ProxyManagerPaid:
     def _create_proxy_dict(proxy_url: str) -> ProxyRequestDict:
         """Creates a correctly formatted proxy dictionary for `requests`."""
         return {"http": proxy_url, "https": proxy_url}
-
 
 proxy_manager_paid = ProxyManagerPaid()
