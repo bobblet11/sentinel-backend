@@ -7,11 +7,11 @@ from typing import Dict, List, Optional, Set, Tuple
 
 import requests
 
-from microservices.web_scraper.config import PROXY_VALIDATION_MAX_WORKERS
-from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
+from microservices.web_scraper.config import MAX_PROXY_VALIDATION_WORKERS
+from common.requests.user_agent_manager import user_agent_manager
 from microservices.web_scraper.proxy_sources.base_classes import (
     ProxySource,
-    normalize_proxy_scheme,
+    ProxyUtils,
 )
 from microservices.web_scraper.proxy_sources.file_based.json_file import JsonFileSource
 from microservices.web_scraper.proxy_sources.file_based.webshareio_file import (
@@ -61,7 +61,7 @@ class ProxyManager:
             "https://www.espn.com",
         ],
         timeout: Tuple[float, float] = (5.0, 7.0),
-        max_workers: int = PROXY_VALIDATION_MAX_WORKERS,
+        max_workers: int = MAX_PROXY_VALIDATION_WORKERS,
     ):
 
         if getattr(self, "_initialized", False):
@@ -309,7 +309,7 @@ class ProxyManager:
         if not scheme:
             return None, None
 
-        proxy_url = normalize_proxy_scheme(proxy, scheme)
+        proxy_url = ProxyUtils.normalize_scheme(proxy, scheme)
 
         try:
             headers = {"User-Agent": user_agent_manager.get_random_agent()}
