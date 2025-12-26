@@ -26,7 +26,7 @@ from microservices.web_scraper.config import (
     MAX_FETCH_RETRIES,
 )
 from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid
-from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
+from common.requests.user_agent_manager import user_agent_manager
 
 
 class FetchManagerSelenium:
@@ -384,7 +384,7 @@ class FetchManagerSelenium:
             country_code = mapping.get(proxy_url, "US")
             lang_string = self.get_headers_for_country(country_code)
             custom_headers = self._create_enhanced_headers(lang_string)
-            user_agent = user_agent_manager.get_random_agent()
+            user_agent = user_agent_manager.get_sticky_agent(proxy_url)
 
             source_name: str = self.extract_source_name(url)
             print(f"DEBUG: Identified source as: '{source_name}' for URL: {url}")
