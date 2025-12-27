@@ -1,3 +1,4 @@
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging import Logger, getLogger
 from typing import Any, Dict, Optional, List
@@ -189,12 +190,16 @@ class ScraperService:
                     
                     # 1. Fetch
                     self.logger.info(f"Waiting for up to {BATCH_SIZE} messages...")
-                    raw_messages:List[Dict[str, Any]] = self.message_consumer.consume_many(
-                        num_to_consume=BATCH_SIZE, block=2000
-                    )   
-                    if not raw_messages:
-                        continue
-
+                    raw_messages:List[Dict[str, Any]] = []
+                    while True:
+                        raw_messages = self.message_consumer.consume_many(
+                            num_to_consume=BATCH_SIZE, block=2000
+                        )   
+                        if not raw_messages:
+                            time.sleep(2)
+                            continue
+                        break
+                    
                     self.logger.info(f"Found {len(raw_messages)} messages. Processing them...")
                     self._process_batch(executor, raw_messages)
                     
