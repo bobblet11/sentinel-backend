@@ -4,7 +4,7 @@ from requests import get, Response, exceptions
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, List, Optional, Tuple, Any
 from logging import Logger, getLogger
-from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
+from common.requests.user_agent_manager import user_agent_manager
 from pathlib import Path
 
 # --- Type Hinting for Clarity ---
