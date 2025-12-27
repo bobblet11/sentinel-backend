@@ -1,13 +1,12 @@
-import random
 import threading
 import hashlib
 
-from typing import List
+from typing import List, Set
 from fake_useragent import UserAgent
 from logging import Logger, getLogger
 
 
-ALL_NON_SAFARI_BROWSERS = [
+ALL_NON_SAFARI_BROWSERS:List[str] = [
                 "Google",
                 "Chrome",
                 "Firefox",
@@ -29,10 +28,11 @@ ALL_NON_SAFARI_BROWSERS = [
                 "Facebook",
                 "Amazon Silk",
 ]
-ALL_SAFARI_BROWSERS = [["Safari", "Mobile Safari UI/WKWebView", "Mobile Safari"]]
-JUST_CHROME = ["chrome"] 
-MAX_UA_POOL_SIZE = 200
-MAX_UA_POOL_ATTEMPTS = 1000
+ALL_SAFARI_BROWSERS:List[str] = [["Safari", "Mobile Safari UI/WKWebView", "Mobile Safari"]]
+JUST_CHROME:List[str] = ["Chrome"] 
+MAX_UA_POOL_SIZE:int = 150
+MAX_UA_POOL_ATTEMPTS:int = 3000
+
 class UserAgentManager:
     """
     A singleton class that contains all functions related to rotating user-agents.
@@ -62,13 +62,23 @@ class UserAgentManager:
         return cls._instance
 
     def __init__(self):
+        if getattr(self, "_initialized", False):
+            return
         self.logger:Logger = getLogger("user_agent_manager")
-        self.logger.info(f"Initialising state for the first time")
-        self.available_generators = [self._generate_chrome_agent_generator()]
+        self.logger.info("Initialising UserAgentManager...")
+        
+        try:
+            self.ua_engine = UserAgent(browsers=JUST_CHROME, min_version=120.0)
+        except Exception as e:
+            self.logger.error(f"Failed to load UserAgent source: {e}")
+            self.ua_engine = None
+            
         self.agent_pool: List[str] = self._generate_agent_pool()
-        self.logger.info(f"Initialisation complete!")
+        
+        self.logger.info(f"Initialization complete! Pool size: {len(self.agent_pool)}")
 
     def _generate_chrome_agent_generator(self) -> UserAgent:
+        """DEPRECATED"""
         try:
             self.logger.info("Generating non-safari user agents")
             chrome_user_agent_generator = UserAgent(browsers=JUST_CHROME, min_version=115.0)
@@ -77,6 +87,7 @@ class UserAgentManager:
             self.logger.error("Could not initialize non-safari UserAgents: {e}")
             
     def _generate_safari_agent_generator(self) -> UserAgent:
+        """DEPRECATED"""
         try:
             self.logger.info("Generating safari user agents")
             safari_user_agent_generator = UserAgent(browsers=ALL_SAFARI_BROWSERS, min_version=17.0)
@@ -88,40 +99,46 @@ class UserAgentManager:
         """
         Generates a list of valid Chrome User Agents to use for Sticky sessions.
         """
+
+        fallbacks:List[str] = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        ]
+                
+        if not self.ua_engine:
+            return fallbacks
+    
+        pool:Set[str] = set()
+        attempts:int = 0
+        
         try:
-            ua:UserAgent = self._generate_chrome_agent_generator()
-            
-            pool = set()
-            attempts = 0
+
             while len(pool) < MAX_UA_POOL_SIZE and attempts < MAX_UA_POOL_ATTEMPTS:
-                pool.add(ua.random)
+                ua_string:str = self.ua_engine.random
+                if ua_string:
+                    pool.add(ua_string)
                 attempts += 1
             
-            if len(pool) < MAX_UA_POOL_ATTEMPTS:
-                self.logger.warning(f"User agent pool size is smaller than the {MAX_UA_POOL_SIZE} agent string size. Suggest reducing MAX_UA_POOL_ATTEMPTS or increasing MAX_UA_POOL_ATTEMPTS")
+            if len(pool) < MAX_UA_POOL_SIZE:
+                self.logger.warning(f"User agent pool size ({len(pool)}) is smaller than the {MAX_UA_POOL_SIZE} agent string size. Suggest reducing MAX_UA_POOL_ATTEMPTS or increasing MAX_UA_POOL_ATTEMPTS")
     
             return list(pool)
         
         except Exception as e:
             self.logger.error(f"Error generating pool: {e}")
-            
-            return [
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-            ]
+            return fallbacks
                  
     def get_random_agent(self) -> str:
         """
-        Returns a random user agent from the available modern generators.
+        Returns a random user agent from the ua engine.
         """
 
-        if not self.available_generators:
-            self.logger.error("UserAgent generators failed. Using a hardcoded fallback.")
+        if not self.ua_engine:
+            self.logger.error("UserAgent engine not initialised. Using a hardcoded fallback.")
             return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   
-        chosen_generator: UserAgent = random.choice(self.available_generators)
-        return chosen_generator.getChrome
+        return self.ua_engine.random
 
     def get_sticky_agent(self, proxy_url:str) -> str:
         """
