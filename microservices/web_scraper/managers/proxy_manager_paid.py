@@ -38,7 +38,7 @@ class ProxyManagerPaid:
                 return
             
             self.logger:Logger = getLogger("proxy_manager_SELENIUM")
-            
+            self.logger.info(f"Starting initialisation")
         
             # --- State ---
             self.proxies:ProxyDictSet = {"https": set(), "socks4": set(), "socks5": set()}
@@ -87,8 +87,7 @@ class ProxyManagerPaid:
         """
         all_usable_proxies:Set[str] = self._get_all_usable_proxies()
         if not all_usable_proxies:
-            self.logger.error("No usable proxies available!")
-            return None
+            raise Exception("No usable proxies available!")
 
         # Should not use US proxy for BBC since they have stricter paywall
         if "bbc" in article_url:
