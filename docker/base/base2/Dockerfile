@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     ca-certificates \
     unzip \
-    # Standard Chrome dependencies for modern Debian
     libnss3 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
@@ -26,9 +25,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libasound2 \
     libpangocairo-1.0-0 \
     libgtk-3-0 \
-    chromium-driver \
-    # Extra tools for Selenium
     xvfb \
+    xserver-xephyr \
+    tigervnc-standalone-server \
+    xfonts-base \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 4. Install Google Chrome Stable
@@ -39,9 +39,9 @@ RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd6
 
 # Step 5: Copy the BASE requirements file.
 COPY docker/base/core-requirements.txt .
+RUN pip install --no-cache-dir -r core-requirements.txt
 
 # Step 6: Install the foundational Python packages.
-RUN pip install --no-cache-dir -r core-requirements.txt
 COPY common/requirements.txt /app/common/requirements.txt
 RUN pip install --no-cache-dir -r /app/common/requirements.txt
 

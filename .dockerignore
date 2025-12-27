@@ -1,0 +1,18 @@
+# .dockerignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.git/
+.gitignore
+
+# Scraper specific (CRITICAL)
+screenshots/
+logs/
+*.log
+*.png
+.seleniumwire/
