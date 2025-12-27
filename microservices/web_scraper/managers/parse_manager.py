@@ -249,4 +249,5 @@ class ParseManager:
         text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
         return text.strip()
 
+
 parse_manager = ParseManager()

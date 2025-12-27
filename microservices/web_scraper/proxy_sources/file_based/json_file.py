@@ -11,11 +11,15 @@ ProxyRequestDict = Optional[Dict[str, str]]
 class JsonFileSource(FileProxySource):
     """Loads proxies from a json file."""
 
+    def __init__(self, name, file_path, str_manip_func):
+        super().__init__(name, file_path)
+        self.str_manip_func = str_manip_func
+        
+    
     def _parse_file_content(self, content: str) -> ProxyDict:
         """Parse JSON file content"""
-
-        proxies_data: ProxyDict = json.loads(content)
         parsed_proxies: ProxyDict = {"https": [], "socks4": [], "socks5": []}
+        proxies_data: ProxyDict = json.loads(content)
 
         for p_type in parsed_proxies.keys():
             for proxy_str in proxies_data.get(p_type, []):

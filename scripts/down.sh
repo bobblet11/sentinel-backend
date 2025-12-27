@@ -29,6 +29,8 @@ run_and_log() {
     "$@" 2>&1 | sed 's/^/        /'
 }
 
+WEB_SCRAPER_CONTAINER_NAME="sentinel-web-scraper-service-container"
+
 # --- Find the Project Root Directory ---
 PROJECT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." &> /dev/null && pwd)
 # --- Main Execution ---
@@ -36,6 +38,17 @@ cd "$PROJECT_ROOT"
 echo -e "\n${GREEN}==> Changed directory to project root${NC}"
 cd "$PROJECT_ROOT"
 log_info "Changed directory to project root"
+
+
+
+if [ "$(sudo docker ps -q -f name=^/${WEB_SCRAPER_CONTAINER_NAME}$)" ]; then
+    echo "Container is running. Copying files..."
+    run_and_log sudo -E docker cp sentinel-web-scraper-service-container:/app/microservices/web_scraper/screenshots/. ./microservices/web_scraper/screenshots/
+
+else
+    echo "Container is NOT running."
+fi
+
 
 run_and_log sudo -E docker-compose down
 
