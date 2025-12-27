@@ -2,11 +2,10 @@ import os
 import threading
 
 import redis
-
 from common.requests.retry_request import exponential_retry
 
-REDIS_HOST = str(os.getenv("REDIS_HOST", "redis"))
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_HOST:str = str(os.getenv("REDIS_HOST", "redis"))
+REDIS_PORT:int = int(os.getenv("REDIS_PORT", 6379))
 
 
 class RedisConnection:
@@ -16,10 +15,10 @@ class RedisConnection:
 
     _instance = None
     _lock = threading.Lock()
-    MAX_RETRIES = 5
-    INITIAL_DELAY = 1  # s
+    MAX_RETRIES:int = 5
+    INITIAL_DELAY_S:int = 1
 
-    def __new__(cls):
+    def __new__(cls) -> None:
         """
         before __init__, make sure no other class
         instance already exists with a connection pool. Enforces Singleton rule.
@@ -27,34 +26,27 @@ class RedisConnection:
 
         # Singleton instance already exists
         if cls._instance is not None:
-            print("RedisConnectionPool already exists. Reusing instance...")
             return cls._instance
 
         # Singleton instance does not exist, attempt creation with lock.
         with cls._lock:
             if cls._instance is not None:
-                print("RedisConnectionPool already exists. Reusing instance...")
                 return cls._instance
 
-            cls._instance = super(RedisConnection, cls).__new__(cls)
-            cls._instance._client = None
+            cls._instance:RedisConnection = super(RedisConnection, cls).__new__(cls)
+            cls._instance._client= None
 
-            # print("RedisConnection Singleton created.")
             return cls._instance
 
     @exponential_retry(
-        max_attempts=5,
-        initial_delay_s=1.0,
-        # Tell the decorator to retry ONLY on these errors
+        max_attempts=MAX_RETRIES,
+        initial_delay_s=INITIAL_DELAY_S,
         on_exceptions=(redis.exceptions.ConnectionError, redis.exceptions.TimeoutError),
     )
-    def connect(self):
+    def connect(self) -> bool:
         """
         Idempotently attempts to establish a connection to the Redis server.
         """
-
-        # print(f"Attempting to connect to Redis at {REDIS_HOST}:{REDIS_PORT}.")
-
         pool = redis.ConnectionPool(
             host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True
         )
@@ -62,25 +54,22 @@ class RedisConnection:
         client = redis.Redis(connection_pool=pool)
 
         if client.ping():
-            print("Successfully pinged Redis.")
             self._client = client
             return True
         else:
             # raise error to let the retry mechanism catch it
             raise redis.exceptions.ConnectionError("Redis ping returned False.")
 
-    def get_client(self):
+
+    def get_client(self) -> redis.Redis:
         """
         Returns the active Redis client. Connects if not already connected.
         """
 
-        # Client already exists
         if self._client is not None:
             return self._client
 
-        # Client does not exist, attempt to connect with lock.
         with self._lock:
-
             if self._client is not None:
                 return self._client
 
@@ -101,16 +90,14 @@ class RedisConnection:
         except redis.exceptions.ConnectionError:
             return False
 
-    def close(self):
+    def close(self) -> None:
         """
         Closes the Redis connection pool.
         """
         if not self._client:
-            print("No connection to close. Connect first!")
+            return
 
-        print("Closing Redis connection...")
         self._client.connection_pool.disconnect()
         self._client = None
 
-
-redis_connection = RedisConnection()
+redis_connection:RedisConnection = RedisConnection()

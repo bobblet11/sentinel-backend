@@ -1,29 +1,62 @@
 import os
+from requests import get, Response, exceptions
+
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Optional, Tuple
-
-import requests
-
-from microservices.web_scraper.managers.user_agent_manager import user_agent_manager
+from typing import Callable, Dict, List, Optional, Tuple, Any
+from logging import Logger, getLogger
+from common.requests.user_agent_manager import user_agent_manager
+from pathlib import Path
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]
 ProxyRequestDict = Optional[Dict[str, str]]
-
-
-def normalize_proxy_scheme(proxy_str: str, scheme: str = "http") -> str:
-    """Ensures a proxy string has a scheme, defaulting if missing."""
     
-    if scheme == "socks5":
-        scheme = "socks5h"
+class ProxyUtils:
+    @staticmethod
+    def normalize_scheme(proxy_str: str, scheme: str = "http") -> str:
+        """Ensures a proxy string has a scheme, defaulting if missing."""
 
-    if "://" not in proxy_str:
-        return f"{scheme}://{proxy_str}"
-    else:
-        parts = proxy_str.split("://")
-        return f"{scheme}://{parts[1]}"
-    return proxy_str
+        if scheme == "socks5":
+            scheme = "socks5h"
 
+        if "://" not in proxy_str:
+            return f"{scheme}://{proxy_str}"
+        else:
+            parts = proxy_str.split("://")
+            return f"{scheme}://{parts[1]}"
+    
+    @staticmethod
+    def normalize_scheme_webshario(proxy_str: str) -> str:
+        """Normalizes Webshare.io 'ip:port:user:pass' format to 'http://user:pass@ip:port'."""
+        try:
+            ip, port, username, password = proxy_str.split(":")
+            return f"http://{username}:{password}@{ip}:{port}"
+        except ValueError:
+            print(f"Warning: Malformed webshare io proxy string: {proxy_str}. Skipping.")
+            return ""
+
+    @staticmethod
+    def get_proxy_country(proxy_url: str, country_reflection_url:str="http://ip-api.com/json", timeout:Tuple[str,str]=(20,20), default_country:str="US")->str:
+        """
+        Finds the country a proxy is located in. Defaults to US if cannot be found
+        
+        proxy_url format: 'ip:port' or 'user:pass@ip:port'
+        Returns: 2-letter country code (e.g., 'US', 'FR')
+        """
+        try:
+            proxies:Dict[str,str] = {
+                "http": proxy_url,
+                "https": proxy_url,
+            }
+            response:Response = get(
+                country_reflection_url, proxies=proxies, timeout=timeout
+            )
+            data:Dict[str,Any] = response.json()
+            
+            return (proxy_url, data.get("countryCode", default_country))
+        
+        except Exception:
+            return (proxy_url, "US")
 
 class ProxySource(ABC):
     """
@@ -32,6 +65,7 @@ class ProxySource(ABC):
 
     def __init__(self, name: str):
         self.name = name
+        self.logger = getLogger(f"ProxySource.{name}")
 
     @abstractmethod
     def get_proxies(self, bootstrap_proxies: ProxyRequestDict = None) -> ProxyDict:
@@ -39,8 +73,12 @@ class ProxySource(ABC):
         Abstract method to get proxies.
         Returns a dictionary categorized by proxy type ('https', 'socks4', 'socks5').
         """
-
-
+        pass
+    
+    def log_summary(self, proxies: ProxyDict) -> None: 
+        count_summary = ", ".join([f"{k.upper()}:{len(v)}" for k, v in proxies.items()])
+        self.logger.info(count_summary)
+        
 class FileProxySource(ProxySource):
     """
     Abstract base interface for any proxy fetching or reading mechanism.
@@ -49,64 +87,59 @@ class FileProxySource(ProxySource):
     def __init__(
         self,
         name: str,
-        file_path: str,
-        str_manip_func: Optional[Callable[[str], str]] = None,
+        file_path: Path,
     ):
         super().__init__(name)
-        self.file_path = file_path
-        self.str_manip_func = str_manip_func or (lambda s: s)
+        self.file_path: Path = file_path
 
+    
     @abstractmethod
     def _parse_file_content(self, content: str) -> ProxyDict:
         """Parses raw file content into categorized proxy lists."""
-
+        pass
+    
     @abstractmethod
     def _format_for_save(self, proxies: ProxyDict) -> str:
         """Formats the proxies into a string for saving to a file."""
-
+        pass
+    
     def get_proxies(self, bootstrap_proxies: ProxyRequestDict = None) -> ProxyDict:
         """Reads and parses proxies from the file path."""
 
         if bootstrap_proxies:
-            print(
-                f"[{self.name}] File sources require no bootstrap_proxy. Ignoring it..."
-            )
-
-        if not os.path.exists(self.file_path):
-            print(f"[{self.name}] [!] No file found at {self.file_path}.")
-            return {"https": [], "socks4": [], "socks5": []}
-
-        print(f"[{self.name}] Reading file {self.file_path} to get proxies...")
+            self.logger.debug(f"File sources require no bootstrap_proxy. Ignoring it...")
+        
+        self.logger.info(f"Reading file {self.file_path} to get proxies...")
         try:
-            with open(self.file_path, "r", encoding="utf-8") as file:
-                content = file.read()
+            
+            content = self.file_path.read_text(encoding="utf-8")
             proxies = self._parse_file_content(content)
-            print(
-                f"[{self.name}] [+] Proxies found:\n\tHTTPS: {len(proxies.get('https',[]))}\n\tSOCKS4: {len(proxies.get('socks4',[]))}\n\tSOCKS5: {len(proxies.get('socks5',[]))}"
-            )
+            self.log_summary(proxies)
             return proxies
-
+        
+        except FileNotFoundError: 
+            self.logger.error(f"No file found at {self.file_path}!")
+            return {"https": [], "socks4": [], "socks5": []}
+        
         except Exception as e:
-            print(f"[{self.name}] [!] Error loading or parsing {self.file_path}: {e}")
+            self.logger.error(f"Error loading or parsing {self.file_path}: {e}")
             return {"https": [], "socks4": [], "socks5": []}
 
-    def save_proxies(self, proxies: ProxyDict):
+    def save_proxies(self, proxies: ProxyDict) -> None:
         """Saves categorized proxies to the file."""
-
-        if not os.path.exists(self.file_path):
-            print(f"[{self.name}] [!] No file found at {self.file_path}.")
-            return
-
-        print(f"[{self.name}] Saving proxies to {self.file_path}...")
+        self.logger.info(f"Saving proxies to {self.file_path}...")
+        
         try:
-            formatted_proxies = self._format_for_save(proxies)
-            with open(self.file_path, "w", encoding="utf-8") as file:
-                file.write(formatted_proxies)
-            print(f"[{self.name}] [+] Proxies saved successfully")
-
+            formatted_content = self._format_for_save(proxies)
+            self.file_path.write_text(formatted_content, encoding="utf-8")
+            self.logger.info(f"Proxies saved successfully")
+        
+        except FileNotFoundError: 
+            self.logger.error(f"No file found at {self.file_path}!")
+        
         except Exception as e:
-            print(
-                f"[{self.name}] [!] Error formatting or saving proxies to {self.file_path}: {e}"
+            self.logger.info(
+                f"Error formatting or saving proxies to {self.file_path}: {e}"
             )
 
 
@@ -130,18 +163,27 @@ class HttpProxySource(ProxySource):
         }
 
         try:
-            response = requests.get(
-                url, headers=headers, proxies=proxies, timeout=self.timeout
+            response: Response = get(
+                url, 
+                headers=headers, 
+                proxies=proxies, 
+                timeout=self.timeout
             )
+            
             response.raise_for_status()
-            proxies_found = parser(response.text)
-            print(
-                f"[{self.name}] [+] Successfully fetched {len(proxies_found)} from {url}"
+            
+            proxies_found:List[str] = parser(response.text)
+            self.logger.info(
+                f"Successfully fetched {len(proxies_found)} from {url}"
             )
             return proxies_found
-        except requests.exceptions.RequestException as e:
-            print(f"[{self.name}] [!] Error fetching from {url}: {e}")
-            return []
+        
+        except exceptions.Timeout:
+            self.logger.warning(f"Timeout connecting to {url}")
+        except exceptions.RequestException as e:
+            self.logger.error(f"HTTP Error fetching {url}: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error parsing {url}: {e}")
 
     @abstractmethod
     def get_proxies(self, bootstrap_proxies: ProxyRequestDict = None) -> ProxyDict:

@@ -9,14 +9,19 @@ ProxyRequestDict = Optional[Dict[str, str]]
 
 class TextFileSource(FileProxySource):
     """Loads proxies from a txt file file."""
-
+    
+    def __init__(self, name, file_path, str_manip_func):
+        super().__init__(name, file_path)
+        self.str_manip_func = str_manip_func
+        
+        
     def _parse_file_content(self, content: str) -> ProxyDict:
-        """Parse TXT file content"""
-
+        """Parse TXT file content assuming order: HTTPS, SOCKS4, SOCKS5"""
+        
         parsed_proxies: ProxyDict = {"https": [], "socks4": [], "socks5": []}
-
-        sections = content.split("\n\n")
-        # Assuming order: HTTPS, SOCKS4, SOCKS5
+        sections:List[str] = content.split("\n\n")
+        
+        
         if len(sections) > 0:
             parsed_proxies["https"] = [
                 self.str_manip_func(line.strip())
@@ -40,9 +45,9 @@ class TextFileSource(FileProxySource):
 
     def _format_for_save(self, proxies: ProxyDict) -> str:
         """Format TXT file content"""
-        https_proxies = proxies.get("https", [])
-        socks4_proxies = proxies.get("socks4", [])
-        socks5_proxies = proxies.get("socks5", [])
+        https_proxies: List[str] = proxies.get("https", [])
+        socks4_proxies: List[str] = proxies.get("socks4", [])
+        socks5_proxies: List[str] = proxies.get("socks5", [])
 
         https_section, socks4_section, socks5_section = (
             "\n".join(https_proxies),

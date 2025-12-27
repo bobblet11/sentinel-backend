@@ -1,83 +1,29 @@
-import os
-import sys
-from typing import Dict, List, Optional
-
+from typing import Optional, List
 from dotenv import load_dotenv
-
-
-def print_env(
-    CONSUMER_NAME: str,
-    INPUT_STREAMS: List[str],
-    OUTPUT_STREAM: str,
-    GROUP_NAME: str,
-    PRIORITY_MAP: Dict[str, int],
-    BATCH_SIZE: int,
-    MAX_WORKERS: int,
-) -> None:
-    print(f"Consumer name {CONSUMER_NAME}")
-    print(f"Group name: {GROUP_NAME}\n\n")
-    print(f"Priority map: {PRIORITY_MAP}\n\n")
-    print(f"Batch size: {BATCH_SIZE}\n\n")
-    print(f"Max workers: {MAX_WORKERS}\n\n")
-    print("-" * 9)
-    print(INPUT_STREAMS)
-    print("-" * 9)
-    print("    |    \n    V    ")
-    print("-" * 9)
-    print(OUTPUT_STREAM)
-
-
+from common.env.log_env import print_env, Config, EnvVariable
+from common.env.get_env_var import get_env_var
+from logging import Logger, getLogger
 load_dotenv()
 
-
-INPUT_STREAMS_: Optional[str] = os.getenv("INPUT_STREAMS")
-if not INPUT_STREAMS_:
-    print("FATAL: INPUT_STREAMS environment variable is not set. Exiting.")
-    sys.exit(1)
+config_logger: Logger = getLogger("config")
+INPUT_STREAMS_: str = get_env_var("INPUT_STREAMS",str, config_logger)
+OUTPUT_STREAM: str = get_env_var("OUTPUT_STREAM",str, config_logger)
+GROUP_NAME: str = get_env_var("GROUP_NAME",str, config_logger)
+CONSUMER_NAME: str = get_env_var("CONSUMER_NAME",str, config_logger)
 INPUT_STREAMS: List[str] = (INPUT_STREAMS_).split(", ")
+BATCH_SIZE: int = get_env_var("BATCH_SIZE", int, config_logger)
+MAX_PUBLISH_WORKERS: int = get_env_var("MAX_PUBLISH_WORKERS", int, config_logger)
 
+env_variables: List[EnvVariable] = [
+    EnvVariable("INPUT_STREAMS", INPUT_STREAMS_),
+    EnvVariable("OUTPUT_STREAM", OUTPUT_STREAM), 
+    EnvVariable("GROUP_NAME", GROUP_NAME), 
+    EnvVariable("CONSUMER_NAME", CONSUMER_NAME), 
+    EnvVariable("BATCH_SIZE", BATCH_SIZE), 
+    EnvVariable("MAX_PUBLISH_WORKERS", MAX_PUBLISH_WORKERS), 
+]
 
-OUTPUT_STREAM: Optional[str] = os.getenv("OUTPUT_STREAM")
-if not OUTPUT_STREAM:
-    print("FATAL: OUTPUT_STREAM environment variable is not set. Exiting.")
-    sys.exit(1)
+input_sources:str = INPUT_STREAMS
+output_stream:str = OUTPUT_STREAM
 
-GROUP_NAME: Optional[str] = os.getenv("GROUP_NAME")
-if not GROUP_NAME:
-    print("FATAL: GROUP_NAME environment variable is not set. Exiting.")
-    sys.exit(1)
-
-PRIORITY_MAP = {
-    "user": 1,
-    "admin": 1,  # Same priority as user
-    "background": 2,
-    "logging": 3,
-}
-
-LOWEST_PRIORITY: Optional[float] = float("inf")
-
-CONSUMER_NAME: Optional[str] = os.getenv("CONSUMER_NAME")
-if not CONSUMER_NAME:
-    print("FATAL: CONSUMER_NAME environment variable is not set. Exiting.")
-    sys.exit(1)
-
-MAX_WORKERS: Optional[int] = int(os.getenv("MAX_WORKERS"))
-if not MAX_WORKERS:
-    print("FATAL: MAX_WORKERS environment variable is not set. Exiting.")
-    sys.exit(1)
-
-BATCH_SIZE: Optional[int] = int(os.getenv("BATCH_SIZE"))
-if not BATCH_SIZE:
-    print("FATAL: BATCH_SIZE environment variable is not set. Exiting.")
-    sys.exit(1)
-
-
-print_env(
-    CONSUMER_NAME,
-    INPUT_STREAMS,
-    OUTPUT_STREAM,
-    GROUP_NAME,
-    PRIORITY_MAP,
-    BATCH_SIZE,
-    MAX_WORKERS,
-)
+print_env(Config(env_variables, input_sources, output_stream), config_logger)

@@ -64,7 +64,7 @@ COPY core-environment.yml /tmp/core-environment.yml
 RUN conda env create -f /tmp/core-environment.yml && rm /tmp/core-environment.yml
 
 COPY environment.yml /tmp/environment.yml
-RUN conda env update --name sentinel-env --file /tmp/environment.yml --prune && rm /tmp/environment.yml
+RUN conda env update --name sentinel-env --file /tmp/environment.yml && rm /tmp/environment.yml
 
 
 # Set up shell to automatically activate our new environment

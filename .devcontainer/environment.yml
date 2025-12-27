@@ -19,26 +19,9 @@ dependencies:
   - pip:
     - types-requests
     - types-psutil
-
-    # Application runtime (pip only)
     - fake_useragent
     - selenium
-    
-    # Testing
-    - pytest
-    - pytest-cov
-    - httpx      
-
-    # Code Quality & Formatting
-    - autoflake
-    - black       # The uncompromising code formatter
-    - black[jupyter]
-    - isort       # Sorts imports automatically
-    - flake8      # A great linter for catching errors
-    - mypy        # For static type checking
-
-    # Debugging & IDE Integration
-    - debugpy   
-
-    # Pre-commit hooks to automate code quality checks
-    - pre-commit
+    - undetected-chromedriver 
+    - selenium-wire
+    - blinker==1.7.0
+    - pyvirtualdisplay

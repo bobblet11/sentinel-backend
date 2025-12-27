@@ -1,69 +1,10 @@
-import os
-import sys
-from typing import Dict, Optional
-
+from typing import Optional, List
 from dotenv import load_dotenv
-
-
-def print_env(
-    INPUT_STREAM: str,
-    USER_OUTPUT_STREAM: str,
-    BACKGROUND_OUTPUT_STREAM: str,
-    FAILURE_OUTPUT_STREAM: str,
-    BATCH_SIZE: int,
-    GROUP_NAME: str,
-    CONSUMER_NAME: str,
-    PRIORITY_MAP: Dict[str, int],
-    SCRAPER_MAX_WORKERS: int,
-    PROXY_VALIDATION_MAX_WORKERS,
-) -> None:
-    print(f"Batch size {BATCH_SIZE}")
-    print(f"Consumer name {CONSUMER_NAME}")
-    print(f"Group name: {GROUP_NAME}")
-    print(f"Scraper Max workers: {SCRAPER_MAX_WORKERS}")
-    print(f"Proxy Max workers: {PROXY_VALIDATION_MAX_WORKERS}")
-    print(f"Priority map: {PRIORITY_MAP}")
-    print("-" * 9)
-    print(INPUT_STREAM)
-    print("-" * 9)
-    print("    |    \n    V    ")
-    print("-" * 9)
-    print(
-        f"[{USER_OUTPUT_STREAM}, {BACKGROUND_OUTPUT_STREAM}, {FAILURE_OUTPUT_STREAM}]"
-    )
-
-
+from common.env.log_env import print_env, Config, EnvVariable
+from common.env.get_env_var import get_env_var
+from logging import Logger, getLogger
 load_dotenv()
-
-INPUT_STREAM: Optional[str] = os.getenv("INPUT_STREAM")
-if not INPUT_STREAM:
-    print("FATAL: INPUT_STREAM environment variable is not set. Exiting.")
-    sys.exit(1)
-
-USER_OUTPUT_STREAM: Optional[str] = os.getenv("USER_OUTPUT_STREAM")
-if not USER_OUTPUT_STREAM:
-    print("FATAL: USER_OUTPUT_STREAM environment variable is not set. Exiting.")
-    sys.exit(1)
-
-BACKGROUND_OUTPUT_STREAM: Optional[str] = os.getenv("BACKGROUND_OUTPUT_STREAM")
-if not BACKGROUND_OUTPUT_STREAM:
-    print("FATAL: BACKGROUND_OUTPUT_STREAM environment variable is not set. Exiting.")
-    sys.exit(1)
-
-FAILURE_OUTPUT_STREAM: Optional[str] = os.getenv("FAILURE_OUTPUT_STREAM")
-if not FAILURE_OUTPUT_STREAM:
-    print("FATAL: FAILURE_OUTPUT_STREAM environment variable is not set. Exiting.")
-    sys.exit(1)
-
-GROUP_NAME: Optional[str] = os.getenv("GROUP_NAME")
-if not GROUP_NAME:
-    print("FATAL: GROUP_NAME environment variable is not set. Exiting.")
-    sys.exit(1)
-
-CONSUMER_NAME: Optional[str] = os.getenv("CONSUMER_NAME")
-if not CONSUMER_NAME:
-    print("FATAL: CONSUMER_NAME environment variable is not set. Exiting.")
-    sys.exit(1)
+config_logger: Logger = getLogger("config")
 
 PRIORITY_MAP = {
     "user": 1,
@@ -71,38 +12,49 @@ PRIORITY_MAP = {
     "background": 2,
     "logging": 3,
 }
+LOWEST_PRIORITY: float = float("inf")
 
-LOWEST_PRIORITY: Optional[float] = float("inf")
+INPUT_STREAM: str = get_env_var("INPUT_STREAM",str, config_logger)
+USER_OUTPUT_STREAM: str = get_env_var("USER_OUTPUT_STREAM",str, config_logger)
+BACKGROUND_OUTPUT_STREAM: str = get_env_var("BACKGROUND_OUTPUT_STREAM",str, config_logger)
+FAILURE_OUTPUT_STREAM: str = get_env_var("FAILURE_OUTPUT_STREAM",str, config_logger)
 
-BATCH_SIZE: Optional[int] = int(os.getenv("BATCH_SIZE"))
-if not BATCH_SIZE:
-    print("FATAL: BATCH_SIZE environment variable is not set. Exiting.")
-    sys.exit(1)
+GROUP_NAME: str = get_env_var("GROUP_NAME",str, config_logger)
+CONSUMER_NAME: str = get_env_var("CONSUMER_NAME",str, config_logger)
 
-SCRAPER_MAX_WORKERS: Optional[int] = int(os.getenv("SCRAPER_MAX_WORKERS"))
-if not SCRAPER_MAX_WORKERS:
-    print("FATAL: SCRAPER_MAX_WORKERS environment variable is not set. Exiting.")
-    sys.exit(1)
+WEBSHARIO_URL: str = get_env_var("WEBSHARIO_URL",str, config_logger)
 
-PROXY_VALIDATION_MAX_WORKERS: Optional[int] = int(
-    os.getenv("PROXY_VALIDATION_MAX_WORKERS")
-)
-if not PROXY_VALIDATION_MAX_WORKERS:
-    print(
-        "FATAL: PROXY_VALIDATION_MAX_WORKERS environment variable is not set. Exiting."
-    )
-    sys.exit(1)
+BATCH_SIZE: int = get_env_var("BATCH_SIZE",int, config_logger)
+SCRAPER_MAX_WORKERS: int = get_env_var("SCRAPER_MAX_WORKERS",int, config_logger)
+MAX_PROXY_VALIDATION_WORKERS: int = get_env_var("MAX_PROXY_VALIDATION_WORKERS",int, config_logger)
+MAX_FETCH_RETRIES: int = get_env_var("MAX_FETCH_RETRIES",int, config_logger)
+INITIAL_FETCH_DELAY_S: float = get_env_var("INITIAL_FETCH_DELAY_S",float, config_logger)
+FETCH_DELAY_GROWTH_RATE: float = get_env_var("FETCH_DELAY_GROWTH_RATE",float, config_logger)
 
 
-print_env(
-    INPUT_STREAM,
-    USER_OUTPUT_STREAM,
-    BACKGROUND_OUTPUT_STREAM,
-    FAILURE_OUTPUT_STREAM,
-    BATCH_SIZE,
-    GROUP_NAME,
-    CONSUMER_NAME,
-    PRIORITY_MAP,
-    SCRAPER_MAX_WORKERS,
-    PROXY_VALIDATION_MAX_WORKERS,
-)
+env_variables: List[EnvVariable] = [
+    EnvVariable("LOWEST_PRIORITY", LOWEST_PRIORITY), 
+    EnvVariable("PRIORITY_MAP", PRIORITY_MAP), 
+    
+    EnvVariable("INPUT_STREAM", INPUT_STREAM),
+    EnvVariable("USER_OUTPUT_STREAM", USER_OUTPUT_STREAM),
+    EnvVariable("BACKGROUND_OUTPUT_STREAM", BACKGROUND_OUTPUT_STREAM),
+    EnvVariable("FAILURE_OUTPUT_STREAM", FAILURE_OUTPUT_STREAM),
+    
+    EnvVariable("GROUP_NAME", GROUP_NAME),
+    EnvVariable("CONSUMER_NAME", CONSUMER_NAME), 
+    
+    EnvVariable("WEBSHARIO_URL", WEBSHARIO_URL), 
+    
+    EnvVariable("BATCH_SIZE", BATCH_SIZE), 
+    EnvVariable("SCRAPER_MAX_WORKERS", SCRAPER_MAX_WORKERS), 
+    EnvVariable("MAX_PROXY_VALIDATION_WORKERS", MAX_PROXY_VALIDATION_WORKERS), 
+    EnvVariable("MAX_FETCH_RETRIES", MAX_FETCH_RETRIES), 
+    EnvVariable("INITIAL_FETCH_DELAY_S", INITIAL_FETCH_DELAY_S), 
+    EnvVariable("FETCH_DELAY_GROWTH_RATE", FETCH_DELAY_GROWTH_RATE), 
+]
+
+input_stream:str = INPUT_STREAM
+output_streams:List[str] = [USER_OUTPUT_STREAM, BACKGROUND_OUTPUT_STREAM, FAILURE_OUTPUT_STREAM]
+
+print_env(Config(env_variables, input_stream, output_streams), config_logger)

@@ -1,36 +1,23 @@
-import os
-import sys
-from typing import Optional
-
+from typing import Optional, List
 from dotenv import load_dotenv
-
-
-def print_env(
-    REDIS_DUPLICATE_FILTER_KEY: str,
-    OUTPUT_STREAM: str,
-) -> None:
-    print(f"Redis duplicate filter key {REDIS_DUPLICATE_FILTER_KEY}\n")
-    print("-" * 9)
-    print("RSS FEEDS")
-    print("-" * 9)
-    print("    |    \n    V    ")
-    print("-" * 9)
-    print(OUTPUT_STREAM)
-
-
+from common.env.log_env import print_env, Config, EnvVariable
+from common.env.get_env_var import get_env_var
+from logging import Logger, getLogger
 load_dotenv()
 
+config_logger: Logger = getLogger("config")
 
-REDIS_DUPLICATE_FILTER_KEY: Optional[str] = os.getenv("REDIS_DUPLICATE_FILTER_KEY")
-if not REDIS_DUPLICATE_FILTER_KEY:
-    print("FATAL: REDIS_DUPLICATE_FILTER_KEY environment variable is not set. Exiting.")
-    sys.exit(1)
+MAX_INGESTOR_WORKERS: int = get_env_var("MAX_INGESTOR_WORKERS",int, config_logger)
+REDIS_DUPLICATE_FILTER_KEY: str = get_env_var("REDIS_DUPLICATE_FILTER_KEY",str, config_logger)
+OUTPUT_STREAM: str = get_env_var("OUTPUT_STREAM",str, config_logger)
 
+env_variables: List[EnvVariable] = [
+    EnvVariable("MAX_INGESTOR_WORKERS", MAX_INGESTOR_WORKERS), 
+    EnvVariable("OUTPUT_STREAM", OUTPUT_STREAM), 
+    EnvVariable("REDIS_DUPLICATE_FILTER_KEY", REDIS_DUPLICATE_FILTER_KEY)
+]
 
-OUTPUT_STREAM: Optional[str] = os.getenv("OUTPUT_STREAM")
-if not OUTPUT_STREAM:
-    print("FATAL: OUTPUT_STREAM environment variable is not set. Exiting.")
-    sys.exit(1)
+input_sources:str = "RSS FEEDS"
+output_stream:str = OUTPUT_STREAM
 
-
-print_env(REDIS_DUPLICATE_FILTER_KEY, OUTPUT_STREAM)
+print_env(Config(env_variables, input_sources, output_stream), config_logger)

@@ -15,8 +15,8 @@ COPY docker/base/core-requirements.txt .
 # Step 5: Install the foundational Python packages.
 RUN pip install --no-cache-dir -r core-requirements.txt
 
-# Step 6: Copy the shared common code.
-COPY common/ /app/common/
-
 COPY common/requirements.txt /app/common/requirements.txt
 RUN pip install --no-cache-dir -r /app/common/requirements.txt
+
+# Step 6: Copy the shared common code.
+COPY common/ /app/common/

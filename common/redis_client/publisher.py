@@ -1,18 +1,12 @@
 import json
 from typing import Any, Dict, List, Optional
-
+from logging import Logger, getLogger
 from common.redis_client.connection import redis_connection
-
+import redis
 
 class RedisPublisher:
     """
     A high-level, reliable wrapper for Redis stream-based FIFO queues.
-
-    Attributes:
-            stream_name (str): The name of the Redis stream used as the queue.
-            client: The connected redis-py client instance, managed by the
-                    RedisConnection singleton.
-            max_len (int): maximum number of messages in queue before a message is removed (allows for prioritisation of messages)
     """
 
     def __init__(self, stream_name: str):
@@ -23,14 +17,15 @@ class RedisPublisher:
 
         if not isinstance(stream_name, str) or not stream_name:
             raise ValueError("Stream name must be a non-empty string.")
+        
+        self.logger: Logger = getLogger(f"{stream_name}.redis_publisher")
+        self.logger.info("--- Initializing RedisPublisher ---")
+        self.stream_name:str = stream_name
+        self.max_len:int = 100000
+        self.client:redis.Redis = redis_connection.get_client()
+        self.logger.info(f"--- Initialized RedisPublisher to {stream_name} ---")
 
-        self.stream_name = stream_name
-        self.max_len = 100000
-        self.client = redis_connection.get_client()
-
-        print(f"Redis publisher initialised and publishing to {stream_name}")
-
-    def publish_one(self, message: Dict[Any, Any]):
+    def publish_one(self, message_payload: Dict[Any, Any]) -> str:
         """
         Serializes a dictionary to JSON and adds it to the stream.
 
@@ -40,34 +35,18 @@ class RedisPublisher:
         Returns:
                 str: The unique message ID if successful, otherwise None.
         """
+        if not message_payload:
+            raise Exception("No message to publish")
 
-        try:
-            if not message or message == {}:
-                print("No message to publish")
-                raise Exception("No message to publish")
+        payload:Dict[str, Any] = {"payload": json.dumps(message_payload)}
+        redis_message_id:str = self.client.xadd(
+            self.stream_name, payload, maxlen=self.max_len, approximate=True
+        )
+        self.logger.debug(f"Published message under id {redis_message_id} to {self.stream_name}")
+        return redis_message_id
 
-            payload = {"payload": json.dumps(message)}
-            redis_message_id = self.client.xadd(
-                self.stream_name, payload, maxlen=self.max_len, approximate=True
-            )
-            # print(
-            #     f"Published message {message.header.message_id} to {self.stream_name}. [ REDIS_MESSAGE_ID: {redis_message_id} ]"
-            # )
-            return redis_message_id
 
-        except TypeError as e:
-            print(
-                f"Failed to serialize data for '{self.stream_name}': {e}. Data not published."
-            )
-            return None
-
-        except Exception as e:
-            print(
-                f"Failed to publish message to {self.stream_name}: {e}. Data not published"
-            )
-            return None
-
-    def publish_many(self, messages: List[Dict[Any, Any]]) -> Optional[List[str]]:
+    def publish_many(self, messages: List[Dict[Any, Any]]) -> List[str]:
         """
         Serializes messages dictionaries to JSON and adds all to the stream.
 
@@ -78,36 +57,18 @@ class RedisPublisher:
                 A list of the unique Redis message IDs for the published messages
                 if successful, otherwise None.
         """
+        
+        if not messages or len(messages) == 0:
+            raise Exception("No messages to publish")
 
-        try:
-            if not messages or len(messages) == 0:
-                print("No messages to publish")
-                raise Exception("No messages to publish")
+        pipe = self.client.pipeline(transaction=True)
 
-            pipe = self.client.pipeline()
-
-            for message_data in messages:
-                payload = {"payload": json.dumps(message_data)}
-                pipe.xadd(
-                    self.stream_name, payload, maxlen=self.max_len, approximate=True
-                )
-
-            redis_message_ids = pipe.execute()
-
-            print(f"Published {len(redis_message_ids)} messages to {self.stream_name}.")
-            return redis_message_ids
-
-        except TypeError as e:
-            # This specific error is for when json.dumps fails.
-            print(
-                f"Serialization failed for a message in the batch for stream "
-                f"'{self.stream_name}'. No messages were published. Error: {e}"
+        for message_data in messages:
+            payload:Dict[str,Any] = {"payload": json.dumps(message_data)}
+            pipe.xadd(
+                self.stream_name, payload, maxlen=self.max_len, approximate=True
             )
-            return None
+        redis_message_ids:List[str] = pipe.execute()
 
-        except Exception as e:
-            print(
-                f"An unexpected error occurred during batch publish to stream "
-                f"'{self.stream_name}'. No messages were published. Error: {e}"
-            )
-            return None
+        self.logger.debug(f"Published {len(redis_message_ids)} messages to {self.stream_name}.")
+        return redis_message_ids
