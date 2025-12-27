@@ -1,7 +1,7 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging import Logger, getLogger
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Tuple
 
 from common.models.api.redis_models import StreamMessage
 from common.redis_client.consumer import RedisConsumer
@@ -49,7 +49,7 @@ class ScraperService:
         self.keep_running: bool = True
         self.message_consumer = RedisConsumer(INPUT_STREAM, GROUP_NAME, CONSUMER_NAME)
         self.sucess_publisher = RedisPublisherRouter(
-            routing_key="type", routing_map=self.routing_map
+            routing_key=["header","type"], routing_map=self.routing_map
         )
         self.fail_publisher = RedisPublisher(FAILURE_OUTPUT_STREAM)
 
@@ -75,27 +75,18 @@ class ScraperService:
     
     def _publish_and_ack_worker(
         self, message: StreamMessage, publisher: RedisPublisherRouter | RedisPublisher
-    ) -> int:
+    ) -> Tuple[str,str]:
         """
         The "worker" function for a single thread.
         It publishes one message and, if successful, acknowledges it.
         """
-        return message
-        stream = message["stream"]
-        redis_msg_id = message["redis_message_id"]
-        message_data = message["data"]
 
         try:
-            if not publisher.publish_one(message_data):
-                raise RuntimeError(
-                    f"Failed to publish message {redis_msg_id} to stream"
-                )
-
-            self.message_consumer.acknowledge(stream, redis_msg_id)
-
-            return message
+            redis_id_of_new_message:str = publisher.publish_one(message.data)
+            self.message_consumer.acknowledge(message.redis_id)
+            return message.redis_id, redis_id_of_new_message
         except Exception as e:
-            self.logger.error(f"  [ERROR] Worker failed for message {redis_msg_id}: {e}")
+            self.logger.error(f"Worker failed to publish or acknowlesdge message {message.redis_id}: {e}")
             raise e
 
     def _fetch_article_and_update(self, message: StreamMessage) -> StreamMessage:
@@ -142,7 +133,7 @@ class ScraperService:
             self.logger.error(f"\nFailed to parse HTML of message. Publishing to failure queue.")
             raise e
 
-    def _fetch_and_parse_message(self, message: StreamMessage):
+    def _fetch_and_parse_message(self, message: StreamMessage) -> Tuple[str,str]:
         try:
             fetched_message:StreamMessage = self._fetch_article_and_update(message)
             parsed_message:StreamMessage = self._parse_article_and_update(fetched_message)
@@ -163,13 +154,14 @@ class ScraperService:
         }
 
         for future in as_completed(parsed_message_futures):
-            original_message:StreamMessage = parsed_message_futures[future]
-            redis_id = original_message.redis_id
+            old_redis_id:str
+            new_redis_id:str
+            old_redis_id, new_redis_id = parsed_message_futures[future]
             try:
                 future.result()
-                self.logger.debug(f"Successfully published and acknowledged Msg ID {redis_id}")
+                self.logger.debug(f"Successfully published and acknowledged Msg ID {new_redis_id}")
             except Exception:
-                self.logger.error(f"Could not process message {redis_id}. Message was acknowledged and placed in the failure queue")
+                self.logger.error(f"Could not process message {old_redis_id}. Message was acknowledged and placed in the failure queue")
     
     def run(self):
         """
