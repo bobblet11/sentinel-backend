@@ -22,7 +22,7 @@ def print_env(
 
 	if config.input_stream:
 		logger.info("-" * 9)
-		logger.info("RSS FEEDS")
+		logger.info(config.input_stream)
 		logger.info("-" * 9)
 
 	logger.info("    |    \n    V    ")
