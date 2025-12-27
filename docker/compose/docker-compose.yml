@@ -109,8 +109,6 @@
       volumes:
         - scraper-prioritiser_service_logs:/var/log
 
-
-        
     web_scraper-service:
       container_name: sentinel-web-scraper-service-container
       image: sentinel/web-scraper-service:latest
@@ -122,8 +120,8 @@
       depends_on:
         # - postgres
         - redis
-        # - ingestor-service
-        # - scraper-prioritiser
+        - ingestor-service
+        - scraper-prioritiser
       
       volumes:
         - web-scraper_service_logs:/var/log
