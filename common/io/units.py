@@ -1,4 +1,4 @@
-def bytes_to_human_readable(n_bytes):
+def bytes_to_human_readable(n_bytes:int) -> str:
     """Converts a number of bytes into a human-readable format (GB, MB, KB)."""
     if n_bytes > 1024**3:
         return f"{n_bytes / 1024**3:.2f} GB"
