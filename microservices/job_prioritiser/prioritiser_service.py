@@ -1,3 +1,4 @@
+import time
 from typing import Any, Dict, List
 from logging import Logger, getLogger
 from common.redis_client.consumer_combiner import RedisConsumerCombiner
@@ -63,12 +64,9 @@ class PrioritiserService:
         self.logger.info(f"Publishing {len(stream_messages)} messages concurrently...")
 
         # 3. Publish and Ack
-        total_count:int = len(stream_messages)
-        success_count:int = 0
-        
         if stream_messages:
-            parsed_message_data: List[Dict, Any] = [message.data for message in stream_messages]
-            published_ids: List[str] = self.publisher.publish_many(parsed_message_data)
+            payloads: List[Dict, Any] = [message.data for message in stream_messages]
+            published_ids: List[str] = self.publisher.publish_many(payloads)
             if published_ids:
                 ack_count = 0
             
@@ -84,10 +82,8 @@ class PrioritiserService:
                 "Batch Publish Failed. RedisPublisher returned None. "
                 "Messages will NOT be acknowledged and will be re-delivered."
             )
-    
-        percentage:float = success_count/total_count if total_count > 0 else 0
-        self.logger.info(f"  - Successfully published and acknowledged {success_count} / {total_count} ({percentage:.1f}%)")
 
+        
     def run(self) -> None:
         """
         Main execution loop. Fetches and processes messages sequentially.
@@ -108,11 +104,15 @@ class PrioritiserService:
                 
                 # 1. Fetch
                 self.logger.info(f"Waiting for up to {BATCH_SIZE} messages...")
-                raw_messages:List[Dict[str, Any]] = self.combiner.consume_many(
-                    num_to_consume=BATCH_SIZE, block=2000
-                )
-                if not raw_messages:
-                    continue
+                raw_messages:List[Dict[str, Any]] = []
+                while True:
+                    raw_messages = self.combiner.consume_many(
+                        num_to_consume=BATCH_SIZE, block=2000
+                    )
+                    if not raw_messages:
+                        time.sleep(2)
+                        continue
+                    break
                 
                 self.logger.info(f"Found {len(raw_messages)} messages. Processing them...")
                 self._process_batch(raw_messages)
