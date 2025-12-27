@@ -43,7 +43,7 @@ def categorise_rss_sources_by_payment_tier(sources:List[RssSourceEntry]) -> Dict
 
 
 if __name__ == "__main__":
-    setup_logging(container_name=SERVICE_NAME)
+    setup_logging(level=logging.DEBUG,container_name=SERVICE_NAME)
     main_logger: logging.Logger = logging.getLogger("__main__")
     
     try:
