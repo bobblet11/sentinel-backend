@@ -3,29 +3,45 @@ import sys
 
 from typing import Callable
 
+NOISY_LOGGERS = [
+        "seleniumwire", 
+        "hpack", 
+        "urllib3", 
+        "urllib3.connectionpool", 
+        "websockets",
+        "undetected_chromedriver",
+        "requests",
+        "web_scraper.selenium.webdriver.remote.remote_connection",
+        "web_scraper.selenium.webdriver.common.service",
+        "selenium",
+        "selenium.webdriver.remote.remote_connection",
+        "selenium.webdriver.common.service",
+        "hpack",
+        "urllib3",
+        "websockets",
+        "asyncio",
+    ]
+
 def setup_logging(level=logging.INFO, container_name:str=""):
     """
     Configures the root logger to send messages to stdout.
     """
     
-    # 1. Get the root logger
     root_logger:logging.Logger = logging.getLogger()
     root_logger.setLevel(level)
 
-    # 2. Create a handler (Output to Console/Docker logs)
-    handler = logging.StreamHandler(sys.stdout)
-    
-    # 3. Create a Formatter
-    # Standard format: Time | Level | Logger Name | Message
-    log_format = f'%(asctime)s - %(levelname)s - [{container_name}.%(name)s] - %(message)s'
-    formatter = logging.Formatter(log_format)
-    
-    # 4. Attach
-    handler.setFormatter(formatter)
-    
-    # Prevent adding multiple handlers if function is called twice
     if not root_logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        
+        # Standard format: Time | Level | Logger Name | Message
+        log_format = f'%(asctime)s - %(levelname)s - [{container_name}.%(name)s] - %(message)s'
+        formatter = logging.Formatter(log_format)
+        
+        handler.setFormatter(formatter)
         root_logger.addHandler(handler)
+    
+    for logger_name in NOISY_LOGGERS:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 def get_logger(func: Callable, args: tuple) -> logging.Logger:
     """
