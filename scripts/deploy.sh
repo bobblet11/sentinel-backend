@@ -48,17 +48,22 @@ log_warn "Forcefully removing ':latest' images, protecting the dev container's i
 OUR_CONTAINER_ID=$(hostname)
 log_info "Dev container ID is: $OUR_CONTAINER_ID"
 
-# Step 2: Get the full Image ID (sha256:...) that our dev container is using.
-OUR_IMAGE_ID=$(sudo -E docker inspect --format='{{.Image}}' "$OUR_CONTAINER_ID")
-log_info "Dev container is using image: $OUR_IMAGE_ID"
 
 # Step 3: Get the list of all images tagged as ':latest'.
 ALL_LATEST_IMAGES=$(sudo -E docker images -q --filter "reference=*:latest")
+IMAGES_TO_DELETE=""
 
-# Step 4: Filter out our own image ID from the list of images to be deleted.
-# We also need to get the short ID of our image to match what 'docker images -q' returns.
-OUR_IMAGE_SHORT_ID=$(sudo -E docker inspect --format='{{.Id}}' "$OUR_IMAGE_ID" | sed 's/sha256://' | cut -c1-12)
-IMAGES_TO_DELETE=$(echo "$ALL_LATEST_IMAGES" | grep -v "$OUR_IMAGE_SHORT_ID" || true)
+# Check if the container exists
+if [ "$(sudo -E docker ps -aq -f name=$OUR_CONTAINER_ID)" ]; then
+    OUR_IMAGE_ID=$(sudo -E docker inspect --format='{{.Image}}' "$OUR_CONTAINER_ID")
+    log_info "Dev container is using image: $OUR_IMAGE_ID"
+    # Step 4: Filter out our own image ID from the list of images to be deleted.
+    # We also need to get the short ID of our image to match what 'docker images -q' returns.
+    OUR_IMAGE_SHORT_ID=$(sudo -E docker inspect --format='{{.Id}}' "$OUR_IMAGE_ID" | sed 's/sha256://' | cut -c1-12)
+    IMAGES_TO_DELETE=$(echo "$ALL_LATEST_IMAGES" | grep -v "$OUR_IMAGE_SHORT_ID" || true)
+else
+    log_warn "No such container: $OUR_CONTAINER_ID"
+fi
 
 # Step 5: Check if there's anything left to delete and then delete it.
 if [ -n "$IMAGES_TO_DELETE" ]; then
