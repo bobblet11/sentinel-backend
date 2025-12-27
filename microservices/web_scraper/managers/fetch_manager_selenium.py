@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import shutil
@@ -6,7 +7,10 @@ import tempfile
 import threading
 import time
 import traceback
-from typing import Dict, List
+import uuid
+import subprocess
+
+from typing import Any, Dict, List, Tuple, Callable, Optional
 
 from requests.exceptions import RequestException
 from selenium.common.exceptions import (
@@ -14,30 +18,75 @@ from selenium.common.exceptions import (
     TimeoutException,
     WebDriverException,
 )
+from requests import Request
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from seleniumwire import undetected_chromedriver as uc
+from logging import Logger, getLogger
 
+from undetected_chromedriver import Chrome, ChromeOptions, Patcher
 from common.requests.retry_request import exponential_retry
 from microservices.web_scraper.config import (
     FETCH_DELAY_GROWTH_RATE,
     INITIAL_FETCH_DELAY_S,
     MAX_FETCH_RETRIES,
 )
-from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid
+from dataclasses import dataclass
+from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
 from common.requests.user_agent_manager import user_agent_manager
+from pathlib import Path
+from pyvirtualdisplay import Display
 
+ProxyRequestDict = Optional[Dict[str, str]]
 
+CURRENT_DIR: str = Path(os.path.dirname(os.path.abspath(__file__)))
+HINTS_PATH:Path = CURRENT_DIR / ".." / "page_structure_hints" / "combined_hints.json"
+SS_PATH:Path = CURRENT_DIR / ".." / "screenshots"
+
+URL_TO_OUTLET_MAP: Dict[str, str] = {
+            ("abcnews", "abcnews.go.com"): "ABC",
+            ("bbc", "www.bbc.com"): "BBC",
+            ("cbc", "www.cbc.ca"): "CBC",
+            ("cbs", "www.cbsnews.com"): "CBS",
+            ("euronews", "www.euronews.com"): "Euronews",
+            ("nbcnews", "www.nbcnews.com"): "NBC",
+            ("npr", "www.npr.org"): "NPR",
+            ("theguardian", "www.theguardian.com"): "The_Guardian",
+        }
+LONG_DELAY_S:int = 6
+MEDIUM_DELAY_S:int = 4
+SHORT_DELAY_S:int = 2
+MAX_NUMBER_SCROLLS:int = 5
+PAGE_LOAD_TIMEOUT_S:int = 45
+
+@dataclass(frozen=True)
+class DriverConfig:
+    proxy_url:str
+    user_agent:str
+    headers:Dict[str,str]
+    
+    source_name:str
+    country_code:str
+    lang_str:str
+    
+    @property
+    def get_config_summary_string(self):
+        source_name_row:str = f"\n\tsource: {self.source_name}"
+        proxy_url_row:str = f"\n\tproxy_url: {self.proxy_url}"
+        proxy_country_code_row:str =f"\n\tproxy_country_code: {self.country_code}"
+        user_agent_row:str = f"\n\tuser_agent: {self.user_agent}"
+        lang_str_row:str = f"\n\tlang_string: {self.lang_str}"
+        return source_name_row + proxy_url_row + proxy_country_code_row + user_agent_row + lang_str_row
 class FetchManagerSelenium:
     """
     A thread-safe Singleton class that fetches news URLs.
     """
 
     _instance = None
-    _class_lock = threading.Lock()  # guards instance creation
-    _init_lock = threading.Lock()  # guards first-time init
-    _startup_lock = threading.Lock()  # for staggering
+    _class_lock = threading.Lock()  
+    _init_lock = threading.Lock() 
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
@@ -48,46 +97,82 @@ class FetchManagerSelenium:
 
     def __init__(
         self,
-        default_timeout=(15.0, 20.0),
-        proxy_manager=None,
-        hint_path: str = "./combined_hints.json",
-        screenshots_path="./",
+        default_timeout: Tuple[float,float]=(15.0, 20.0),
+        proxy_manager: ProxyManagerPaid = None,
+        hint_path: Path = CURRENT_DIR / 'combined_hints.json',
+        screenshots_path: Path = CURRENT_DIR,
     ):
+        
         if getattr(self, "_initialized", False):
             return
+        
+        self.logger:Logger = getLogger("fetch_manager_SELENIUM")
+        self.logger.info(f"Starting initialisation")
+        
+        if not proxy_manager:
+            self.logger.error(f"No proxy manager available!")
+            exit(1)
+           
+        self._create_selenium_wire_CA_folder()
+        screenshots_path.mkdir(parents=True, exist_ok=True)
+        hint_path.parent.mkdir(parents=True, exist_ok=True)
+    
         self.proxy_manager = proxy_manager
-        # Pre-create the selenium-wire CA folder to prevent the 'PEM routines' error
+        self.screenshots_path:Path = screenshots_path
+        self.default_timeout:Tuple[float,float] = default_timeout
+        self.hint_config:Dict[str, Dict[str,Any]] = json.loads(hint_path.read_text())
+        self.x_path_config: Dict[str, List[str]] = self._generate_xpath_dict(self.hint_config)
+        
+        # Start Global Virtual Display
+        self.logger.info("Starting Global Virtual Display...")
+        self.display = Display(visible=0, size=(1920, 1080))
+        self.display.start()
+
+        # We download/patch the driver ONCE here, then copy it for threads later.
+        self.logger.info("Detecting Chrome version and preparing driver...")
+        try:
+            # 1. Get installed Chrome version
+            result = subprocess.run(["google-chrome", "--version"], capture_output=True, text=True)
+            version_output = result.stdout.strip().split()[-1]
+            major_version = int(version_output.split('.')[0])
+            self.logger.info(f"Detected Google Chrome Version: {version_output} (Major: {major_version})")
+
+            # 2. Download matching driver
+            patcher = Patcher(version_main=major_version)
+            patcher.auto() 
+            self.base_driver_path = patcher.executable_path
+            os.chmod(self.base_driver_path, 0o755)
+            self.logger.info(f"Master driver ready at: {self.base_driver_path}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to prepare driver: {e}")
+            raise e
+        
+        self._initialized:bool = True
+        self.logger.info(f"Initialisation complete!")
+
+    def _create_selenium_wire_CA_folder(self) -> None:
+        """Pre-create the selenium-wire CA folder to prevent the 'PEM routines' error"""
         os.makedirs(os.path.expanduser("~/.seleniumwire"), exist_ok=True)
-
-        with open(hint_path, "r") as f:
-            hint_config: Dict[str, str] = json.load(f)
-            self.x_paths: Dict[str, List[str]] = self.generate_xpath_dict(hint_config)
-
-        self.screenshots_path = screenshots_path
-        self._initialized = True
-
+    
     @staticmethod
-    def get_headers_for_country(country_code: str = "US"):
-        language_options = {
-            # Canada: English first, then French (since it's bilingual)
+    def get_accept_language_string(country_code: str = "US") -> str:
+        language_options:Dict[str, str] = {
             "CA": "en-CA,en;q=0.9,fr-CA;q=0.8",
-            # United Kingdom: British English preferred
             "GB": "en-GB,en;q=0.9",
-            # United States: American English preferred
             "US": "en-US,en;q=0.9",
-            # France: English first (for content), French second (for proxy-matching stealth)
             "FR": "en-US,en;q=0.9,fr-FR;q=0.8,fr;q=0.7",
         }
-        default_string = language_options["US"]
-        return language_options.get(country_code.upper(), default_string)
+        default_language_string: str = language_options["US"]
+        return language_options.get(country_code.upper(), default_language_string)
 
     @staticmethod
-    def find_free_port():
+    def find_free_port() -> int:
         """Finds a truly free port for the selenium-wire proxy to bind to."""
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("", 0))
             s.listen(1)
-            port = s.getsockname()[1]
+            port:int = s.getsockname()[1]
         return port
 
     def _create_enhanced_headers(
@@ -108,8 +193,9 @@ class FetchManagerSelenium:
             "Cache-Control": "max-age=0",
         }
 
-    def generate_interceptor_function(self, custom_headers: Dict[str, str]):
-        def interceptor(request):
+    def _generate_interceptor_function(self, custom_headers: Dict[str, str]) -> Callable:
+        
+        def interceptor(request:Request):
             """Intercepts request made by Selenium and replaces headers. Returns a dictionary of headers to better mimic a real browser."""
             if request.headers.get("Sec-Fetch-Dest") == "document":
                 for key, value in custom_headers.items():
@@ -119,127 +205,115 @@ class FetchManagerSelenium:
 
         return interceptor
 
-    def get_clean_driver(self, proxy_url, user_agent, custom_headers):
-        # --- ISOLATION STEP 1: Unique Port & Dirs ---
-        wire_port = self.find_free_port()
-        debug_port = self.find_free_port()
-        user_data_dir = tempfile.mkdtemp(prefix="chrome_profile_")
-        wire_tmp_dir = tempfile.mkdtemp(prefix="wire_")
+    def _generate_new_driver(self, config: DriverConfig) -> Chrome:
+        # Ports
+        wire_port:int = self.find_free_port()
+        debug_port:int = self.find_free_port()
+        
+        # Unique Paths per Thread
+        unique_id = uuid.uuid4().hex[:8]
+        driver_bin_dir:str = tempfile.mkdtemp(prefix=f"uc_driver_{unique_id}_")
+        user_data_dir:str = tempfile.mkdtemp(prefix=f"chrome_prof_{unique_id}_")
+        wire_tmp_dir:str = tempfile.mkdtemp(prefix=f"wire_{unique_id}_")
 
-        # --- ISOLATION STEP 2: Unique Driver Binary (THE FIX) ---
-        # Create a unique folder and COPY the system chromedriver into it.
-        # This prevents UC from colliding on the patched file.
-        driver_executable_dir = tempfile.mkdtemp(prefix="driver_exe_")
-        # Note: Ensure the path matches where Chrome/Chromedriver is installed in your Dockerfile
-        base_driver_path = "/usr/bin/chromedriver"
-        unique_driver_path = os.path.join(driver_executable_dir, "chromedriver")
-        shutil.copy2(base_driver_path, unique_driver_path)
-        os.chmod(unique_driver_path, 0o755)  # Make executable
+        # Copy Driver Binary 
+        # Copy the master driver to this thread's private folder to prevent race conditions
+        thread_driver_path = os.path.join(driver_bin_dir, "chromedriver")
+        shutil.copy(self.base_driver_path, thread_driver_path)
+        os.chmod(thread_driver_path, 0o755)
 
-        options = uc.ChromeOptions()
-        options.add_argument("--headless")
+        options: ChromeOptions = uc.ChromeOptions()
         options.add_argument("--no-sandbox")
+        options.add_argument("--disable-setuid-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-infobars")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--remote-allow-origins=*")
+        
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--start-maximized")
         options.add_argument("--ignore-certificate-errors")
+        
         options.add_argument(f"--remote-debugging-port={debug_port}")
         options.add_argument(f"--user-data-dir={user_data_dir}")
-        options.add_argument(f"--user-agent={user_agent}")
+        options.add_argument(f"--user-agent={config.user_agent}")
         options.binary_location = "/usr/bin/google-chrome"
-
-        proxy_options = {
-            "proxy": {"http": proxy_url, "https": proxy_url},
+        
+        proxy_options: Dict[str, Any] = {
+            "proxy": {"http": config.proxy_url, "https": config.proxy_url},
             "port": wire_port,
             "request_storage_base_dir": wire_tmp_dir,
             "request_storage": "memory",
             "verify_ssl": False,
         }
 
-        # --- ISOLATION STEP 3: Strict Creation Lock ---
-        with self._startup_lock:
-            driver = uc.Chrome(
+        try:
+            driver: Chrome = uc.Chrome(
                 options=options,
                 seleniumwire_options=proxy_options,
-                # Point UC to our private copy of the driver
-                driver_executable_path=unique_driver_path,
-                headless=True,
-                # use_subprocess is buggy in some multi-threaded Docker setups;
-                # let's set it to False to see if stability improves.
-                use_subprocess=False,
+                headless=False,
+                version_main=None, 
+                use_subprocess=True, 
+                driver_executable_path=thread_driver_path
             )
-            time.sleep(3)  # Give the OS time to bind the ports
-
-        # Store all 3 directories for cleanup
-        driver._thread_dirs = [user_data_dir, wire_tmp_dir, driver_executable_dir]
-        driver.request_interceptor = self.generate_interceptor_function(custom_headers)
+        except Exception as e:
+            if hasattr(e, 'msg'):
+                self.logger.error(f"Chrome Start Error: {e.msg}")
+            raise e
+            
+        # Add cleanup paths for this specific thread
+        driver._thread_dirs = [user_data_dir, wire_tmp_dir, driver_bin_dir]
+        driver.request_interceptor = self._generate_interceptor_function(config.headers)
         return driver
-
-    def extract_source_name(self, url: str):
-        source_map: Dict[str, str] = {
-            ("abcnews", "abcnews.go.com"): "ABC",
-            ("bbc", "www.bbc.com"): "BBC",
-            ("cbc", "www.cbc.ca"): "CBC",
-            ("cbs", "www.cbsnews.com"): "CBS",
-            ("euronews", "www.euronews.com"): "Euronews",
-            ("nbcnews", "www.nbcnews.com"): "NBC",
-            ("npr", "www.npr.org"): "NPR",
-            ("theguardian", "www.theguardian.com"): "The_Guardian",
-        }
-
-        for url_patterns, source_name in source_map.items():
+    
+    def _extract_source_name(self, article_url: str, default_source_name:str = "BBC") -> str:
+        for url_patterns, source_name in URL_TO_OUTLET_MAP.items():
             for pattern in url_patterns:
-                if pattern in url:
+                if pattern in article_url:
                     return source_name
 
-        return None
+        return default_source_name
 
-    def _build_xpath(self, rule_name, rule_data):
+    def _create_xpath(self, rule_name:str, rule_data:Dict[str,Any]) -> str:
         """
         Converts the JSON rule into a valid XPath string.
         """
-
-        print(f"Creating xpath for {rule_name}")
-        xpath_parts = []
+        xpath_parts: List[str] = []
 
         # 1. Handle Parents (Ancestors)
-        # Your JSON lists immediate parent first, so we reverse it to build XPath Top-Down
         if "parents" in rule_data:
             for parent in reversed(rule_data["parents"]):
-                tag = parent.get("tag", "*")
-                attrs = self._get_attribute_predicates(parent)
-
-                # Combine tag and attributes, e.g., //div[@id='onetrust']
+                tag:str = parent.get("tag", "*")
+                attrs:str = self._create_attribute_predicates(parent)
                 xpath_parts.append(f"//{tag}{attrs}")
 
-        # 2. Handle the Target Element
-        tag = rule_data.get("tag", "*")
-        attrs = self._get_attribute_predicates(rule_data)
+        # 2. Handle the Target Element (Button we want to close)
+        tag:str = rule_data.get("tag", "*")
+        attrs:str = self._create_attribute_predicates(rule_data)
         xpath_parts.append(f"//{tag}{attrs}")
-        print(f"Xpath for {rule_name} = {xpath_parts}")
-        # Join parts to form full path: //ancestor//parent//target
+        
+        self.logger.debug(f"Xpath for {rule_name} = {xpath_parts}")
         return "".join(xpath_parts)
 
-    def _get_attribute_predicates(self, data):
+    def _create_attribute_predicates(self, tag_description:Dict[str, Any]) ->str:
         """
         Helper to turn a dictionary {"class": "foo", "id": "bar"}
-        into XPath string "[contains(@class, 'foo') and @id='bar']"
+        into XPath attribute string "[contains(@class, 'foo') and @id='bar']"
         """
-        predicates = []
+        predicates:List[str] = []
 
-        # Keys to ignore (not HTML attributes)
-        ignore_keys = ["tag", "parents"]
+        ignore_keys:List[str] = ["tag", "parents"]
 
-        for key, value in data.items():
+        for key, value in tag_description.items():
             if key in ignore_keys:
                 continue
 
-            # Special handling for 'class' to allow partial matches
             if key == "class":
                 predicates.append(f"contains(@class, '{value}')")
             elif key == "text_contains":
-                # This generates XPath: //button[contains(text(), 'Maybe later')]
                 predicates.append(f"contains(., '{value}')")
             else:
-                # specific attributes like ng-click, external-event, etc.
                 predicates.append(f"@{key}='{value}'")
 
         if not predicates:
@@ -247,79 +321,97 @@ class FetchManagerSelenium:
 
         return "[" + " and ".join(predicates) + "]"
 
-    def handle_scroll(self, driver):
-        print("Scrolling down...")
-        last_height = driver.execute_script("return document.body.scrollHeight")
-        while True:
+    def _handle_scroll(self, driver: Chrome) -> None:
+        self.logger.debug("Scrolling down...")
+        last_height:int = driver.execute_script("return document.body.scrollHeight")
+        
+        for _ in range(MAX_NUMBER_SCROLLS):
             driver.execute_script("window.scrollBy(0, 800);")
-            time.sleep(5)
-
-            new_height = driver.execute_script("return document.body.scrollHeight")
+            time.sleep(SHORT_DELAY_S)
+            new_height:int = driver.execute_script("return document.body.scrollHeight")
+            
             if new_height == last_height:
                 break
+            
             last_height = new_height
-        print("Reached the bottom!")
+            
+        self.logger.debug("Reached the bottom!")
 
-    def generate_xpath_dict(self, hint_config):
+    def _generate_xpath_dict(self, hint_config: Dict[str, Dict[str,Any]]) -> Dict[str,List[str]]:
         """
         Generates a map of all the close buttons needed to be pressed for each source.
         """
-        xpath_dict = {}
+        self.logger.info("Generating XPATH dictionary...")
+        
+        xpath_dict: Dict[str, List[str]] = {}
         for source_name, source_rules in hint_config.items():
             xpath_dict[source_name] = []
 
-            for rule_name, rule_data in source_rules.get("selectors", {}).items():
-                print(rule_name, rule_data)
-                xpath = self._build_xpath(rule_name, rule_data)
+            if not source_rules.get("selectors", None):
+                continue
+            
+            for rule_name, rule_data in source_rules.get("selectors").items():
+                self.logger.debug(rule_name, rule_data)
+                
+                xpath:str = self._create_xpath(rule_name, rule_data)
                 xpath_dict[source_name].append(xpath)
 
         return xpath_dict
 
-    def handle_pop_ups(self, source_name: str, driver):
-        print(f"Looking for pop ups for {source_name}")
-        x_paths = self.x_paths.get(source_name, [])
+    def _handle_pop_ups(self, source_name: str, driver:Chrome) -> None:
+        self.logger.debug(f"Looking for pop ups in {source_name}")
+        x_paths_for_buttons: List[str] = self.x_path_config.get(source_name, [])
 
-        if not x_paths:
-            print(f"No xpath rules found for {source_name}")
+        if not x_paths_for_buttons:
+            self.logger.warning(f"No xpath rules found for {source_name}")
             return
 
-        def try_click(context_driver, xpath):
-            print(f"trying to click {xpath}")
+        def click_xpath(context_driver : Chrome, xpath : str) -> bool:
+            
+            self.logger.debug(f"Trying to click {xpath}")
+            
             try:
-                # Reduced timeout to 1s because we iterate iframes, don't want to wait long per frame
+
                 element = WebDriverWait(context_driver, 1).until(
                     EC.presence_of_element_located((By.XPATH, xpath))
                 )
+                
                 if element.is_displayed():
-                    print(f"   Found popup [{xpath}]. Clicking...")
+                    self.logger.info(f"Found popup [{xpath}]. Clicking...")
+                    
                     try:
                         element.click()
                     except ElementClickInterceptedException:
                         context_driver.execute_script("arguments[0].click();", element)
-                    print(f"   ✅ Closed [{xpath}]")
+                        
+                    self.logger.info(f"✅ Closed [{xpath}]")
+                    
                     return True
+                
             except TimeoutException:
-                pass
+                self.logger.warning(f"Timeout: Pop up did not appear.")
             except Exception as e:
-                print(f"   ⚠️ Error interacting: {e}")
+                self.logger.error(f"⚠️ Error interacting: {e}")
             return False
 
-        for x_path_to_close in x_paths:
-            # 1. Try Main Content
-            driver.switch_to.default_content()
-            if try_click(driver, x_path_to_close):
-                time.sleep(1)
-                continue  # Move to next rule
+        for button_to_close in x_paths_for_buttons:
 
-            # 2. If not found, iterate ALL iframes
+            driver.switch_to.default_content()
+            
+            # Successfully clicked a button
+            if click_xpath(driver, button_to_close):
+                time.sleep(SHORT_DELAY_S)
+                continue 
+
+            # If not found, iterate ALL iframes
             iframes = driver.find_elements(By.TAG_NAME, "iframe")
             for i, iframe in enumerate(iframes):
                 try:
-                    driver.switch_to.default_content()  # Reset
-                    driver.switch_to.frame(iframe)  # Enter iframe
-                    if try_click(driver, x_path_to_close):
-                        time.sleep(1)
-                        break  # Stop looking through iframes for this rule
+                    driver.switch_to.default_content() 
+                    driver.switch_to.frame(iframe) 
+                    if click_xpath(driver, button_to_close):
+                        time.sleep(SHORT_DELAY_S)
+                        break 
                 except Exception:
                     # Iframes sometimes unload or deny access, just skip
                     continue
@@ -327,29 +419,101 @@ class FetchManagerSelenium:
             # Always reset to default after finishing a rule
             driver.switch_to.default_content()
 
-    def save_screenshot(self, driver, url):
+    def _take_and_save_screenshot(self, driver: Chrome, article_url:str, prefix:str = "") -> None:
         if not driver:
             return None
 
         try:
-            print("Taking screenshot")
-            png_data = driver.get_screenshot_as_png()
+            self.logger.debug("Taking screenshot")
+            png_data: bytes = driver.get_screenshot_as_png()
+            
         except Exception as e:
-            print(f"Could not take screenshot: {e}")
+            self.logger.error(f"Could not take screenshot: {e}")
             return
 
-        print("Saving screenshot")
+        
         try:
-            timestamp = int(time.time())
-            filename = f"{timestamp}.png"
-            file_path = os.path.join(self.screenshots_path, filename)
+            self.logger.debug("Saving screenshot")
+            timestamp: int = int(time.time())
+            url_hash: str = hashlib.md5(article_url.encode("utf-8")).hexdigest()[:8]
+            filename: str = f"{prefix}_{timestamp}_{url_hash}.png"
+            file_path:Path = self.screenshots_path / filename
 
-            with open(file_path, "wb") as f:
-                f.write(png_data)
-            print(f"📸 Screenshot saved to: {file_path}")
+            file_path.write_bytes(png_data)
+            self.logger.info(f"📸 Screenshot saved to: {file_path}")
         except Exception as e:
-            print(f"❌ Failed to write screenshot file: {e}")
+            self.logger.error(f"Failed to write screenshot file: {e}")
 
+    def _create_driver_config(self, article_url:str) -> DriverConfig:
+        source_name: str = self._extract_source_name(article_url)
+        self.logger.debug(f"Identified source as: '{source_name}' for URL: {article_url}")
+        
+        proxies: ProxyRequestDict = self.proxy_manager.get_next_proxy(article_url)
+        proxy_url:str = proxies.get("https", proxies.get("http"))
+        if not proxy_url:
+            raise Exception("Proxy dictionary found, but no http/https URL present")
+        
+
+        ip_country_mapping:Dict[str,str] = getattr(self.proxy_manager, "ip_country_mapping", {})
+        if ip_country_mapping is None: self.logger.warning("IP Country Map was not generated. Proxy source was not initialised correctly")
+        proxy_country_code:str = ip_country_mapping.get(proxy_url, "US")
+        lang_string:str = self.get_accept_language_string(proxy_country_code)
+        
+        headers:Dict[str,str] = self._create_enhanced_headers(lang_string)
+        user_agent:str = user_agent_manager.get_sticky_agent(proxy_url)
+        
+        driver_config: DriverConfig = DriverConfig(proxy_url, user_agent, headers, source_name, proxy_country_code, lang_string)
+        self.logger.debug(f"Created driver config for {article_url}" + driver_config.get_config_summary_string)
+        return driver_config
+    
+    def _scroll_and_close_popups(self,driver:Chrome, article_url:str, source_name:str) -> None:
+        """Scrolls to bottom, waits, then closes any pop ups"""
+        self.logger.debug("Attempting to execute scroll and close commands in page")
+        try:
+            self._handle_scroll(driver)
+            self._take_and_save_screenshot(driver, article_url)
+            time.sleep(LONG_DELAY_S)
+            self._handle_pop_ups(source_name, driver)
+            self._take_and_save_screenshot(driver, article_url)
+            self._handle_scroll(driver)
+            self._take_and_save_screenshot(driver, article_url)
+            
+        except Exception as e:
+            self._take_and_save_screenshot(driver, article_url, prefix="FAIL")
+            raise Exception(f"Failed to navigate page: {e}")
+
+    def _extract_html(self, driver:Chrome) -> str:
+        body_element:str=""
+        
+        try:
+            body_element:str = driver.find_element(By.TAG_NAME, "body").get_attribute("innerHTML")
+        except Exception:
+            body_element:str = driver.page_source
+            
+        if not body_element or len(body_element) < 200:
+            self.logger.warning("Captured body was empty. Falling back to full page_source.")
+            body_element:str = driver.page_source
+        
+        if "ERR_CERT_AUTHORITY_INVALID" in body_element:
+            raise Exception("SSL Bypass failed")
+        
+        return body_element
+
+    def _clean_up_driver(self, driver:Chrome) -> None:
+        try:
+            driver.quit()        
+        except Exception:
+            pass
+
+        # Clean up temporary directories
+        try:
+            dirs_to_clean:List[str] = getattr(driver, "_thread_dirs", [])
+            for directory in dirs_to_clean:
+                if os.path.exists(directory):
+                    shutil.rmtree(directory, ignore_errors=True)
+        except Exception as cleanup_err:
+             self.logger.warning(f"Failed to clean dirs: {cleanup_err}")
+             
     @exponential_retry(
         max_attempts=MAX_FETCH_RETRIES,
         initial_delay_s=INITIAL_FETCH_DELAY_S,
@@ -357,89 +521,40 @@ class FetchManagerSelenium:
         jitter=True,
         on_exceptions=(RequestException, WebDriverException, Exception),
     )
-    def fetch_article_html(self, url: str):
+    def fetch_article_html(self, article_url: str) -> str:
         """
-        Fetches the HTML of a webpage using rotating headers and proxies.
+        Fetches the HTML of a webpage using rotating proxies, sticky user agents, 
+        and country specific langugage strings for headers.
         This method is wrapped by a retry decorator. It is responsible for
         a SINGLE fetch attempt and for reporting bad proxies.
         """
-        driver = None
-        proxy_url = None
+        driver: Chrome = None
 
         try:
+            self.logger.debug(f"Fetching HTML for {article_url}")
+            driver_config:DriverConfig = self._create_driver_config(article_url)
+            driver:Chrome = self._generate_new_driver(driver_config)
+            
+            driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT_S)
 
-            proxies = self.proxy_manager.get_next_proxy(url)
-            if proxies is None:
-                raise Exception("Proxy manager returned None - Pool might be empty")
-
-            proxy_url = proxies.get("https", proxies.get("http"))
-            if not proxy_url:
-                raise Exception("Proxy dictionary found, but no http/https URL present")
-
-            mapping = self.proxy_manager.ip_country_mapping
-            if mapping is None:
-                mapping = {}
-                print("NO mapping found")
-
-            country_code = mapping.get(proxy_url, "US")
-            lang_string = self.get_headers_for_country(country_code)
-            custom_headers = self._create_enhanced_headers(lang_string)
-            user_agent = user_agent_manager.get_sticky_agent(proxy_url)
-
-            source_name: str = self.extract_source_name(url)
-            print(f"DEBUG: Identified source as: '{source_name}' for URL: {url}")
-
-            driver = self.get_clean_driver(proxy_url, user_agent, custom_headers)
-            driver.get(url)
-
-            try:
-                time.sleep(2)
-                self.handle_scroll(driver)
-                self.save_screenshot(driver, url)
-                self.handle_pop_ups(source_name, driver)
-                self.save_screenshot(driver, url)
-                self.handle_scroll(driver)
-                self.save_screenshot(driver, url)
-            except Exception as e:
-                data = self.collect_failure_screenshots()
-                self.save_screenshot(data)
-                raise Exception(f"Failed to navigate page: {e}")
-
-            body_element = driver.find_element(By.TAG_NAME, "main").get_attribute(
-                "innerHTML"
-            )
-            if "ERR_CERT_AUTHORITY_INVALID" in body_element:
-                raise Exception("SSL Bypass failed")
-            print(f"[SUCCESS] Successfully fetched {url}")
+            driver.get(article_url)
+            self._scroll_and_close_popups(driver, article_url, driver_config.source_name)
+            body_element:str = self._extract_html(driver)           
+            self.logger.debug(f"[SUCCESS] Successfully fetched {len(body_element)} bytes from {article_url}")
             return body_element
-
+        
         except Exception as e:
-            print(f"[ERROR] Fetching {url}: {e}")
-            traceback.print_exc()
+            self.logger.info(f"[ERROR] Could not fetch {article_url}: {e}")
+            # traceback.print_exc()
             raise e
 
         finally:
             if driver:
-                # Use the name with the underscore
-                dirs_to_clean = getattr(driver, "_thread_dirs", [])
-                try:
-                    driver.quit()
-                    time.sleep(2)  # Buffer for OS to release file locks
-                    for d in dirs_to_clean:
-                        if os.path.exists(d):
-                            shutil.rmtree(d, ignore_errors=True)
-                except Exception as cleanup_err:
-                    print(f"Cleanup Error: {cleanup_err}")
+                self._clean_up_driver(driver)
 
 
-script_dir: str = os.path.dirname(os.path.abspath(__file__))
-combined_hints_file_path: str = os.path.abspath(
-    os.path.join(script_dir, "../", "page_structure_hints", "combined_hints.json")
-)
-screenshots_folder_path: str = "/app/microservices/web_scraper/screenshots"
-os.makedirs(screenshots_folder_path, exist_ok=True)
 fetch_manager = FetchManagerSelenium(
     proxy_manager=proxy_manager_paid,
-    hint_path=combined_hints_file_path,
-    screenshots_path=screenshots_folder_path,
+    hint_path=HINTS_PATH,
+    screenshots_path=SS_PATH,
 )
