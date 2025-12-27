@@ -88,6 +88,7 @@ class BaseIngestor:
 
         published_ids:List[str] = self.publisher.publish_many(messages_to_publish)
         number_of_published_ids: int = len(published_ids)
+        
         if number_of_published_ids == 0:
             self.logger.info("--- Ingestion cycle finished. Could not publish to queue. ---\n\n")
             return
