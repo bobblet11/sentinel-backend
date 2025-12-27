@@ -19,3 +19,4 @@ selenium
 undetected-chromedriver 
 selenium-wire
 blinker==1.7.0
+pyvirtualdisplay
