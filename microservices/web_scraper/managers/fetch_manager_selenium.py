@@ -483,21 +483,17 @@ class FetchManagerSelenium:
             raise Exception(f"Failed to navigate page: {e}")
 
     def _extract_html(self, driver:Chrome) -> str:
-        body_element:str=""
-        
-        try:
-            body_element:str = driver.find_element(By.TAG_NAME, "body").get_attribute("innerHTML")
-        except Exception:
-            body_element:str = driver.page_source
+        # Use page_source to ensure <head> and <meta> tags are captured
+        full_html: str = driver.page_source
             
-        if not body_element or len(body_element) < 200:
-            self.logger.warning("Captured body was empty. Falling back to full page_source.")
-            body_element:str = driver.page_source
+        if not full_html or len(full_html) < 200:
+            self.logger.warning("Captured page_source was empty or too short.")
+            raise Exception("Page source extraction failed or empty")
         
-        if "ERR_CERT_AUTHORITY_INVALID" in body_element:
+        if "ERR_CERT_AUTHORITY_INVALID" in full_html:
             raise Exception("SSL Bypass failed")
         
-        return body_element
+        return full_html
 
     def _clean_up_driver(self, driver:Chrome) -> None:
         try:
