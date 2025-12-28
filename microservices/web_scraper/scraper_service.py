@@ -2,7 +2,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging import Logger, getLogger
 from typing import Any, Dict, Optional, List, Tuple
-
 from common.models.api.redis_models import StreamMessage
 from common.redis_client.consumer import RedisConsumer
 from common.redis_client.publisher import RedisPublisher
@@ -19,7 +18,7 @@ from microservices.web_scraper.config import (
     MAX_FETCH_RETRIES
 )
 from microservices.web_scraper.managers.fetch_manager_selenium import fetch_manager
-from microservices.web_scraper.managers.parse_manager import parse_manager
+from microservices.web_scraper.managers.parse_manager import parse_manager, ParseResult
 
 SERVICE_NAME="scraper"
 PRIORITY_MAP = {
@@ -115,6 +114,9 @@ class ScraperService:
             article_url:Optional[str] = message.link
             article_html:Optional[str] = message.html
             
+            #fill this out later!
+            article_metadata:Optional[Dict] = None
+            
             if not article_url:
                 self.logger.error(f"No link on this message {message}")
                 raise FailedToParse("No link on this message")
@@ -125,9 +127,15 @@ class ScraperService:
             
             self.logger.debug(f"Attemping to parse HTML from {article_url}")
 
-            parsed_text:str = parse_manager.parse_article_html(article_html, article_url)
-            self.logger.debug(f"Successfully parsed HTML for {article_url}, length: {len(parsed_text)}")
-            message.set_parsed_text(parsed_text)
+            parsed_result:Dict[str,str] = parse_manager.parse_article_raw_html(article_html, article_url, article_metadata)
+            
+            self.logger.debug(parsed_result)
+            
+            self.logger.debug(
+                f"Successfully parsed HTML for {article_url}, "
+                f"length: {len(parsed_result.get('text') or '')}"
+            )
+            message.set_parsed_text(parsed_result)
             return message
         except Exception as e:
             self.logger.error(f"\nFailed to parse HTML of message. Publishing to failure queue.")
@@ -154,14 +162,13 @@ class ScraperService:
         }
 
         for future in as_completed(parsed_message_futures):
-            old_redis_id:str
-            new_redis_id:str
-            old_redis_id, new_redis_id = parsed_message_futures[future]
+            original_message = parsed_message_futures[future] 
+
             try:
-                future.result()
-                self.logger.debug(f"Successfully published and acknowledged Msg ID {new_redis_id}")
+                old_redis_id, new_redis_id = future.result() 
+                self.logger.debug(f"Successfully published Msg {old_redis_id} -> {new_redis_id}")
             except Exception:
-                self.logger.error(f"Could not process message {old_redis_id}. Message was acknowledged and placed in the failure queue")
+                self.logger.error(f"Could not process message {original_message.redis_id}. Message was acknowledged and placed in the failure queue")
     
     def run(self):
         """

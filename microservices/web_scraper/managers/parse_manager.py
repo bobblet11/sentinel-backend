@@ -1,135 +1,195 @@
 import json
+from logging import Logger, getLogger
 import re
-from typing import Any, Dict, Optional
-
 import trafilatura
+import threading 
+
+from typing import Any, Dict, List, Optional, Callable
 from bs4 import BeautifulSoup
-
-from microservices.web_scraper.managers.parser_registry_manager import (
-    ParserRegistryManager,
-)
+from microservices.web_scraper.managers.parser_registry_manager import ParserRegistryManager
 from microservices.web_scraper.parsers.base_parser import BaseParser
+from dataclasses import asdict, dataclass
 
+@dataclass
+class ParseResult:
+    text: str
+    title: Optional[str]
+    author: Optional[str]
+    published_at: Optional[str]
+    
+    def __getitem__(self, key):
+        return getattr(self, key, None)
+    
+    def __setitem__(self, key, value):
+        if hasattr(self, key):
+            setattr(self, key, value)
+        else:
+            raise KeyError(f"{key} is not a valid field")
+        
 
 class ParseManager:
     """
-    Robust HTML -> article parser which:
+    Robust raw_HTML -> article parser which:
       1) Checks hardcoded scrapers (registry)
       2) Uses RSS metadata if provided (message-driven)
       3) Uses trafilatura
       4) Falls back to DOM paragraph extraction
     """
+    _instance = None
+    _class_lock = threading.Lock()
+    _init_lock = threading.Lock()
 
-    def __init__(self):
-        self.hardcoded_parser_registry = ParserRegistryManager()
-        self.name = type(self).__name__
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            with cls._class_lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    
+    def __init__(self, registry: ParserRegistryManager = None):
+        if getattr(self, "_initialized", False):
+            return
 
-    def parse_article_html(
-        self,
-        html: str,
-        url: Optional[str] = None,
-        rss_metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict:
-
-        if not html or len(html) < 20:
-            raise ValueError(
-                f"[{self.name}] HTML content too short or empty during parsing"
-            )
-
-        # 0) If RSS metadata provided and has full text, prefer that
-        if rss_metadata:
-            text_content: str = rss_metadata.get("content") or rss_metadata.get(
-                "description"
-            )
-            rss_metadata_is_sufficient: bool = (
-                text_content and len(text_content.strip()) > 100
-            )
-
-            if rss_metadata_is_sufficient:
-                print(f"[{self.name}] using RSS metadata")
-                output: Dict[str, Any] = {
-                    "title": rss_metadata.get("title"),
-                    "text": rss_metadata.get("content")
-                    or rss_metadata.get("description"),
-                    "author": rss_metadata.get("author") or rss_metadata.get("creator"),
-                    "published_at": rss_metadata.get("published")
-                    or rss_metadata.get("pubDate"),
-                }
-                return output
-
-        # 1) Hardcoded Scraper
-        if url:
-            try:
-                output: Dict[str, Any] = self._extract_with_hardcoded_parser(url, html)
-                text_content: str = rss_metadata.get("content") or rss_metadata.get(
-                    "description"
-                )
-                hardcoded_parser_is_sufficient: bool = (
-                    text_content and len(text_content.strip()) > 80
-                )
-
-                if hardcoded_parser_is_sufficient:
-                    print(f"[{self.name}] using hardcoded parser")
-                    # fill missing metadata from JSON-LD or OG if missing
-                    if not output.get("title"):
-                        output["title"] = self._extract_title(html)
-                    if not output.get("author"):
-                        output["author"] = self._extract_author(html)
-                    if not output.get("published_at"):
-                        output["published_at"] = self._extract_date(html)
-                    return output
-
-            except Exception:
-                pass
-
-        # 2) Trafilatura
-        text_content = self._extract_with_trafilatura(html)
-        trafilatura_is_sufficient: bool = (
-            text_content and len(text_content.strip()) > 80
-        )
-
-        # 3) fallback if trafilatura failed or too short
-        if not trafilatura_is_sufficient:
-            print(f"[{self.name}] using fallback method")
-            text_content = self._fallback_extract_text(html)
-
-        print(f"[{self.name}] using trafilatura")
-        text_content = self._clean_text(text_content)
-
-        return {
-            "title": self._extract_title(html),
-            "text": text_content,
-            "author": self._extract_author(html),
-            "published_at": self._extract_date(html),
-        }
-
-    def _extract_with_hardcoded_parser(self, url: str, html: str) -> Optional[Dict]:
-        if not url or not html:
+        with self._init_lock:
+            if getattr(self, "_initialized", False):
+                return
+            
+            self.logger:Logger = getLogger("parse_manager")
+            self.logger.info(f"Starting initialisation")
+        
+            self.hardcoded_parser_registry = registry or ParserRegistryManager()
+            
+            self._initialized = True
+            self.logger.info(f"Initialisation complete!")
+        
+    def _attempt_multiple_keys(self, payload:Dict[str,Any], keys: List[str]) -> Optional[Any]:
+        """
+        Finds a key inside of a dictionary
+        """
+        if not keys or not payload:
+            raise Exception("Missing arguments")
+            
+        for key in keys:
+            if key in payload:
+                return payload[key]
+        
+        return None
+    
+    def _strategy_metadata(self, article_metadata: Dict[str,str])  -> Optional[ParseResult]:
+        self.logger.debug(f"[level 0] Attempting to parse with metadata")
+        
+        if not article_metadata:
             return None
-
-        hardcoded_parser: Optional[BaseParser] = (
-            self.hardcoded_parser_registry.find_matching_parser(url)
+        
+        title:str = self._attempt_multiple_keys(article_metadata, ["title"])
+        text:str = self._attempt_multiple_keys(article_metadata, ["content", "description"])
+        author:str = self._attempt_multiple_keys(article_metadata, ["author", "creator"])
+        published_at:str = self._attempt_multiple_keys(article_metadata, ["published", "pubDate"])
+        
+        return ParseResult(
+            text,
+            title,
+            author,
+            published_at
         )
 
+
+    def _strategy_hardcoded(self, article_url:str, soup:BeautifulSoup)  -> Optional[ParseResult]:
+        self.logger.debug(f"[level 1] Attempting parsing with hardcoded parser")
+        
+        if not article_url:
+            return None
+        
+        hardcoded_parser: Optional[BaseParser] = self.hardcoded_parser_registry.find_matching_parser(article_url)
+        
         if not hardcoded_parser:
             return None
 
-        soup = BeautifulSoup(html, "lxml")
-        return hardcoded_parser.extract(soup, url)
-
-    def _extract_with_trafilatura(self, html: str) -> Optional[str]:
-        try:
-            text_content = trafilatura.extract(
-                html, include_comments=False, include_tables=False
-            )
-            return text_content
-        except Exception:
+        result: Optional[ParseResult]= hardcoded_parser.extract(soup, article_url)
+        return result
+    
+    
+    def _strategy_trafilatura(self, raw_html:str)  -> Optional[ParseResult]:
+        self.logger.debug(f"[level 2] Attempting parsing with trafilatura")
+        
+        dirty_text: Optional[str] = self._extract_text_with_trafilatura(raw_html)
+        
+        if not dirty_text:
             return None
+        
+        clean_text: Optional[str]  = self._clean_text(dirty_text)
+        
+        if not clean_text:
+            return None
+        return ParseResult(clean_text, None, None, None)
+    
+    
+    def _strategy_fallback(self, soup: BeautifulSoup) -> Optional[ParseResult]:
+        self.logger.debug(f"[level 3] Attempting parsing with fallback")
+        text:str = self._fallback_extract_text(soup)
+        
+        return ParseResult(text, None, None, None)
+    
+    def _is_sufficient(self, result: ParseResult) -> bool:
+        return result and result.text and len(result.text.strip()) > 100
+    
+    def _hydrate_missing_fields(self, result:ParseResult, soup:BeautifulSoup) -> ParseResult:
+        if not result.title:
+            result.title = self._extract_title(soup)
+            
+        if not result.author:
+            result.author = self._extract_author(soup)
+            
+        if not result.published_at:
+            result.published_at = self._extract_date(soup)
+            
+        return result
+    
+    def parse_article_raw_html(self, 
+        raw_html: str,
+        article_url: Optional[str] = None,
+        article_metadata: Optional[Dict[str, Any]] = None) -> Dict[str,str]:
+        
+        if not raw_html or len(raw_html) < 20:
+            raise ValueError("raw_html content too short or empty during parsing")
 
-    def _fallback_extract_text(self, html: str) -> str:
-        soup = BeautifulSoup(html, "lxml")
-        container = soup.find(["article", "main"]) or soup
-        noisy_tags_to_remove = container(
+        
+        soup = BeautifulSoup(raw_html, "lxml")
+        
+        strategies: List[Callable] = [
+            lambda: self._strategy_metadata(article_metadata),
+            lambda: self._strategy_hardcoded(article_url, soup),
+            lambda: self._strategy_trafilatura(raw_html),
+            lambda: self._strategy_fallback(soup)
+        ]
+        
+        for strategy in strategies:
+            result: ParseResult = strategy()
+            
+            if result and self._is_sufficient(result):
+                self._hydrate_missing_fields(result, soup) 
+                return {k: v for k, v in asdict(result).items() if v is not None}
+                
+        fallback_result: ParseResult = self._strategy_fallback(soup)
+        return {k: v for k, v in asdict(fallback_result).items() if v is not None}
+
+    def _extract_text_with_trafilatura(self, raw_html: str) -> Optional[str]:
+        """
+            Will rely on trafilatura to extract all text.
+        """
+        text: Optional[str] = trafilatura.extract(
+                filecontent=raw_html, include_comments=False, include_tables=False
+            )
+        return text
+
+
+    def _fallback_extract_text(self, soup:BeautifulSoup) -> str:
+        """
+            Will manually remove tags that don't contain text content.
+        """
+        container = soup.find(["article", "main", "body"]) or soup
+        noisy_tags_to_remove: List[str] = container(
             [
                 "script",
                 "style",
@@ -151,17 +211,17 @@ class ParseManager:
             except Exception:
                 pass
 
-        paragraphs = [
+        paragraphs: List[str] = [
             p.get_text(strip=True)
             for p in container.find_all("p")
             if p.get_text(strip=True)
         ]
 
-        joined_paragraphs = "\n\n".join(paragraphs)
+        joined_paragraphs:str = "\n\n".join(paragraphs)
         return joined_paragraphs
 
-    def _extract_title(self, html: str) -> Optional[str]:
-        soup = BeautifulSoup(html, "lxml")
+
+    def _extract_title(self, soup: BeautifulSoup) -> Optional[str]:
         if soup.title and soup.title.string:
             return soup.title.string.strip()
 
@@ -170,7 +230,7 @@ class ParseManager:
             return og["content"].strip()
 
         # JSON-LD
-        jsonld_title = self._extract_jsonld_property(html, "headline")
+        jsonld_title = self._extract_jsonld_property("headline", soup)
         if jsonld_title:
             return jsonld_title.strip()
 
@@ -180,8 +240,7 @@ class ParseManager:
 
         return None
 
-    def _extract_author(self, html: str) -> Optional[str]:
-        soup = BeautifulSoup(html, "lxml")
+    def _extract_author(self,  soup:BeautifulSoup) -> Optional[str]:
         patterns = [
             {"name": "meta", "attrs": {"name": "author"}},
             {"name": "meta", "attrs": {"property": "article:author"}},
@@ -194,7 +253,7 @@ class ParseManager:
             if tag and tag.get("content"):
                 return tag["content"]
 
-        jsonld_author = self._extract_jsonld_property(html, "author")
+        jsonld_author = self._extract_jsonld_property("author", soup)
         if jsonld_author:
             if isinstance(jsonld_author, dict):
                 return jsonld_author.get("name")
@@ -206,8 +265,7 @@ class ParseManager:
             return byline.get_text(strip=True)
         return None
 
-    def _extract_date(self, html: str) -> Optional[str]:
-        soup = BeautifulSoup(html, "lxml")
+    def _extract_date(self, soup:BeautifulSoup) -> Optional[str]:
         date_tags = [
             {"property": "article:published_time"},
             {"name": "pubdate"},
@@ -220,17 +278,19 @@ class ParseManager:
             if tag and tag.get("content"):
                 return tag["content"]
 
-        jsonld_date = self._extract_jsonld_property(html, "datePublished")
+        jsonld_date:str = self._extract_jsonld_property("datePublished", soup)
         if jsonld_date:
             return jsonld_date
 
         return None
 
-    def _extract_jsonld_property(self, html: str, prop: str):
-        soup = BeautifulSoup(html, "lxml")
+    def _extract_jsonld_property(self, prop: str, soup:BeautifulSoup) -> Optional[str]:
         scripts = soup.find_all("script", type="application/ld+json")
 
         for script in scripts:
+            if not script.string:
+                continue
+        
             try:
                 data = json.loads(script.string)
                 if isinstance(data, list):
@@ -243,11 +303,10 @@ class ParseManager:
                 continue
         return None
 
-    def _clean_text(self, text: str) -> str:
+    def _clean_text(self, text: str) -> Optional[str]:
         if not text:
-            return ""
+            return None
         text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
         return text.strip()
-
 
 parse_manager = ParseManager()
