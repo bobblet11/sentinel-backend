@@ -70,7 +70,6 @@ class ParserRegistryManager:
     
     def find_matching_parser(self, article_url: str) -> Optional[BaseParser]:
         # hardcoded parsers are not setup yet, so return None for now.
-        return None 
         hardcoded_parser: Optional[BaseParser] = self._match_hardcoded_parser(article_url)
         
         if not hardcoded_parser:
