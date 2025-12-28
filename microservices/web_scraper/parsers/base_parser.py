@@ -2,19 +2,31 @@ from typing import Dict, Optional
 
 from bs4 import BeautifulSoup
 from bs4.element import Comment
+from dataclasses import dataclass
 
+@dataclass
+class ParseResult:
+    text: str
+    title: Optional[str]
+    author: Optional[str]
+    published_at: Optional[str]
+    
+    def __getitem__(self, key):
+        return getattr(self, key, None)
+    
+    def __setitem__(self, key, value):
+        if hasattr(self, key):
+            setattr(self, key, value)
+        else:
+            raise KeyError(f"{key} is not a valid field")
 
 class BaseParser:
     """
     Abstract base for site-specific hardcoded scrapers.
-    Implement `matches(url)` and `extract(soup, url)` in subclasses.
+    Implement `extract(soup, url)` in subclasses.
     """
 
-    def matches(self, url: str) -> bool:
-        # Return True if this scraper should handle `url`.
-        raise NotImplementedError
-
-    def extract(self, soup: BeautifulSoup, url: str) -> Optional[Dict]:
+    def extract(self, soup: BeautifulSoup, url: str) -> Optional[ParseResult]:
         """
         Extract title/text/author/published_at from a BeautifulSoup object.
         Must return a dict with at least 'text', and optionally 'title','author','published_at'.
