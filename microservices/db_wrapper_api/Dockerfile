@@ -13,9 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Step 5: Copy the rest of your application's source code.
 COPY microservices/db_wrapper_api/ /app/microservices/db_wrapper_api
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-
 # Expose the service port
 EXPOSE 8001
 
