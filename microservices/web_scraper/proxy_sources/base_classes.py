@@ -32,7 +32,6 @@ class ProxyUtils:
             ip, port, username, password = proxy_str.split(":")
             return f"http://{username}:{password}@{ip}:{port}"
         except ValueError:
-            print(f"Warning: Malformed webshare io proxy string: {proxy_str}. Skipping.")
             return ""
 
     @staticmethod
@@ -158,7 +157,7 @@ class HttpProxySource(ProxySource):
         """Helper to make an HTTP request and parse the response."""
 
         headers = {
-            "User-Agent": user_agent_manager.get_random_agent(),
+            "User-Agent": user_agent_manager.generate_profile().user_agent_string,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
 

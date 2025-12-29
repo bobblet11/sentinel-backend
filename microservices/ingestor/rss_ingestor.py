@@ -37,7 +37,7 @@ class RssIngestor(BaseIngestor):
         Fetches and parses a single RSS feed. Will be executed in multithreaded fashion.
         """
         try:
-            feed:FeedParserDict = parse(rss_url, agent=user_agent_manager.get_random_agent())
+            feed:FeedParserDict = parse(rss_url, agent=user_agent_manager.generate_profile().user_agent_string)
             if feed.bozo:
                 raise feed.bozo_exception
             return feed
