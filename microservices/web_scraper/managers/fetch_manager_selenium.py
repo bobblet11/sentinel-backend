@@ -35,7 +35,7 @@ from microservices.web_scraper.config import (
 )
 from dataclasses import dataclass
 from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
-from common.requests.user_agent_manager import user_agent_manager
+from common.requests.user_agent_manager import BrowserProfile, user_agent_manager
 from pathlib import Path
 from pyvirtualdisplay import Display
 
@@ -64,7 +64,7 @@ PAGE_LOAD_TIMEOUT_S:int = 45
 @dataclass(frozen=True)
 class DriverConfig:
     proxy_url:str
-    user_agent:str
+    browser_profile:BrowserProfile
     headers:Dict[str,str]
     
     source_name:str
@@ -76,7 +76,7 @@ class DriverConfig:
         source_name_row:str = f"\n\tsource: {self.source_name}"
         proxy_url_row:str = f"\n\tproxy_url: {self.proxy_url}"
         proxy_country_code_row:str =f"\n\tproxy_country_code: {self.country_code}"
-        user_agent_row:str = f"\n\tuser_agent: {self.user_agent}"
+        user_agent_row:str = f"\n\tuser_agent: {self.browser_profile}"
         lang_str_row:str = f"\n\tlang_string: {self.lang_str}"
         return source_name_row + proxy_url_row + proxy_country_code_row + user_agent_row + lang_str_row
 class FetchManagerSelenium:
@@ -117,7 +117,7 @@ class FetchManagerSelenium:
         screenshots_path.mkdir(parents=True, exist_ok=True)
         hint_path.parent.mkdir(parents=True, exist_ok=True)
     
-        self.proxy_manager = proxy_manager
+        self.proxy_manager: ProxyManagerPaid = proxy_manager
         self.screenshots_path:Path = screenshots_path
         self.default_timeout:Tuple[float,float] = default_timeout
         self.hint_config:Dict[str, Dict[str,Any]] = json.loads(hint_path.read_text())
@@ -136,7 +136,8 @@ class FetchManagerSelenium:
             version_output = result.stdout.strip().split()[-1]
             major_version = int(version_output.split('.')[0])
             self.logger.info(f"Detected Google Chrome Version: {version_output} (Major: {major_version})")
-
+            user_agent_manager.set_max_browser_version(major_version)
+            
             # 2. Download matching driver
             patcher = Patcher(version_main=major_version)
             patcher.auto() 
@@ -237,8 +238,11 @@ class FetchManagerSelenium:
         
         options.add_argument(f"--remote-debugging-port={debug_port}")
         options.add_argument(f"--user-data-dir={user_data_dir}")
-        options.add_argument(f"--user-agent={config.user_agent}")
+        options.add_argument(f"--user-agent={config.browser_profile.user_agent_string}")
+        options.add_argument(f"--window-size={config.browser_profile.screen_width},{config.browser_profile.screen_height}")
         options.binary_location = "/usr/bin/google-chrome"
+        
+
         
         proxy_options: Dict[str, Any] = {
             "proxy": {"http": config.proxy_url, "https": config.proxy_url},
@@ -257,6 +261,27 @@ class FetchManagerSelenium:
                 use_subprocess=True, 
                 driver_executable_path=thread_driver_path
             )
+            
+            driver.execute_cdp_cmd("Network.setUserAgentOverride", {
+                "userAgent": config.browser_profile.user_agent_string,
+                "platform": config.browser_profile.os_platform,
+                "userAgentMetadata": config.browser_profile.cdp_metadata
+            })
+            
+            driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                "source": f"""
+                    Object.defineProperty(navigator, 'hardwareConcurrency', {{
+                        get: () => {config.browser_profile.cpu_concurrency}
+                    }});
+                    Object.defineProperty(navigator, 'deviceMemory', {{
+                        get: () => {config.browser_profile.device_memory}
+                    }});
+                    Object.defineProperty(navigator, 'platform', {{
+                        get: () => '{config.browser_profile.os_platform}'
+                    }});
+                """
+            })
+
         except Exception as e:
             if hasattr(e, 'msg'):
                 self.logger.error(f"Chrome Start Error: {e.msg}")
@@ -460,9 +485,9 @@ class FetchManagerSelenium:
         lang_string:str = self.get_accept_language_string(proxy_country_code)
         
         headers:Dict[str,str] = self._create_enhanced_headers(lang_string)
-        user_agent:str = user_agent_manager.get_sticky_agent(proxy_url)
+        browser_profile:BrowserProfile = user_agent_manager.get_sticky_browser_profile(proxy_url)
         
-        driver_config: DriverConfig = DriverConfig(proxy_url, user_agent, headers, source_name, proxy_country_code, lang_string)
+        driver_config: DriverConfig = DriverConfig(proxy_url, browser_profile, headers, source_name, proxy_country_code, lang_string)
         self.logger.debug(f"Created driver config for {article_url}" + driver_config.get_config_summary_string)
         return driver_config
     

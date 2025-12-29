@@ -89,7 +89,7 @@ class FetchManagerHTML:
             if not proxies:
                 raise RequestException("No proxies available in the pool.")
 
-            user_agent = user_agent_manager.get_random_agent()
+            user_agent = user_agent_manager.generate_profile().user_agent_string
             headers = self._create_enhanced_headers(user_agent)
             proxy_url_for_reporting = proxies.get("https", proxies.get("http"))
 
