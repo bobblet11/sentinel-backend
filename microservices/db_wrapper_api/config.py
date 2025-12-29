@@ -1,15 +1,29 @@
-from os import getenv
-
+from typing import List
 from dotenv import load_dotenv
-
+from common.env.log_env import print_env, Config, EnvVariable
+from common.env.get_env_var import get_env_var
+from logging import Logger, getLogger
 load_dotenv()
+config_logger: Logger = getLogger("config")
 
 # Service Configuration
-SERVICE_PORT = int(getenv("DB_SERVICE_PORT", 8001))
+DB_SERVICE_PORT: int = get_env_var("DB_SERVICE_PORT",int, config_logger)
 
-# not currently in use
-POSTGRES_HOST = getenv("POSTGRES_HOST", "postgres")
-POSTGRES_PORT = int(getenv("POSTGRES_PORT", 5432))
-POSTGRES_DB = getenv("POSTGRES_DB", "sentinel_db")
-POSTGRES_USER = getenv("POSTGRES_USER", "sentinel_user")
-POSTGRES_PASSWORD = getenv("POSTGRES_PASSWORD", "sentinel_password")
+# Postgres Connection Configuration
+POSTGRES_HOST: str = get_env_var("POSTGRES_HOST",str, config_logger)
+POSTGRES_PORT: int = get_env_var("POSTGRES_PORT",int, config_logger)
+POSTGRES_DB: str = get_env_var("POSTGRES_DB",str, config_logger)
+POSTGRES_USER: str = get_env_var("POSTGRES_USER",str, config_logger)
+POSTGRES_PASSWORD: str = get_env_var("POSTGRES_PASSWORD",str, config_logger)
+
+env_variables: List[EnvVariable] = [
+    EnvVariable("DB_SERVICE_PORT", DB_SERVICE_PORT), 
+    
+    EnvVariable("POSTGRES_HOST", POSTGRES_HOST), 
+    EnvVariable("POSTGRES_PORT", POSTGRES_PORT),
+    EnvVariable("POSTGRES_DB", POSTGRES_DB),
+    EnvVariable("POSTGRES_USER", POSTGRES_USER),
+    EnvVariable("POSTGRES_PASSWORD", POSTGRES_PASSWORD),
+]
+
+print_env(Config(env_variables, None, None), config_logger)

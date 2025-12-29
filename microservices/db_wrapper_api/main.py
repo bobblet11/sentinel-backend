@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from common.io.logging import setup_logging
 from microservices.db_wrapper_api.src.setup.connect_to_postgres import get_db
-from .config import SERVICE_PORT
+from .config import DB_SERVICE_PORT
 
 CONTAINER_NAME:str = "sentinel_db_service"
 FAST_API_NAME:str = "Sentinel Database Service"
@@ -38,4 +38,4 @@ async def root(db: Session = Depends(get_db)):
     return {"service": "Sentinel Database Service", "version": "0.1.0"}
 
 if __name__ == "__main__":
-    uvicorn.run("microservices.db_wrapper_api.main:app", host="0.0.0.0", port=SERVICE_PORT)
+    uvicorn.run("microservices.db_wrapper_api.main:app", host="0.0.0.0", port=DB_SERVICE_PORT)
