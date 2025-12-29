@@ -5,13 +5,13 @@ FROM sentinel/base-image:1.0
 WORKDIR /app
 
 # Step 3: Copy the dependencies file first.
-COPY microservices/db/requirements.txt .
+COPY microservices/db_wrapper_api/requirements.txt .
 
 # Step 4: Install python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Step 5: Copy the rest of your application's source code.
-COPY microservices/db/ /app/microservices/db
+COPY microservices/db_wrapper_api/ /app/microservices/db_wrapper_api
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -20,4 +20,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8001
 
 # Run the application
-CMD ["python", "-m", "microservices.db.main"]
+CMD ["python", "-m", "microservices.db_wrapper_api.main"]
