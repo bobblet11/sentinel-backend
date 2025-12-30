@@ -7,7 +7,7 @@ load_dotenv()
 config_logger: Logger = getLogger("config")
 
 # Service Configuration
-DB_SERVICE_PORT: int = get_env_var("DB_SERVICE_PORT",int, config_logger)
+API_SERVICE_PORT: int = get_env_var("API_SERVICE_PORT",int, config_logger)
 
 # Postgres Connection Configuration
 POSTGRES_HOST: str = get_env_var("POSTGRES_HOST",str, config_logger)
@@ -17,7 +17,7 @@ POSTGRES_USER: str = get_env_var("POSTGRES_USER",str, config_logger)
 POSTGRES_PASSWORD: str = get_env_var("POSTGRES_PASSWORD",str, config_logger)
 
 env_variables: List[EnvVariable] = [
-    EnvVariable("DB_SERVICE_PORT", DB_SERVICE_PORT), 
+    EnvVariable("API_SERVICE_PORT", API_SERVICE_PORT), 
     
     EnvVariable("POSTGRES_HOST", POSTGRES_HOST), 
     EnvVariable("POSTGRES_PORT", POSTGRES_PORT),
