@@ -49,12 +49,12 @@
       command: postgres -c shared_preload_libraries=vector
 
     # --- MICROSERVICES ---
-    db-service:
-      container_name: sentinel-db-service-container
-      image: sentinel/db-service:latest
+    api-service:
+      container_name: sentinel-api-service-container
+      image: sentinel/api-service:latest
       build:
         context: ../../
-        dockerfile: ./microservices/db_wrapper_api/Dockerfile
+        dockerfile: ./microservices/api/Dockerfile
 
       depends_on:
         postgres:
@@ -63,9 +63,9 @@
           condition: service_started
 
       volumes:
-        - db_service_logs:/var/log
+        - api_service_logs:/var/log
       ports:
-        - "${DB_SERVICE_PORT}:8001"
+        - "${API_SERVICE_PORT}:8001"
 
       <<: *common-env
       restart: unless-stopped
@@ -151,7 +151,7 @@
     ingestor_service_logs: {}
     scraper-prioritiser_service_logs: {}
     web-scraper_service_logs: {}
-    db_service_logs: {}
+    api_service_logs: {}
     postgres_data: {}
 
   networks:

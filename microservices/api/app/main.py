@@ -1,16 +1,16 @@
 import uvicorn
 
 
-from logging import DEBUG, INFO, Logger, basicConfig, getLogger
-from fastapi import Depends, FastAPI
+from logging import DEBUG, Logger, getLogger
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from common.io.logging import setup_logging
-from microservices.db_wrapper_api.src.setup.connect_to_postgres import get_db
-from .config import DB_SERVICE_PORT
+from microservices.api.app.api.v1.api import api_router
+from microservices.api.app.core.config import API_SERVICE_PORT
 
-CONTAINER_NAME:str = "sentinel_db_service"
-FAST_API_NAME:str = "Sentinel Database Service"
+CONTAINER_NAME:str = "sentinel_api_service"
+FAST_API_NAME:str = "Sentinel API Service"
 FAST_API_VERSION:str = "0.0"
 
 setup_logging(level=DEBUG,container_name=CONTAINER_NAME)
@@ -31,11 +31,12 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "database"}
 
-
 @app.get("/")
-async def root(db: Session = Depends(get_db)):
+async def root():
     """Root endpoint"""
     return {"service": "Sentinel Database Service", "version": "0.1.0"}
 
+app.include_router(api_router, prefix="/api/v1")
+
 if __name__ == "__main__":
-    uvicorn.run("microservices.db_wrapper_api.main:app", host="0.0.0.0", port=DB_SERVICE_PORT)
+    uvicorn.run("microservices.api.app.main:app", host="0.0.0.0", port=API_SERVICE_PORT)
