@@ -33,4 +33,4 @@ class QueueService:
         )
 
         publisher = self._get_publisher()
-        publisher.publish(message.dict())
+        publisher.publish_one(message.dict())
