@@ -16,8 +16,10 @@ queue_service = QueueService()
 
 
 class AnalyzeRequest(BaseModel):
+    title: str
     url: str
     content: str
+    
 
 
 @router.post("/analyze")
@@ -27,7 +29,8 @@ def analyze_article(req: AnalyzeRequest):
     queue_service.publish_analysis_job(
         job_id=job.job_id,
         url=req.url,
-        content=req.content
+        content=req.content,
+        title=req.title
     )
 
     return {

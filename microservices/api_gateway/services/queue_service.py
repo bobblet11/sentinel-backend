@@ -18,7 +18,7 @@ class QueueService:
             self._publisher = RedisPublisher(stream_name=JOB_STREAM)
         return self._publisher
 
-    def publish_analysis_job(self, job_id: str, url: str, content: str):
+    def publish_analysis_job(self, job_id: str, url: str, content: str, title: str):
         message = Message(
             header=MessageHeader(
                 message_id=str(uuid.uuid4()),
@@ -28,6 +28,7 @@ class QueueService:
             data=MessageURLPayload(
                 url=url,
                 content=content,
+                title=title,
                 source_rss="browser-extension"
             )
         )
