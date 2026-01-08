@@ -21,6 +21,7 @@ class AnalysisOptions:
     enable_ner: bool = True
     max_claims: int = 10
     min_confidence: float = 0.5
+    return_embeddings: bool = False
 
 @dataclass
 class SentenceScore:
@@ -30,6 +31,7 @@ class SentenceScore:
     sentence_index: int
     text: str
     score: float
+    embedding: Optional[List[float]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
@@ -41,6 +43,7 @@ class Claim:
     confidence: float
     sentence_indices: List[int]
     context: Optional[str] = None
+    embedding: Optional[List[float]] = None
 
 @dataclass
 class BiasProfile:
@@ -56,9 +59,10 @@ class AnalysisResult:
     """
     The aggregate result of the NLP analysis pipeline.
     """
-    article_id: Optional[str]
-    claims: List[Claim]
-    summary: Optional[str]
-    bias_profile: Optional[BiasProfile]
-    entities: List[Dict[str, Any]]
-    processing_time_ms: float
+    article_id: Optional[str] = None
+    claims: List[Claim] = field(default_factory=list)
+    summary: Optional[str] = None
+    bias_profile: Optional[BiasProfile] = None
+    entities: List[Dict[str, Any]] = field(default_factory=list)
+    processing_time_ms: float = 0.0
+    document_embedding: Optional[List[float]] = None
