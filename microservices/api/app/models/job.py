@@ -3,8 +3,9 @@ import uuid
 from sqlalchemy import Column, String, DateTime, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from microservices.api.app.db.session import Base
+from sqlalchemy.ext.declarative import declarative_base
 
+Base = declarative_base()
 class JobRequest(Base):
     __tablename__ = "job_requests"
 
