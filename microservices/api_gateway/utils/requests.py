@@ -1,7 +1,7 @@
 # async HTTP helper with timeout and simple retry
+# microservices/api_gateway/utils/requests.py
 import httpx
-from config import HTTP_TIMEOUT
-
+from microservices.api_gateway.config import HTTP_TIMEOUT
 
 async def fetch_json(
     url: str,
@@ -17,3 +17,4 @@ async def fetch_json(
             r = await client.post(url, json=json)
         r.raise_for_status()
         return r.json()
+

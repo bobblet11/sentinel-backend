@@ -2,7 +2,7 @@ import json
 from typing import Any, Optional
 
 import redis.asyncio as redis
-from config import REDIS_URL
+from microservices.api_gateway.config import REDIS_URL
 
 _redis = None
 

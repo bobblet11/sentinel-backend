@@ -1,17 +1,13 @@
+# microservices/api_gateway/routers/database.py
 import logging
-import os
-import sys
-
-from config import DB_SERVICE_URL
 from fastapi import APIRouter
-from utils.requests import fetch_json
 
-# Add parent directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+from microservices.api_gateway.config import DB_SERVICE_URL
+from microservices.api_gateway.utils.requests import fetch_json
 
 router = APIRouter(prefix="/database", tags=["database"])
 logger = logging.getLogger("api_gateway.database")
+
 
 
 @router.get("/status")
