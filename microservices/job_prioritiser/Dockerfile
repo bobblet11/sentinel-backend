@@ -15,8 +15,5 @@ RUN apt-get update && apt-get install -y cron && \
 # Step 5: Copy the rest of your application's source code.
 COPY microservices/job_prioritiser/ /app/microservices/job_prioritiser
 
-# Step 6: Give correct permissions and create log file.
-RUN touch /var/log/service.log
-
 # Step 7: Define the command to run your application.
-CMD ["python", "-m", "microservices.job_prioritiser.main", ">>", "/var/log/service.log", "2>&1"]
+CMD ["python", "-m", "microservices.job_prioritiser.main"]

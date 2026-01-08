@@ -11,6 +11,5 @@ COPY microservices/web_scraper/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY microservices/web_scraper/ /app/microservices/web_scraper
-RUN touch /var/log/service.log
 
-CMD ["python", "-m", "microservices.web_scraper.main", ">>", "/var/log/service.log", "2>&1"]
+CMD ["python", "-m", "microservices.web_scraper.main"]

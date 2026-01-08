@@ -38,12 +38,11 @@ from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_
 from common.requests.user_agent_manager import BrowserProfile, user_agent_manager
 from pathlib import Path
 from pyvirtualdisplay import Display
-
+from common.io.screenshot_handler import RotatingScreenshotHandler
 ProxyRequestDict = Optional[Dict[str, str]]
 
 CURRENT_DIR: str = Path(os.path.dirname(os.path.abspath(__file__)))
 HINTS_PATH:Path = CURRENT_DIR / ".." / "page_structure_hints" / "combined_hints.json"
-SS_PATH:Path = CURRENT_DIR / ".." / "screenshots"
 
 URL_TO_OUTLET_MAP: Dict[str, str] = {
             ("abcnews", "abcnews.go.com"): "ABC",
@@ -100,7 +99,7 @@ class FetchManagerSelenium:
         default_timeout: Tuple[float,float]=(15.0, 20.0),
         proxy_manager: ProxyManagerPaid = None,
         hint_path: Path = CURRENT_DIR / 'combined_hints.json',
-        screenshots_path: Path = CURRENT_DIR,
+        screenshot_handler: RotatingScreenshotHandler = RotatingScreenshotHandler()
     ):
         
         if getattr(self, "_initialized", False):
@@ -114,14 +113,13 @@ class FetchManagerSelenium:
             exit(1)
            
         self._create_selenium_wire_CA_folder()
-        screenshots_path.mkdir(parents=True, exist_ok=True)
         hint_path.parent.mkdir(parents=True, exist_ok=True)
     
         self.proxy_manager: ProxyManagerPaid = proxy_manager
-        self.screenshots_path:Path = screenshots_path
         self.default_timeout:Tuple[float,float] = default_timeout
         self.hint_config:Dict[str, Dict[str,Any]] = json.loads(hint_path.read_text())
         self.x_path_config: Dict[str, List[str]] = self._generate_xpath_dict(self.hint_config)
+        self.screenshot_handler: RotatingScreenshotHandler = screenshot_handler
         
         # Start Global Virtual Display
         self.logger.info("Starting Global Virtual Display...")
@@ -451,23 +449,24 @@ class FetchManagerSelenium:
         try:
             self.logger.debug("Taking screenshot")
             png_data: bytes = driver.get_screenshot_as_png()
-            
         except Exception as e:
             self.logger.error(f"Could not take screenshot: {e}")
             return
-
         
         try:
             self.logger.debug("Saving screenshot")
+
             timestamp: int = int(time.time())
             url_hash: str = hashlib.md5(article_url.encode("utf-8")).hexdigest()[:8]
             filename: str = f"{prefix}_{timestamp}_{url_hash}.png"
-            file_path:Path = self.screenshots_path / filename
-
-            file_path.write_bytes(png_data)
-            self.logger.info(f"📸 Screenshot saved to: {file_path}")
+            self.screenshot_handler.save_screenshot(png_data, filename=filename)
+            capacity: float = self.screenshot_handler.current_bytes / self.screenshot_handler.max_bytes if self.screenshot_handler.max_bytes != 0 else 100.0
+            self.logger.info(f"📸 Screenshot saved as: {filename} to {self.screenshot_handler.screenshot_directory} ({capacity}% used)")
         except Exception as e:
-            self.logger.error(f"Failed to write screenshot file: {e}")
+            self.logger.error(f"Could not save screenshot: {e}")
+            return
+
+
 
     def _create_driver_config(self, article_url:str) -> DriverConfig:
         source_name: str = self._extract_source_name(article_url)
@@ -577,5 +576,5 @@ class FetchManagerSelenium:
 fetch_manager = FetchManagerSelenium(
     proxy_manager=proxy_manager_paid,
     hint_path=HINTS_PATH,
-    screenshots_path=SS_PATH,
+    screenshot_handler=RotatingScreenshotHandler()
 )

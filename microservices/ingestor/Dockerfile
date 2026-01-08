@@ -25,7 +25,5 @@ RUN dos2unix /tmp/app-cronjob
 RUN crontab /tmp/app-cronjob
 RUN rm /tmp/app-cronjob
 
-# Step 7: Create log file
-RUN touch /var/log/service.log
 # # Step 8: Define the command to run your application.
-CMD ["/bin/sh", "-c", "printenv > /etc/environment && cron -f & tail -f /var/log/service.log"]
+CMD ["/bin/sh", "-c", "printenv > /etc/environment && cron -f"]
