@@ -1,8 +1,8 @@
 from typing import List
-from microservices.nlp.models.base import ZeroShotClassifier
-from microservices.nlp.types import Claim
+from microservices.nlp.models.base import ZeroShotClassifier, NLPComponent
+from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions
 
-class CheckWorthinessFilter:
+class CheckWorthinessFilter(NLPComponent):
     """
     Filters claims to retain only those that are factual and worth checking.
     """
@@ -12,14 +12,14 @@ class CheckWorthinessFilter:
         """
         pass
 
-    def run(self, claims: List[Claim]) -> List[Claim]:
+    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
         """
-        Filters out subjective statements and opinions.
+        Filters result.claims to retain only check-worthy ones.
+        Updates result.claims in-place.
         
         Args:
-            claims: List of candidate claims.
-            
-        Returns:
-            List of claims deemed check-worthy.
+            article: The article input (context).
+            result: The analysis result containing claims.
+            options: Configuration options.
         """
         pass

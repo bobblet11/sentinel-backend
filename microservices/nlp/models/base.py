@@ -1,5 +1,18 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
+from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions
+
+class NLPComponent(ABC):
+    """
+    Abstract base class for all NLP pipeline stages.
+    Each component (NER, Bias, etc.) must implement 'run'.
+    """
+    @abstractmethod
+    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
+        """
+        Executes the component logic and updates the shared AnalysisResult in-place.
+        """
+        pass
 
 class SentenceEmbedder(ABC):
     """

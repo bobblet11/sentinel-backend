@@ -1,7 +1,7 @@
-from microservices.nlp.models.base import ZeroShotClassifier
-from microservices.nlp.types import BiasProfile
+from microservices.nlp.models.base import ZeroShotClassifier, NLPComponent
+from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions
 
-class BiasAnalyzer:
+class BiasAnalyzer(NLPComponent):
     """
     Analyzes text to detect political or other forms of bias.
     """
@@ -11,14 +11,13 @@ class BiasAnalyzer:
         """
         pass
 
-    def run(self, text: str) -> BiasProfile:
+    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
         """
-        Analyzes the text for bias.
+        Analyzes the text for bias and updates result.bias_profile.
         
         Args:
-            text: The full text to analyze.
-            
-        Returns:
-            A BiasProfile object containing the detected bias information.
+            article: The article input containing text.
+            result: The analysis result to update.
+            options: Configuration options (e.g., enable_bias_detection).
         """
         pass

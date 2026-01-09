@@ -1,8 +1,8 @@
 from typing import List
-from microservices.nlp.models.base import SentenceEmbedder
-from microservices.nlp.types import SentenceScore
+from microservices.nlp.models.base import SentenceEmbedder, NLPComponent
+from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions
 
-class CentralityScorer:
+class CentralityScorer(NLPComponent):
     """
     Scores sentences based on their centrality/importance to the overall text.
     """
@@ -12,14 +12,14 @@ class CentralityScorer:
         """
         pass
 
-    def run(self, sentences: List[str]) -> List[SentenceScore]:
+    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
         """
-        Calculates centrality scores for each sentence.
+        Calculates centrality scores and embeddings for sentences in result.sentences.
+        Updates result.sentences in-place.
         
         Args:
-            sentences: List of sentences to score.
-            
-        Returns:
-            List of SentenceScore objects containing the score for each sentence.
+            article: The article input.
+            result: The analysis result containing sentences to score.
+            options: Configuration options.
         """
         pass
