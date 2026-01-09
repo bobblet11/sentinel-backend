@@ -1,23 +1,47 @@
-from microservices.nlp.models.base import ZeroShotClassifier, NLPComponent
-from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions
+import logging
+from models.base import NLPComponent
+from schemas import ArticleInput, AnalysisResult, AnalysisOptions, BiasProfile
 
-class BiasAnalyzer(NLPComponent):
+logger = logging.getLogger(__name__)
+
+class BiasDetector(NLPComponent):
     """
-    Analyzes text to detect political or other forms of bias.
+    detects bias in the text (DUMMY IMPLEMENTATION).
     """
-    def __init__(self, classifier: ZeroShotClassifier):
+    def __init__(self, model=None):
         """
-        Initializes the analyzer with a classifier model.
+        Initializes with a model (ignored for now).
         """
-        pass
+        self.model = model
 
     def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
         """
-        Analyzes the text for bias and updates result.bias_profile.
-        
-        Args:
-            article: The article input containing text.
-            result: The analysis result to update.
-            options: Configuration options (e.g., enable_bias_detection).
+        Populates result with dummy bias scores.
         """
-        pass
+        logger.info("BiasDetector: Running in DUMMY mode.")
+
+        # 1. Dummy Sentence Scores
+        # Iterate over sentences already split by the Preprocessor
+        if result.sentences:
+            for i, sentence in enumerate(result.sentences):
+                # Assign a fake score (alternating low/high for variety)
+                # 0.1 for even indices, 0.8 for odd indices
+                dummy_score = 0.8 if i % 2 != 0 else 0.1
+                
+                sentence.score = dummy_score
+                # sentence.label = "BIASED" if dummy_score > 0.5 else "NEUTRAL" # If label field exists on SentenceScore
+
+        # 2. Dummy Global Bias Profile
+        # Create a BiasProfile with hardcoded values
+        dummy_profile = BiasProfile(
+            label="Center", 
+            score=0.15
+            # Add other fields if your BiasProfile schema requires them
+        )
+        
+        # 3. Update Result
+        # Assuming AnalysisResult has a 'bias' field of type BiasProfile
+        if hasattr(result, 'bias'):
+            result.bias = dummy_profile
+        
+        logger.info("BiasDetector: Populated dummy bias profile and sentence scores.")
