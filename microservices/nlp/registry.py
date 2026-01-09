@@ -1,69 +1,93 @@
-# microservices/nlp/registry.py
+import os
 import logging
-from typing import Any
+import torch
+from transformers import (
+    AutoTokenizer, 
+    AutoModelForSequenceClassification, 
+    AutoModelForTokenClassification, 
+    pipeline
+)
 from sentence_transformers import SentenceTransformer
-from transformers import pipeline
-from microservices.nlp.config import NLPConfig
+from dotenv import load_dotenv
 
-# Setup basic logging
-logger = logging.getLogger("nlp_service.registry")
+# Load env vars
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ModelRegistry:
-    """
-    Singleton-style registry to manage heavy ML models.
-    Ensures models are loaded only once and reused.
-    """
+    _instance = None
     
-    # Class-level storage for loaded models
-    _embedder: Any = None
-    _ner_pipeline: Any = None
-    _bias_classifier: Any = None
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(ModelRegistry, cls).__new__(cls)
+            cls._instance.initialized = False
+        return cls._instance
 
-    @classmethod
-    def get_embedder(cls):
-        """Returns the SentenceTransformer model."""
-        if cls._embedder is None:
-            logger.info(f"Loading Embedder: {NLPConfig.EMBEDDING_MODEL}...")
-            # This aligns with the SentenceEmbedder interface (has .encode method)
-            cls._embedder = SentenceTransformer(NLPConfig.EMBEDDING_MODEL, device=NLPConfig.DEVICE)
-            logger.info("Embedder loaded.")
-        return cls._embedder
+    def __init__(self):
+        if self.initialized:
+            return
+            
+        self.device = os.getenv("INFERENCE_DEVICE", "cpu")
+        logger.info(f"Registry initialized. Target device: {self.device}")
+        
+        # Model placeholders
+        self._ner_pipeline = None
+        self._bias_model = None
+        self._bias_tokenizer = None
+        self._embedding_model = None
+        
+        self.initialized = True
 
-    @classmethod
-    def get_ner_pipeline(cls):
-        """Returns the HuggingFace NER pipeline."""
-        if cls._ner_pipeline is None:
-            logger.info(f"Loading NER model: {NLPConfig.NER_MODEL}...")
-            cls._ner_pipeline = pipeline(
+    @property
+    def ner(self):
+        """Lazy loads the Named Entity Recognition pipeline"""
+        if self._ner_pipeline is None:
+            model_name = os.getenv("MODEL_NER", "dslim/bert-base-ner")
+            logger.info(f"Loading NER model: {model_name}...")
+            
+            # aggregation_strategy="simple" groups sub-tokens into whole words
+            self._ner_pipeline = pipeline(
                 "ner", 
-                model=NLPConfig.NER_MODEL, 
-                aggregation_strategy="simple",
-                device=0 if NLPConfig.DEVICE == "cuda" else -1
+                model=model_name, 
+                tokenizer=model_name, 
+                device=0 if self.device == "cuda" else -1,
+                aggregation_strategy="simple"
             )
-            logger.info("NER pipeline loaded.")
-        return cls._ner_pipeline
+            logger.info("NER model loaded.")
+        return self._ner_pipeline
 
-    @classmethod
-    def get_bias_classifier(cls):
-        """Returns the Zero-Shot Classification pipeline for bias detection."""
-        if cls._bias_classifier is None:
-            logger.info(f"Loading Bias model: {NLPConfig.BIAS_MODEL}...")
-            cls._bias_classifier = pipeline(
-                "zero-shot-classification", 
-                model=NLPConfig.BIAS_MODEL,
-                device=0 if NLPConfig.DEVICE == "cuda" else -1
-            )
-            logger.info("Bias classifier loaded.")
-        return cls._bias_classifier
+    @property
+    def bias(self):
+        """Lazy loads the Bias Detection model & tokenizer"""
+        if self._bias_model is None:
+            model_name = os.getenv("MODEL_BIAS", "valurank/distilroberta-bias")
+            logger.info(f"Loading Bias model: {model_name}...")
+            
+            self._bias_tokenizer = AutoTokenizer.from_pretrained(model_name)
+            self._bias_model = AutoModelForSequenceClassification.from_pretrained(model_name)
+            
+            if self.device == "cuda":
+                self._bias_model.cuda()
+            elif self.device == "mps":
+                self._bias_model.to("mps")
+                
+            logger.info("Bias model loaded.")
+            
+        return (self._bias_model, self._bias_tokenizer)
 
-    @classmethod
-    def warmup(cls):
-        """
-        Forces all models to load into memory.
-        Call this during service startup (e.g. in __init__ or before accepting traffic).
-        """
-        logger.info("Starting model warmup...")
-        cls.get_embedder()
-        cls.get_ner_pipeline()
-        cls.get_bias_classifier()
-        logger.info("Model warmup complete.")
+    @property
+    def embeddings(self):
+        """Lazy loads the Sentence Transformer model for embeddings"""
+        if self._embedding_model is None:
+            model_name = os.getenv("MODEL_EMBEDDINGS", "sentence-transformers/all-MiniLM-L6-v2")
+            logger.info(f"Loading Embedding model: {model_name}...")
+            
+            self._embedding_model = SentenceTransformer(model_name, device=self.device)
+            logger.info("Embedding model loaded.")
+        return self._embedding_model
+
+# Global instance
+registry = ModelRegistry()
