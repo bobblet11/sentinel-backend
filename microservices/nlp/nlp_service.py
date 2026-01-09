@@ -1,49 +1,47 @@
-from typing import Optional
+# microservices/nlp/nlp_service.py
+from typing import Optional, List
 from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions
-from microservices.nlp.registry import ModelRegistry
+from microservices.nlp.models.base import NLPComponent
+
+# We will implement these empty skeletons in the next step
+from microservices.nlp.components.preprocess import Preprocessor
+from microservices.nlp.components.centrality import CentralityScorer
+from microservices.nlp.components.bias import BiasDetector
+from microservices.nlp.components.ner import EntityRecognizer
+from microservices.nlp.components.checkworthy import ClaimExtractor
 
 class SentinelNLP:
-    """
-    Main entry point for the Sentinel NLP microservice.
-    Orchestrates the analysis pipeline.
-    """
     def __init__(self, options: Optional[AnalysisOptions] = None):
-        """
-        Initialize the NLP service.
+        self.default_options = options or AnalysisOptions()
         
-        Args:
-            options: Global default options for analysis.
-        """
-        pass
-
-    def warmup(self) -> None:
-        """
-        Preloads necessary models to ensure low latency on first request.
-        """
-        pass
+        # Define the execution order of the pipeline
+        self.pipeline: List[NLPComponent] = [
+            Preprocessor(),
+            CentralityScorer(),
+            BiasDetector(),
+            EntityRecognizer(),
+            ClaimExtractor()
+        ]
 
     def analyze(self, article: ArticleInput, options: Optional[AnalysisOptions] = None) -> AnalysisResult:
         """
-        Analyzes an article to extract claims, detect bias, and identify entities.
-        
-        Args:
-            article: The article input containing text and metadata.
-            options: Optional runtime overrides for analysis options.
-            
-        Returns:
-            AnalysisResult containing all extracted insights.
+        The main orchestrator that passes the article through each pipeline stage.
         """
-        pass
+        current_options = options or self.default_options
+        
+        # Initialize the result container
+        result = AnalysisResult(article_id=article.id)
+        result.status = "processing"
 
-    def analyze_text(self, text: str, options: Optional[AnalysisOptions] = None) -> AnalysisResult:
-        """
-        Convenience method to analyze raw text without full article metadata.
-        
-        Args:
-            text: Single string of text to analyze.
-            options: Optional runtime overrides for analysis options.
-            
-        Returns:
-            AnalysisResult containing all extracted insights.
-        """
-        pass
+        # Execute each stage sequentially
+        for component in self.pipeline:
+            try:
+                # Components modify 'result' in-place (e.g. adding claims or entities)
+                component.run(article, result, current_options)
+            except Exception as e:
+                # Log the error but allow the rest of the pipeline to attempt completion
+                print(f"Pipeline error in {component.__class__.__name__}: {str(e)}")
+                continue
+
+        result.status = "completed"
+        return result

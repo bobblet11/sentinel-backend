@@ -1,8 +1,8 @@
 from typing import List, Tuple
-from microservices.nlp.models.base import Seq2SeqRewriter
-from microservices.nlp.types import Claim
+from microservices.nlp.models.base import Seq2SeqRewriter, NLPComponent
+from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions
 
-class Decontextualizer:
+class Decontextualizer(NLPComponent):
     """
     Rewrites claims to be self-contained by resolving coreferences and adding context.
     """
@@ -12,15 +12,14 @@ class Decontextualizer:
         """
         pass
 
-    def run(self, claims: List[Claim], full_text: str) -> List[Claim]:
+    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
         """
-        Processes claims to make them standalone.
+        Rewrites claims in result.claims to make them standalone.
+        Updates result.claims in-place.
         
         Args:
-            claims: List of claims to decontextualize.
-            full_text: The original context text.
-            
-        Returns:
-            List of modified claims with resolved context.
+            article: The article input (source of full context).
+            result: The analysis result containing claims.
+            options: Configuration options.
         """
         pass

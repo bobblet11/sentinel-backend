@@ -1,8 +1,8 @@
 from typing import List
-from microservices.nlp.types import Claim
-from microservices.nlp.models.base import SentenceEmbedder
+from microservices.nlp.models.base import SentenceEmbedder, NLPComponent
+from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions
 
-class ClaimDeduplicator:
+class ClaimDeduplicator(NLPComponent):
     """
     Deduplicates semantically similar claims.
     """
@@ -12,14 +12,14 @@ class ClaimDeduplicator:
         """
         pass
 
-    def run(self, claims: List[Claim]) -> List[Claim]:
+    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
         """
-        Removes duplicate claims based on semantic similarity.
+        Removes duplicate claims from result.claims based on semantic similarity.
+        Updates result.claims in-place.
         
         Args:
-            claims: List of potential claims.
-            
-        Returns:
-            List of unique claims.
+            article: The article input.
+            result: The analysis result containing claims.
+            options: Configuration options.
         """
         pass

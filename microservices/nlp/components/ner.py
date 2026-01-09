@@ -1,7 +1,8 @@
 from typing import List, Dict, Any
-from microservices.nlp.models.base import NERModel
+from microservices.nlp.models.base import NERModel, NLPComponent
+from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions
 
-class EntityRecognizer:
+class EntityRecognizer(NLPComponent):
     """
     Identifies named entities in the text.
     """
@@ -11,14 +12,13 @@ class EntityRecognizer:
         """
         pass
 
-    def run(self, text: str) -> List[Dict[str, Any]]:
+    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
         """
-        Extracts entities from the text.
+        Extracts entities from the text and updates result.entities.
         
         Args:
-            text: The text to analyze.
-            
-        Returns:
-            List of detected entities with their metadata.
+            article: The article input.
+            result: The analysis result to update.
+            options: Configuration options.
         """
         pass

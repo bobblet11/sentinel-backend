@@ -1,6 +1,8 @@
 from typing import List
+from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions, SentenceScore
 
-class Preprocessor:
+class Preprocessor(NLPComponent):
     """
     Handles text cleaning and sentence splitting.
     """
@@ -10,14 +12,13 @@ class Preprocessor:
         """
         pass
 
-    def run(self, text: str) -> List[str]:
+    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
         """
-        Cleans the input text and splits it into sentences.
+        Cleans the input text, splits it into sentences, and populates result.sentences.
         
         Args:
-            text: Raw input text.
-            
-        Returns:
-            List of cleaned sentences.
+            article: The article input containing text.
+            result: The analysis result to update (sentences).
+            options: Configuration options.
         """
         pass
