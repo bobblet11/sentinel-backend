@@ -1,38 +1,91 @@
+from dataclasses import dataclass
 import threading
 import hashlib
+import random
 
-from typing import List, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 from fake_useragent import UserAgent
 from logging import Logger, getLogger
 
+MIN_CHROME_BROWSER_VERSION:int=130
+MAX_CHROME_BROWSER_VERSION:int=143
 
-ALL_NON_SAFARI_BROWSERS:List[str] = [
-                "Google",
-                "Chrome",
-                "Firefox",
-                "Edge",
-                "Opera",
-                "Android",
-                "Yandex Browser",
-                "Samsung Internet",
-                "Opera Mobile",
-                "Firefox Mobile",
-                "Firefox iOS",
-                "Chrome Mobile",
-                "Chrome Mobile iOS",
-                "Edge Mobile",
-                "DuckDuckGo Mobile",
-                "MiuiBrowser",
-                "Whale",
-                "Twitter",
-                "Facebook",
-                "Amazon Silk",
+SCREEN_RESOLUTIONS:List[Tuple[int,int]] = [
+    (1920, 1080), (1920, 1080), (1920, 1080), # Common
+    (1366, 768),  (1440, 900),  (1536, 864),  # Laptops
+    (2560, 1440), (3840, 2160)                # High Res
 ]
-ALL_SAFARI_BROWSERS:List[str] = [["Safari", "Mobile Safari UI/WKWebView", "Mobile Safari"]]
-JUST_CHROME:List[str] = ["Chrome"] 
-MAX_UA_POOL_SIZE:int = 150
-MAX_UA_POOL_ATTEMPTS:int = 3000
 
+@dataclass
+class BrowserProfile:
+    # --- 1. CORE IDENTITY (Dynamic Input) ---
+    major_chrome_version: int         # e.g. 125
+    full_chrome_version: str          # e.g. "125.0.6422.60"
+
+    # --- 2. HARDWARE FINGERPRINT (NEW) ---
+    screen_width: int
+    screen_height: int
+    cpu_concurrency: int  # e.g., 4, 8, 16
+    device_memory: int    # e.g., 4, 8, 16, 32 (GB)
+
+    # --- 3. USER AGENT STRING COMPONENTS (Defaults for Linux/Docker) ---
+    mozilla_prefix: str = "Mozilla/5.0"   
+    system_information: str = "X11; Linux x86_64"   # "X11; Linux x86_64" is the standard identifier for Chrome on Ubuntu
+    platform_engine: str = "AppleWebKit/537.36"     # Engine versions rarely change in modern Chrome strings
+    rendering_engine: str = "KHTML, like Gecko"     # Engine versions rarely change in modern Chrome strings
+    compatibility_suffix: str = "Safari/537.36"      # The suffix that mimics Safari (standard behavior)
+
+    # --- 4. CLIENT HINTS / METADATA (For CDP Override) ---
+    # These MUST match the OS of your Docker Container
+    os_platform: str = "Linux"        # Maps to navigator.platform
+    os_version: str = "6.5.0"         # A generic, modern Linux Kernel version
+    architecture: str = "x86"
+    bitness: str = "64"
+    mobile_flag: bool = False
+    model: str = ""                   # Desktop should always be empty string
+    
+    @property
+    def user_agent_string(self) -> str:
+        """
+        Constructs the exact UA string.
+        Format: Mozilla/5.0 (System) Engine (Rendering) Chrome/Version Safari/Compat
+        """
+        
+        return (
+            f"{self.mozilla_prefix} ({self.system_information}) "
+            f"{self.platform_engine} ({self.rendering_engine}) "
+            f"Chrome/{self.full_chrome_version} {self.compatibility_suffix}"
+        )  
+    
+    @property
+    def brands(self) -> List[Dict[str, str]]:
+        """
+        Generates the 'Grease' brands + Chrome brands for Sec-CH-UA headers.
+        """
+        return [
+            {"brand": "Not/A)Brand", "version": "99"}, 
+            {"brand": "Google Chrome", "version": str(self.major_chrome_version)},
+            {"brand": "Chromium", "version": str(self.major_chrome_version)}
+        ]
+
+    @property
+    def cdp_metadata(self) -> Dict[str, Any]:
+        """
+        Returns the dictionary required for 'Network.setUserAgentOverride'.
+        """
+        return {
+            "brands": self.brands,
+            "fullVersion": self.full_chrome_version,
+            "platform": self.os_platform,
+            "platformVersion": self.os_version,
+            "architecture": self.architecture,
+            "model": self.model,
+            "mobile": self.mobile_flag,
+            "bitness": self.bitness,
+            "wow64": False
+        }
+    
+  
 class UserAgentManager:
     """
     A singleton class that contains all functions related to rotating user-agents.
@@ -49,13 +102,11 @@ class UserAgentManager:
 
         # Singleton instance already exists
         if cls._instance is not None:
-            print("ProxyHandler instance already exists. Reusing instance...")
             return cls._instance
 
         # Singleton instance does not exist, attempt creation with lock.
         with cls._lock:
             if cls._instance is not None:
-                print("ProxyHandler instance already exists. Reusing instance...")
                 return cls._instance
 
         cls._instance = super().__new__(cls)
@@ -67,93 +118,73 @@ class UserAgentManager:
         self.logger:Logger = getLogger("user_agent_manager")
         self.logger.info("Initialising UserAgentManager...")
         
-        try:
-            self.ua_engine = UserAgent(browsers=JUST_CHROME, min_version=120.0)
-        except Exception as e:
-            self.logger.error(f"Failed to load UserAgent source: {e}")
-            self.ua_engine = None
-            
-        self.agent_pool: List[str] = self._generate_agent_pool()
-        
-        self.logger.info(f"Initialization complete! Pool size: {len(self.agent_pool)}")
-
-    def _generate_chrome_agent_generator(self) -> UserAgent:
-        """DEPRECATED"""
-        try:
-            self.logger.info("Generating non-safari user agents")
-            chrome_user_agent_generator = UserAgent(browsers=JUST_CHROME, min_version=115.0)
-            return chrome_user_agent_generator
-        except Exception as e:
-            self.logger.error("Could not initialize non-safari UserAgents: {e}")
-            
-    def _generate_safari_agent_generator(self) -> UserAgent:
-        """DEPRECATED"""
-        try:
-            self.logger.info("Generating safari user agents")
-            safari_user_agent_generator = UserAgent(browsers=ALL_SAFARI_BROWSERS, min_version=17.0)
-            return safari_user_agent_generator
-        except Exception as e:
-            self.logger.error("Could not initialize safari UserAgents: {e}")
-          
-    def _generate_agent_pool(self) -> List[str]:
-        """
-        Generates a list of valid Chrome User Agents to use for Sticky sessions.
-        """
-
-        fallbacks:List[str] = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-        ]
-                
-        if not self.ua_engine:
-            return fallbacks
+        self.min_browser_version=MIN_CHROME_BROWSER_VERSION
+        self.max_browser_version=MAX_CHROME_BROWSER_VERSION
+        self.logger.info(f"Initialization complete!")
     
-        pool:Set[str] = set()
-        attempts:int = 0
+    def set_max_browser_version(self, major_chrome_version:int) -> None:
+        self.max_browser_version = major_chrome_version
         
-        try:
-
-            while len(pool) < MAX_UA_POOL_SIZE and attempts < MAX_UA_POOL_ATTEMPTS:
-                ua_string:str = self.ua_engine.random
-                if ua_string:
-                    pool.add(ua_string)
-                attempts += 1
-            
-            if len(pool) < MAX_UA_POOL_SIZE:
-                self.logger.warning(f"User agent pool size ({len(pool)}) is smaller than the {MAX_UA_POOL_SIZE} agent string size. Suggest reducing MAX_UA_POOL_ATTEMPTS or increasing MAX_UA_POOL_ATTEMPTS")
+    def set_min_browser_version(self, major_chrome_version:int) -> None:
+        self.min_browser_version = major_chrome_version
     
-            return list(pool)
+    def _get_hardware_from_hash(self, hash_int: int) -> Tuple[int, int, int, int]:
+        """
+        Derives hardware stats deterministically from the hash.
+        """
+        # 1. Screen Resolution
+        res_index = hash_int % len(SCREEN_RESOLUTIONS)
+        width, height = SCREEN_RESOLUTIONS[res_index]
         
-        except Exception as e:
-            self.logger.error(f"Error generating pool: {e}")
-            return fallbacks
-                 
-    def get_random_agent(self) -> str:
-        """
-        Returns a random user agent from the ua engine.
-        """
+        # 2. CPU Cores (4, 8, 12, 16)
+        # We shift the hash to get a 'fresh' random number
+        cpu_seed = (hash_int >> 4) % 4 
+        cores = [4, 8, 12, 16][cpu_seed]
 
-        if not self.ua_engine:
-            self.logger.error("UserAgent engine not initialised. Using a hardcoded fallback.")
-            return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  
-        return self.ua_engine.random
+        # 3. RAM (4, 8, 16, 32)
+        ram_seed = (hash_int >> 8) % 4
+        ram = [4, 8, 16, 32][ram_seed]
+        
+        return width, height, cores, ram
+    
+    def _get_version_from_hash(self, hash_int: int) -> int:
+        version_span = (self.max_browser_version - self.min_browser_version) + 1
+        major_version = self.min_browser_version + (hash_int % version_span)
+        return major_version
+    
+    def generate_profile(self, hash_int: int = 0) -> BrowserProfile:
+        # Generate hardware stats
+        if hash_int == 0:
+            # Random for non-sticky
+            hash_int = random.getrandbits(32)
+            
+        major_chrome_version = self._get_version_from_hash(hash_int)
+        full_chrome_version:str = f"{major_chrome_version}.0.0.0"
+        w, h, cores, ram = self._get_hardware_from_hash(hash_int)
 
-    def get_sticky_agent(self, proxy_url:str) -> str:
+        return BrowserProfile(
+            major_chrome_version=major_chrome_version,
+            full_chrome_version=full_chrome_version,
+            screen_width=w,
+            screen_height=h,
+            cpu_concurrency=cores,
+            device_memory=ram
+        )         
+        
+    def get_sticky_browser_profile(self, proxy_url:str) -> BrowserProfile:
         """
         Returns a user agent based on the proxy url, ensuring the same user agent is used for proxy url every time.
         """
-
-        if not self.agent_pool:
-            raise Exception("User pool is not intialized!")
-
+        
         if not proxy_url:
-            return self.agent_pool[0]
+            self.logger.warning("No proxy url passed for sticky! Using default")
+            return self.generate_profile()
         
         hash_val = hashlib.sha256(proxy_url.encode('utf-8')).hexdigest()
         hash_int = int(hash_val, 16)
-        index = hash_int % len(self.agent_pool)
-        return self.agent_pool[index]
+        
+        return self.generate_profile(hash_int)
+
+    
 
 user_agent_manager = UserAgentManager()

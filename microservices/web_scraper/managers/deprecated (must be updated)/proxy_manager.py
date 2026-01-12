@@ -312,7 +312,7 @@ class ProxyManager:
         proxy_url = ProxyUtils.normalize_scheme(proxy, scheme)
 
         try:
-            headers = {"User-Agent": user_agent_manager.get_random_agent()}
+            headers = {"User-Agent": user_agent_manager.generate_profile().user_agent_string}
             response = requests.get(
                 test_url,
                 proxies={"http": proxy_url, "https": proxy_url},
