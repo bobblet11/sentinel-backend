@@ -68,20 +68,24 @@ class StreamMessage:
 
     @property
     def html(self) -> Optional[str]:
-        return self.data.get("data", {}).get("html", None)
+        return self.data.get("data", {}).get("raw_html", None)
+    
+    @property
+    def text(self) -> Optional[str]:
+        return self.data.get("data", {}).get("parse_result", {}).get("text", None)
 
     
     def set_raw_html(self, page_html: str) -> None:
         """
         sets the raw_html
         """
-        self.data.setdefault("data", {})["html"] = page_html
+        self.data.setdefault("data", {})["raw_html"] = page_html
     
     def set_parsed_text(self, parsed_text: str) -> None:
         """
         sets the raw_html
         """
-        self.data.setdefault("data", {})["text"] = parsed_text
+        self.data.setdefault("data", {})["parse_result"] = parsed_text
     
     def set_nested(self, value: Any, *keys: str) -> None:
         """

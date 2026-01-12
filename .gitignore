@@ -8,3 +8,5 @@ saved_proxies.json
 /workspaces/sentinel-backend/microservices/web_scraper/screenshots
 ./microservices/web_scraper/screenshots
 microservices/web_scraper/screenshots
+./logs
+logs

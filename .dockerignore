@@ -16,3 +16,10 @@ logs/
 *.log
 *.png
 .seleniumwire/
+*.pyc
+*.pyo
+.git
+.env
+.venv
+logs
+screenshots

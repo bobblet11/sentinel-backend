@@ -3,8 +3,13 @@
         "build": {
                 "dockerfile": "Dockerfile"
         },
-        "mounts": ["source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"],
-        "runArgs": ["--gpus", "all"],
+        "mounts": [
+                "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+        ],
+        // "runArgs": [
+        //         "--gpus",
+        //         "all"
+        // ],
         "customizations": {
                 "vscode": {
                         "settings": {
@@ -12,8 +17,16 @@
                                 "python.linting.pylintEnabled": true,
                                 "python.linting.enabled": true
                         },
-                        "extensions": ["ms-python.python", "ms-python.vscode-pylance", "ms-azuretools.vscode-docker", "eamodio.gitlens"]
+                        "extensions": [
+                                "ms-python.python",
+                                "ms-python.vscode-pylance",
+                                "ms-azuretools.vscode-docker",
+                                "eamodio.gitlens"
+                        ]
                 }
         },
-        "remoteUser": "vscode"
+        "remoteUser": "vscode",
+        "remoteEnv": {
+                "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
+        }
 }

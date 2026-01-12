@@ -41,13 +41,13 @@ log_info "Changed directory to project root"
 
 
 
-if [ "$(sudo docker ps -q -f name=^/${WEB_SCRAPER_CONTAINER_NAME}$)" ]; then
-    echo "Container is running. Copying files..."
-    run_and_log sudo -E docker cp sentinel-web-scraper-service-container:/app/microservices/web_scraper/screenshots/. ./microservices/web_scraper/screenshots/
+# if [ "$(sudo docker ps -q -f name=^/${WEB_SCRAPER_CONTAINER_NAME}$)" ]; then
+#     echo "Container is running. Copying files..."
+#     run_and_log sudo -E docker cp sentinel-web-scraper-service-container:/app/microservices/web_scraper/screenshots/. ./microservices/web_scraper/screenshots/
 
-else
-    echo "Container is NOT running."
-fi
+# else
+#     echo "Container is NOT running."
+# fi
 
 
 run_and_log sudo -E docker-compose down
