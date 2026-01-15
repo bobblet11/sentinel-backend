@@ -227,9 +227,12 @@ class RedisConsumerCombiner:
             result = self.client.xack(stream_name, self.group_name, redis_message_id)
             if result == 0:
                 raise Exception("Failed to ack")
+            
+            self.logger.debug(f"Successfully acknowledged {redis_message_id}")
         except Exception as e:
             self.logger.error(
                 f"Failed to acknowledging message {redis_message_id} on stream {stream_name}: {e}"
             )
             raise e
+        
         

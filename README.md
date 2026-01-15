@@ -77,7 +77,7 @@ The process is nearly identical for both macOS and Windows.
         POSTGRES_USER=sentinel_user
         POSTGRES_PASSWORD=your_secure_password_here
         POSTGRES_PORT=15432
-        DB_SERVICE_PORT=8001
+        API_SERVICE_PORT=8001
         ```
     *   **Configure PostgreSQL credentials** in your .env file:
         ```bash

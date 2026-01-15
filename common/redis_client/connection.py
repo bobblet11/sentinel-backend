@@ -82,7 +82,6 @@ class RedisConnection:
         Pings the Redis server to check the health of the connection.
         """
         if not self._client:
-            print("No connection to ping. Connect first!")
             return False
 
         try:

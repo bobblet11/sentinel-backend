@@ -25,3 +25,6 @@ dependencies:
     - selenium-wire
     - blinker==1.7.0
     - pyvirtualdisplay
+    - sqlalchemy
+    - psycopg2-binary
+
