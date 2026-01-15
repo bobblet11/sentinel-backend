@@ -146,7 +146,53 @@
         - MAX_FETCH_RETRIES=3
         - INITIAL_FETCH_DELAY_S=1
         - FETCH_DELAY_GROWTH_RATE=1.2
+
+    nlp-prioritiser:  
+      <<: [ *common-env, *prioritiser-service ]
+      container_name: sentinel-nlp-prioritiser-service-container
+      environment:
+        - INPUT_STREAMS=background:to.be.nlp, user:to.be.nlp
+        - OUTPUT_STREAM=prioritised:to.be.nlp
+        - GROUP_NAME=default
+        - CONSUMER_NAME=nlp-prioritiser-1
+        - BATCH_SIZE=100
+        - MAX_PUBLISH_WORKERS=10
+      depends_on:
+        - web_scraper-service
+      volumes:
+        - ${HOST_LOG_ROOT}/nlp_prioritiser:/app/logs
+
+    nlp-service:
+      container_name: sentinel-nlp-service-container
+      image: sentinel/nlp-service:latest
+      build: 
+        context: ../../
+        dockerfile: ./microservices/nlp/Dockerfile
+      shm_size: '4gb'
+      ipc: host 
+      depends_on:
+        # - postgres
+        - redis
+        - ingestor-service
+        - nlp-prioritiser
       
+      volumes:
+        - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
+      <<: *common-env 
+      restart: always
+      networks:
+        - sentinel-net
+
+      environment:
+        - INPUT_STREAM=prioritised:to.be.nlp
+        - USER_OUTPUT_STREAM=user:to.be.retrieved
+        - BACKGROUND_OUTPUT_STREAM=background:to.be.stored
+        - FAILURE_OUTPUT_STREAM=failure:to.be.nlp
+        - BATCH_SIZE=10
+        - GROUP_NAME=default
+        - CONSUMER_NAME=web-scraper-1
+        - SCRAPER_MAX_WORKERS=1
+
   volumes:
     redis_data: {}
     postgres_data: {}
