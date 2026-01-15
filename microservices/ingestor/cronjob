@@ -1,2 +1,2 @@
 # The command to run will be provided by a wrapper script 
-0 * * * * PYTHONPATH=/app /usr/local/bin/python3 -m microservices.ingestor.main >> /var/log/service.log 2>&1
+0 * * * * PYTHONPATH=/app /usr/local/bin/python3 -m microservices.ingestor.main > /proc/1/fd/1 2>/proc/1/fd/2

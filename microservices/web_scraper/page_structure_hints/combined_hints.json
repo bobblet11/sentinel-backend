@@ -87,8 +87,59 @@
 		}
 	},
 	"CBC":{},
-	"CBS":{},
-	"NBC":{},
+	"CBS":{
+		"html_examples" : {
+			"read_more_button" : [
+			"<div class=\"tbl-read-more-box\" style=\"padding: 75px 12px 15px; background: linear-gradient(rgba(255, 255, 255, 0.05) 10%, rgb(255, 255, 255) 60%, rgb(255, 255, 255) 100%);\">",
+			"<a id=\"tbl-read-more-box-btn_Below Article Feed Redesign | Card 2_41354\" href=\"#\" class=\"tbl-read-more-btn tbl-read-more-trecs-btn\">",
+			"Read More",
+			"<svg aria-label=\"arrow\" class=\"tbl-read-more-button-arrow\" viewBox=\"0 0 8 6\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">",
+			"<path d=\"M6.85381 0.203525L3.99181 3.06553L1.12981 0.203525C1.00407 0.0820867 0.835672 0.0148905 0.660874 0.0164095C0.486076 0.0179284 0.318868 0.088041 0.195262 0.211646C0.0716568 0.335252 0.00154415 0.50246 2.52017e-05 0.677258C-0.00149374 0.852056 0.0657025 1.02046 0.187141 1.14619L3.52047 4.47953C3.64549 4.60451 3.81503 4.67472 3.99181 4.67472C4.16858 4.67472 4.33812 4.60451 4.46314 4.47953L7.79647 1.14619C7.86015 1.08469 7.91094 1.01113 7.94588 0.929795C7.98081 0.848459 7.99921 0.760979 7.99997 0.67246C8.00074 0.58394 7.98388 0.496154 7.95036 0.414223C7.91683 0.332292 7.86733 0.257857 7.80474 0.195262C7.74214 0.132667 7.66771 0.083165 7.58578 0.0496444C7.50385 0.0161238 7.41606 -0.00074404 7.32754 2.51711e-05C7.23902 0.000794382 7.15154 0.0191852 7.0702 0.0541246C6.98887 0.0890639 6.91531 0.139852 6.85381 0.203525Z\" fill=\"#BCBCBC\"></path>",
+			"</svg>",
+			"</a>",
+			"</div>"
+			]
+		},
+		"selectors" : {
+			"read_more_button" : {
+				"parents" : [
+					{
+						"class":"tbl-read-more-box",
+						"tag":"div"
+					}
+				],
+				"tag" : "a",
+				"id": "tbl-read-more-box-btn_Below Article Feed Redesign | Card 2_41354",
+				"class" : "tbl-read-more-btn tbl-read-more-trecs-btn"
+			}
+		}
+	},
+	"NBC":{
+		"html_examples": {
+			"read_more_button": [
+				"<div class=\"tbl-read-more-box\" style=\"padding: 75px 12px 15px; background: linear-gradient(rgba(255, 255, 255, 0.05) 10%, rgb(255, 255, 255) 60%, rgb(255, 255, 255) 100%);\">",
+				"<a id=\"tbl-read-more-box-btn_Mobile Below Article - Taboola Feed | Card 1_53891\" href=\"#\" class=\"tbl-read-more-btn tbl-read-more-trecs-btn\">",
+				"CONTINUE READING",
+				"<svg aria-label=\"arrow\" class=\"tbl-read-more-button-arrow\" viewBox=\"0 0 8 6\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">",
+				"<path d=\"M6.85381 0.203525L3.99181 3.06553L1.12981 0.203525C1.00407 0.0820867 0.835672 0.0148905 0.660874 0.0164095C0.486076 0.0179284 0.318868 0.088041 0.195262 0.211646C0.0716568 0.335252 0.00154415 0.50246 2.52017e-05 0.677258C-0.00149374 0.852056 0.0657025 1.02046 0.187141 1.14619L3.52047 4.47953C3.64549 4.60451 3.81503 4.67472 3.99181 4.67472C4.16858 4.67472 4.33812 4.60451 4.46314 4.47953L7.79647 1.14619C7.86015 1.08469 7.91094 1.01113 7.94588 0.929795C7.98081 0.848459 7.99921 0.760979 7.99997 0.67246C8.00074 0.58394 7.98388 0.496154 7.95036 0.414223C7.91683 0.332292 7.86733 0.257857 7.80474 0.195262C7.74214 0.132667 7.66771 0.083165 7.58578 0.0496444C7.50385 0.0161238 7.41606 -0.00074404 7.32754 2.51711e-05C7.23902 0.000794382 7.15154 0.0191852 7.0702 0.0541246C6.98887 0.0890639 6.91531 0.139852 6.85381 0.203525Z\" fill=\"#BCBCBC\"></path>",
+				"</svg>",
+				"</a>",
+				"</div>"
+			]
+		},
+		"selectors" : {
+			"read_more_button": {
+				"parents" : [
+					{
+						"tag" : "div",
+						"class" : "tbl-read-more-box"
+					}
+				],
+				"tag" : "a",
+				"class" : "tbl-read-more-btn tbl-read-more-trecs-btn"
+			}
+		}
+	},
 	"NPR":{
 		"html_examples" : {
 			"cookies_close_button" : [
@@ -726,7 +777,7 @@
 					"parents" : [
 						{
 							"tag" : "div",
-							"class" : "message-component message-row cta-button-row"
+							"class" : "message-component message-row"
 						},
 						{
 							"tag" : "div",
@@ -736,7 +787,7 @@
 					],
 					"title" : "No, thank you",
 					"aria-label" : "No, thank you",
-					"class":"message-component message-button no-children focusable btn-tertiary sp_choice_type_13",
+					"class":"message-component message-button no-children focusable",
 					"tag" : "button",
 					"type" : "button",
 					"text_contains" : "No, thank you"

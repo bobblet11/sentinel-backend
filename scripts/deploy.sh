@@ -40,6 +40,29 @@ log_warn "Tearing down the docker-compose project (if it exists)..."
 # This will stop and remove the containers from your application, but not the dev container.
 run_and_log sudo -E docker-compose down || true
 
+log_warn "Creating log folders"
+
+if [ -n "${LOCAL_WORKSPACE_FOLDER:-}" ]; then
+    log_info "Detected Dev Container. Using Host Path."
+    HOST_LOG_ROOT="${LOCAL_WORKSPACE_FOLDER}/logs"
+else
+    log_info "No Dev Container"
+    HOST_LOG_ROOT="$PROJECT_ROOT/logs"
+fi
+
+log_warn "Creating log folders at: $HOST_LOG_ROOT"
+sudo mkdir -p "$HOST_LOG_ROOT/ingestor"
+sudo mkdir -p "$HOST_LOG_ROOT/scraper/logs"
+sudo mkdir -p "$HOST_LOG_ROOT/scraper/screenshots"
+sudo mkdir -p "$HOST_LOG_ROOT/scraper_prioritiser"
+sudo mkdir -p "$HOST_LOG_ROOT/api"
+sudo mkdir -p "$HOST_LOG_ROOT/nlp_prioritiser"
+
+# Set permissions
+sudo chmod -R 777 "$HOST_LOG_ROOT"
+echo "        Completed log directory setup"
+
+
 # --- SELF-AWARE DELETION ---
 log_warn "Forcefully removing ':latest' images, protecting the dev container's image..."
 
@@ -76,6 +99,31 @@ fi
 
 log_warn "Pruning any remaining dangling Docker images..."
 run_and_log sudo -E docker image prune -f
+
+
+
+
+
+log_info "Preparing Docker Environment..."
+
+# 1. Define where the Docker files live
+COMPOSE_FOLDER="docker/compose"
+COMPOSE_FILE="$COMPOSE_FOLDER/docker-compose.yml"
+COMPOSE_ENV="$COMPOSE_FOLDER/.env"
+
+# 2. Copy the root .env to the docker folder so it has REDIS_PORT etc.
+#    (Using cat > ensures we don't mess up permissions, sudo needed if root owns folder)
+log_info "Generating $COMPOSE_ENV for variable substitution..."
+cat .env | sudo tee "$COMPOSE_ENV" > /dev/null
+
+# 3. Append our HOST_LOG_ROOT variable to that file
+echo "" | sudo tee -a "$COMPOSE_ENV" > /dev/null
+echo "HOST_LOG_ROOT=$HOST_LOG_ROOT" | sudo tee -a "$COMPOSE_ENV" > /dev/null
+
+# Check if it was written correctly (for debug)
+log_info "Env file generated. HOST_LOG_ROOT is set to: $(grep HOST_LOG_ROOT $COMPOSE_ENV)"
+
+
 
 log_warn "Building base Docker image 1..."
 run_and_log sudo -E docker build --pull -t sentinel/base-image:1.0 -f docker/base/base1/Dockerfile .

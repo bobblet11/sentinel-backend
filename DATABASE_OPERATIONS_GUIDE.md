@@ -37,7 +37,7 @@ curl http://localhost:8000/database/status
    POSTGRES_PORT=15433
    
    # Change database service port (currently 8001)
-   DB_SERVICE_PORT=8002
+   API_SERVICE_PORT=8002
    ```
 ---
 

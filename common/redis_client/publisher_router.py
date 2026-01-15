@@ -18,7 +18,7 @@ class RedisPublisherRouter:
         splitter.publish_one({'type':'unknown'})        //fails, unknown mapping
     """
 
-    def __init__(self, routing_map: Dict[str, str], routing_key: str):
+    def __init__(self, routing_map: Dict[str, str], routing_key: List[str]):
         """
         Initializes the RedisPublisherRouter with a map of message types to stream names.
 
@@ -28,22 +28,22 @@ class RedisPublisherRouter:
                                          and values are the target Redis stream names
                                          (e.g., "user-nlp-jobs", "background-nlp-jobs").
 
-            routing_key (str): The key within an incoming message dictionary that
+            routing_key (List[str]): The key within an incoming message dictionary that
                                contains the message type string.
         """
 
         if not isinstance(routing_map, dict) or not routing_map:
             raise ValueError("routing_map must be a non-empty dictionary.")
         
-        if not isinstance(routing_key, str) or not routing_key:
-            raise ValueError("routing_key must be a non-empty string.")
+        if not isinstance(routing_key, list) or not routing_key:
+            raise ValueError("routing_key must be a non-empty list of strings.")
 
         unique_handle: str = hashlib.md5(str(routing_map).encode("utf-8")).hexdigest()[:5]
         self.logger: Logger = getLogger(f"{unique_handle}.redis_publisher_router")
         self.logger.info("--- Initializing RedisPublisherRouter ---")
         
         self.routing_map:Dict[str,str] = routing_map
-        self.routing_key:str = routing_key
+        self.routing_key:List[str] = routing_key
         self.publishers: Dict[str, RedisPublisher] = {}
 
         for message_type, stream_name in self.routing_map.items():
@@ -68,22 +68,40 @@ class RedisPublisherRouter:
         """
     
         # 1. Determine the route
-        message_type:str = message_payload.get(self.routing_key, None)
-        if not message_type:
-            raise Exception("Routing key '{self.routing_key}' not found in message. Message not published.")
+        routing_value:str = self._get_nested_value(message_payload, self.routing_key)
+        if not routing_value:
+            raise Exception(f"Routing key '{self.routing_key}' not found in message. Message not published.")
 
         # 2. Find the correct publisher for that route
-        publisher:RedisPublisher = self.publishers.get(message_type, None)
+        publisher:RedisPublisher = self.publishers.get(routing_value, None)
         if publisher is None:
-            raise Exception("No publisher configured for message type '{message_type}'. Message not published.")
+            raise Exception(f"No publisher configured for routing value '{routing_value}'. Message not published.")
 
         # 3. Use the dedicated publisher to send the message
-        self.logger.debug(f"Routing message of type '{message_type}' to stream '{publisher.stream_name}'.")
+        self.logger.debug(f"Routing message of routing value '{routing_value}' to stream '{publisher.stream_name}'.")
         # can release exception if fails
         return publisher.publish_one(message_payload)
 
-
-
+    def _get_nested_value(self, payload:Dict[str,Any], keys: List[str]) -> Any:
+        """
+        Sets a value deep inside the data dictionary.
+        Creates intermediate dictionaries if they don't exist.
+        Usage: msg.set_nested(html_content, "data", "data", "html")
+        """
+        if not keys or not payload:
+            raise Exception("Missing arguments")
+        
+        current_level = payload
+        
+        for key in keys[:-1]:
+            if key not in current_level or not isinstance(current_level[key], dict):
+                raise Exception("Key does not exist in payload!")
+            
+            current_level:Dict[str, Any] = current_level[key]
+        
+        value:Any = current_level[keys[-1]]
+        return value
+    
     def publish_many(self, message_payloads: List[Dict[str, Any]]) -> Dict[str, int]:
         """
         Groups a list of messages by their type and publishes each group

@@ -199,7 +199,7 @@ class RedisConsumer:
             self.logger.error(f"Could not consume a many messages: {e}")
             raise e
 
-    def acknowledge(self, redis_message_id: str):
+    def acknowledge(self, redis_message_id: str) -> None:
         """
         Acknowledges that a message from a specific stream has been processed.
         """
@@ -210,6 +210,7 @@ class RedisConsumer:
             )
             if result == 0:
                 raise Exception("Failed to ack")
+            self.logger.debug(f"Successfully acknowledged {redis_message_id}")
             
         except Exception as e:
             self.logger.error(

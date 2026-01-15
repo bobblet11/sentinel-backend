@@ -35,15 +35,14 @@ from microservices.web_scraper.config import (
 )
 from dataclasses import dataclass
 from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
-from common.requests.user_agent_manager import user_agent_manager
+from common.requests.user_agent_manager import BrowserProfile, user_agent_manager
 from pathlib import Path
 from pyvirtualdisplay import Display
-
+from common.io.screenshot_handler import RotatingScreenshotHandler
 ProxyRequestDict = Optional[Dict[str, str]]
 
 CURRENT_DIR: str = Path(os.path.dirname(os.path.abspath(__file__)))
 HINTS_PATH:Path = CURRENT_DIR / ".." / "page_structure_hints" / "combined_hints.json"
-SS_PATH:Path = CURRENT_DIR / ".." / "screenshots"
 
 URL_TO_OUTLET_MAP: Dict[str, str] = {
             ("abcnews", "abcnews.go.com"): "ABC",
@@ -64,7 +63,7 @@ PAGE_LOAD_TIMEOUT_S:int = 45
 @dataclass(frozen=True)
 class DriverConfig:
     proxy_url:str
-    user_agent:str
+    browser_profile:BrowserProfile
     headers:Dict[str,str]
     
     source_name:str
@@ -76,7 +75,7 @@ class DriverConfig:
         source_name_row:str = f"\n\tsource: {self.source_name}"
         proxy_url_row:str = f"\n\tproxy_url: {self.proxy_url}"
         proxy_country_code_row:str =f"\n\tproxy_country_code: {self.country_code}"
-        user_agent_row:str = f"\n\tuser_agent: {self.user_agent}"
+        user_agent_row:str = f"\n\tuser_agent: {self.browser_profile}"
         lang_str_row:str = f"\n\tlang_string: {self.lang_str}"
         return source_name_row + proxy_url_row + proxy_country_code_row + user_agent_row + lang_str_row
 class FetchManagerSelenium:
@@ -100,7 +99,7 @@ class FetchManagerSelenium:
         default_timeout: Tuple[float,float]=(15.0, 20.0),
         proxy_manager: ProxyManagerPaid = None,
         hint_path: Path = CURRENT_DIR / 'combined_hints.json',
-        screenshots_path: Path = CURRENT_DIR,
+        screenshot_handler: RotatingScreenshotHandler = RotatingScreenshotHandler()
     ):
         
         if getattr(self, "_initialized", False):
@@ -114,14 +113,13 @@ class FetchManagerSelenium:
             exit(1)
            
         self._create_selenium_wire_CA_folder()
-        screenshots_path.mkdir(parents=True, exist_ok=True)
         hint_path.parent.mkdir(parents=True, exist_ok=True)
     
-        self.proxy_manager = proxy_manager
-        self.screenshots_path:Path = screenshots_path
+        self.proxy_manager: ProxyManagerPaid = proxy_manager
         self.default_timeout:Tuple[float,float] = default_timeout
         self.hint_config:Dict[str, Dict[str,Any]] = json.loads(hint_path.read_text())
         self.x_path_config: Dict[str, List[str]] = self._generate_xpath_dict(self.hint_config)
+        self.screenshot_handler: RotatingScreenshotHandler = screenshot_handler
         
         # Start Global Virtual Display
         self.logger.info("Starting Global Virtual Display...")
@@ -136,7 +134,8 @@ class FetchManagerSelenium:
             version_output = result.stdout.strip().split()[-1]
             major_version = int(version_output.split('.')[0])
             self.logger.info(f"Detected Google Chrome Version: {version_output} (Major: {major_version})")
-
+            user_agent_manager.set_max_browser_version(major_version)
+            
             # 2. Download matching driver
             patcher = Patcher(version_main=major_version)
             patcher.auto() 
@@ -237,8 +236,11 @@ class FetchManagerSelenium:
         
         options.add_argument(f"--remote-debugging-port={debug_port}")
         options.add_argument(f"--user-data-dir={user_data_dir}")
-        options.add_argument(f"--user-agent={config.user_agent}")
+        options.add_argument(f"--user-agent={config.browser_profile.user_agent_string}")
+        options.add_argument(f"--window-size={config.browser_profile.screen_width},{config.browser_profile.screen_height}")
         options.binary_location = "/usr/bin/google-chrome"
+        
+
         
         proxy_options: Dict[str, Any] = {
             "proxy": {"http": config.proxy_url, "https": config.proxy_url},
@@ -257,6 +259,27 @@ class FetchManagerSelenium:
                 use_subprocess=True, 
                 driver_executable_path=thread_driver_path
             )
+            
+            driver.execute_cdp_cmd("Network.setUserAgentOverride", {
+                "userAgent": config.browser_profile.user_agent_string,
+                "platform": config.browser_profile.os_platform,
+                "userAgentMetadata": config.browser_profile.cdp_metadata
+            })
+            
+            driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                "source": f"""
+                    Object.defineProperty(navigator, 'hardwareConcurrency', {{
+                        get: () => {config.browser_profile.cpu_concurrency}
+                    }});
+                    Object.defineProperty(navigator, 'deviceMemory', {{
+                        get: () => {config.browser_profile.device_memory}
+                    }});
+                    Object.defineProperty(navigator, 'platform', {{
+                        get: () => '{config.browser_profile.os_platform}'
+                    }});
+                """
+            })
+
         except Exception as e:
             if hasattr(e, 'msg'):
                 self.logger.error(f"Chrome Start Error: {e.msg}")
@@ -426,23 +449,24 @@ class FetchManagerSelenium:
         try:
             self.logger.debug("Taking screenshot")
             png_data: bytes = driver.get_screenshot_as_png()
-            
         except Exception as e:
             self.logger.error(f"Could not take screenshot: {e}")
             return
-
         
         try:
             self.logger.debug("Saving screenshot")
+
             timestamp: int = int(time.time())
             url_hash: str = hashlib.md5(article_url.encode("utf-8")).hexdigest()[:8]
             filename: str = f"{prefix}_{timestamp}_{url_hash}.png"
-            file_path:Path = self.screenshots_path / filename
-
-            file_path.write_bytes(png_data)
-            self.logger.info(f"📸 Screenshot saved to: {file_path}")
+            self.screenshot_handler.save_screenshot(png_data, filename=filename)
+            capacity: float = self.screenshot_handler.current_bytes / self.screenshot_handler.max_bytes if self.screenshot_handler.max_bytes != 0 else 100.0
+            self.logger.info(f"📸 Screenshot saved as: {filename} to {self.screenshot_handler.screenshot_directory} ({capacity}% used)")
         except Exception as e:
-            self.logger.error(f"Failed to write screenshot file: {e}")
+            self.logger.error(f"Could not save screenshot: {e}")
+            return
+
+
 
     def _create_driver_config(self, article_url:str) -> DriverConfig:
         source_name: str = self._extract_source_name(article_url)
@@ -460,9 +484,9 @@ class FetchManagerSelenium:
         lang_string:str = self.get_accept_language_string(proxy_country_code)
         
         headers:Dict[str,str] = self._create_enhanced_headers(lang_string)
-        user_agent:str = user_agent_manager.get_sticky_agent(proxy_url)
+        browser_profile:BrowserProfile = user_agent_manager.get_sticky_browser_profile(proxy_url)
         
-        driver_config: DriverConfig = DriverConfig(proxy_url, user_agent, headers, source_name, proxy_country_code, lang_string)
+        driver_config: DriverConfig = DriverConfig(proxy_url, browser_profile, headers, source_name, proxy_country_code, lang_string)
         self.logger.debug(f"Created driver config for {article_url}" + driver_config.get_config_summary_string)
         return driver_config
     
@@ -483,21 +507,17 @@ class FetchManagerSelenium:
             raise Exception(f"Failed to navigate page: {e}")
 
     def _extract_html(self, driver:Chrome) -> str:
-        body_element:str=""
-        
-        try:
-            body_element:str = driver.find_element(By.TAG_NAME, "body").get_attribute("innerHTML")
-        except Exception:
-            body_element:str = driver.page_source
+        # Use page_source to ensure <head> and <meta> tags are captured
+        full_html: str = driver.page_source
             
-        if not body_element or len(body_element) < 200:
-            self.logger.warning("Captured body was empty. Falling back to full page_source.")
-            body_element:str = driver.page_source
+        if not full_html or len(full_html) < 200:
+            self.logger.warning("Captured page_source was empty or too short.")
+            raise Exception("Page source extraction failed or empty")
         
-        if "ERR_CERT_AUTHORITY_INVALID" in body_element:
+        if "ERR_CERT_AUTHORITY_INVALID" in full_html:
             raise Exception("SSL Bypass failed")
         
-        return body_element
+        return full_html
 
     def _clean_up_driver(self, driver:Chrome) -> None:
         try:
@@ -556,5 +576,5 @@ class FetchManagerSelenium:
 fetch_manager = FetchManagerSelenium(
     proxy_manager=proxy_manager_paid,
     hint_path=HINTS_PATH,
-    screenshots_path=SS_PATH,
+    screenshot_handler=RotatingScreenshotHandler()
 )
