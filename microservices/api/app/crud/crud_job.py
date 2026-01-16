@@ -9,7 +9,8 @@ def create_job(db: Session, job_dto: JobCreate)->JobResponse:
             status = JobStatus.PENDING
         )
         # use job_dto to add article entry as well and link to job
-
+        
+    
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)

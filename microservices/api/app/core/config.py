@@ -16,6 +16,10 @@ POSTGRES_DB: str = get_env_var("POSTGRES_DB",str, config_logger)
 POSTGRES_USER: str = get_env_var("POSTGRES_USER",str, config_logger)
 POSTGRES_PASSWORD: str = get_env_var("POSTGRES_PASSWORD",str, config_logger)
 
+# Redis stream configs
+USER_OUTPUT_STREAM: str = get_env_var("USER_OUTPUT_STREAM",str, config_logger)
+BACKGROUND_OUTPUT_STREAM: str = get_env_var("BACKGROUND_OUTPUT_STREAM",str, config_logger)
+
 env_variables: List[EnvVariable] = [
     EnvVariable("API_SERVICE_PORT", API_SERVICE_PORT), 
     
@@ -24,6 +28,11 @@ env_variables: List[EnvVariable] = [
     EnvVariable("POSTGRES_DB", POSTGRES_DB),
     EnvVariable("POSTGRES_USER", POSTGRES_USER),
     EnvVariable("POSTGRES_PASSWORD", POSTGRES_PASSWORD),
+    
+    EnvVariable("USER_OUTPUT_STREAM", USER_OUTPUT_STREAM),
+    EnvVariable("BACKGROUND_OUTPUT_STREAM", BACKGROUND_OUTPUT_STREAM),
 ]
+
+output_streams = [USER_OUTPUT_STREAM, BACKGROUND_OUTPUT_STREAM ]
 
 print_env(Config(env_variables, None, None), config_logger)
