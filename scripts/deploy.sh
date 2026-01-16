@@ -44,9 +44,11 @@ log_warn "Creating log folders"
 
 if [ -n "${LOCAL_WORKSPACE_FOLDER:-}" ]; then
     log_info "Detected Dev Container. Using Host Path."
+    HOST_ROOT="${LOCAL_WORKSPACE_FOLDER}"
     HOST_LOG_ROOT="${LOCAL_WORKSPACE_FOLDER}/logs"
 else
     log_info "No Dev Container"
+    HOST_ROOT="$PROJECT_ROOT"
     HOST_LOG_ROOT="$PROJECT_ROOT/logs"
 fi
 
@@ -119,6 +121,7 @@ cat .env | sudo tee "$COMPOSE_ENV" > /dev/null
 # 3. Append our HOST_LOG_ROOT variable to that file
 echo "" | sudo tee -a "$COMPOSE_ENV" > /dev/null
 echo "HOST_LOG_ROOT=$HOST_LOG_ROOT" | sudo tee -a "$COMPOSE_ENV" > /dev/null
+echo "HOST_ROOT=$HOST_ROOT" | sudo tee -a "$COMPOSE_ENV" > /dev/null
 
 # Check if it was written correctly (for debug)
 log_info "Env file generated. HOST_LOG_ROOT is set to: $(grep HOST_LOG_ROOT $COMPOSE_ENV)"
