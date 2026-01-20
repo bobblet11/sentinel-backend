@@ -106,58 +106,55 @@
     #     - OUTPUT_STREAM=ingestor:to.be.scraped
     #     - MAX_INGESTOR_WORKERS=100
 
-    # scraper-prioritiser:  
-    #   <<: [ *common-env, *prioritiser-service ]
-    #   container_name: sentinel-scraper-prioritiser-service-container
-    #   environment:
-    #     - INPUT_STREAMS=ingestor:to.be.scraped, user:to.be.scraped
-    #     - OUTPUT_STREAM=prioritised:to.be.scraped
-    #     - GROUP_NAME=default
-    #     - CONSUMER_NAME=scraper-prioritiser-1
-    #     - BATCH_SIZE=100
-    #     - MAX_PUBLISH_WORKERS=10
-    #     - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.scraper
+    scraper-prioritiser:  
+      <<: [ *common-env, *prioritiser-service ]
+      container_name: sentinel-scraper-prioritiser-service-container
+      environment:
+        - INPUT_STREAMS=ingestor:to.be.scraped, user:to.be.scraped
+        - OUTPUT_STREAM=prioritised:to.be.scraped
+        - GROUP_NAME=default
+        - CONSUMER_NAME=scraper-prioritiser-1
+        - BATCH_SIZE=100
+        - MAX_PUBLISH_WORKERS=10
+        - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.scraper
 
-    #   depends_on:
-    #     - ingestor-service
-    #   volumes:
-    #     - ${HOST_LOG_ROOT}/scraper_prioritiser:/app/logs
+      volumes:
+        - ${HOST_LOG_ROOT}/scraper_prioritiser:/app/logs
 
-    # web_scraper-service:
-    #   container_name: sentinel-web-scraper-service-container
-    #   image: sentinel/web-scraper-service:latest
-    #   build: 
-    #     context: ../../
-    #     dockerfile: ./microservices/web_scraper/Dockerfile
-    #   shm_size: '4gb'
-    #   ipc: host 
-    #   depends_on:
-    #     # - postgres
-    #     - redis
-    #     - ingestor-service
-    #     - scraper-prioritiser
+    web_scraper-service:
+      container_name: sentinel-web-scraper-service-container
+      image: sentinel/web-scraper-service:latest
+      build: 
+        context: ../../
+        dockerfile: ./microservices/web_scraper/Dockerfile
+      shm_size: '4gb'
+      ipc: host 
+      depends_on:
+        # - postgres
+        - redis
+        - scraper-prioritiser
       
-    #   volumes:
-    #     - ${HOST_LOG_ROOT}/scraper/logs:/app/logs
-    #     - ${HOST_LOG_ROOT}/scraper/screenshots:/app/screenshots
-    #   <<: *common-env 
-    #   restart: always
-    #   networks:
-    #     - sentinel-net
+      volumes:
+        - ${HOST_LOG_ROOT}/scraper/logs:/app/logs
+        - ${HOST_LOG_ROOT}/scraper/screenshots:/app/screenshots
+      <<: *common-env 
+      restart: always
+      networks:
+        - sentinel-net
 
-    #   environment:
-    #     - INPUT_STREAM=prioritised:to.be.scraped
-    #     - USER_OUTPUT_STREAM=user:to.be.nlp
-    #     - BACKGROUND_OUTPUT_STREAM=background:to.be.nlp
-    #     - FAILURE_OUTPUT_STREAM=failure:to.be.scraped
-    #     - BATCH_SIZE=10
-    #     - GROUP_NAME=default
-    #     - CONSUMER_NAME=web-scraper-1
-    #     - SCRAPER_MAX_WORKERS=2
-    #     - MAX_PROXY_VALIDATION_WORKERS=100
-    #     - MAX_FETCH_RETRIES=3
-    #     - INITIAL_FETCH_DELAY_S=1
-    #     - FETCH_DELAY_GROWTH_RATE=1.2
+      environment:
+        - INPUT_STREAM=prioritised:to.be.scraped
+        - USER_OUTPUT_STREAM=user:to.be.nlp
+        - BACKGROUND_OUTPUT_STREAM=background:to.be.nlp
+        - FAILURE_OUTPUT_STREAM=failure:to.be.scraped
+        - BATCH_SIZE=10
+        - GROUP_NAME=default
+        - CONSUMER_NAME=web-scraper-1
+        - SCRAPER_MAX_WORKERS=2
+        - MAX_PROXY_VALIDATION_WORKERS=100
+        - MAX_FETCH_RETRIES=3
+        - INITIAL_FETCH_DELAY_S=1
+        - FETCH_DELAY_GROWTH_RATE=1.2
       
   volumes:
     redis_data: {}
