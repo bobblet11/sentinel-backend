@@ -21,7 +21,12 @@ class JobStage(StrEnum):
     
 class JobCreate(BaseModel):
     article_url: str
-    article_html: str
+    article_html: str | None = None
+    
+    title: str | None = None
+    news_outlet: str | None = None
+    summary: str  | None = None
+
 class JobResponse(BaseModel):
     id: int
     status: str

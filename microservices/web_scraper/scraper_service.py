@@ -2,6 +2,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging import Logger, getLogger
 from typing import Any, Dict, Optional, List, Tuple
+from common.models.api.dtos.job import JobStage
 from common.models.api.redis_models import StreamMessage
 from common.redis_client.consumer import RedisConsumer
 from common.redis_client.publisher import RedisPublisher
@@ -59,6 +60,7 @@ class ScraperService(ServiceTemplate):
             
             self.logger.debug(f"Successfully fetched HTML for {article_url}, length: {len(article_html)}")
             message.set_raw_html(article_html)
+            message.add_timestamp(JobStage.FETCHED)
             return message
         
         except Exception as e:
@@ -86,6 +88,7 @@ class ScraperService(ServiceTemplate):
                 f"length: {len(parsed_result.get('text') or '')}"
             )
             message.set_parsed_text(parsed_result)
+            message.add_timestamp(JobStage.PARSED)
             return message
         except Exception as e:
             self.logger.error(f"\nFailed to parse HTML of message. Publishing to failure queue.")
@@ -95,6 +98,7 @@ class ScraperService(ServiceTemplate):
         try:
             fetched_message:StreamMessage = self._fetch_article_and_update(message)
             parsed_message:StreamMessage = self._parse_article_and_update(fetched_message)
+            
             return parsed_message
         
         except FailedToFetch as e:
