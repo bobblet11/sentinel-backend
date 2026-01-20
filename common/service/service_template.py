@@ -1,16 +1,13 @@
 
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import Logger, getLogger
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
-from sqlalchemy import Tuple
 
 from common.models.api.redis_models import Message, StreamMessage
-from common.redis_client.consumer import RedisConsumer
 from common.redis_client.consumer_combiner import RedisConsumerCombiner
 from common.redis_client.publisher import RedisPublisher
 from common.redis_client.publisher_router import RedisPublisherRouter
@@ -42,7 +39,7 @@ class ServiceConfig():
         consumer_name:str
         failure_output_stream: str | None # if none, then failed batches will just not be published and will be pending for next cycle
         routing_map: Dict[str,str]
-        routing_key:List[str] = ["header","type"]
+        routing_key:List[str] = field(default_factory=lambda: ["header", "type"])
         is_concurrent: bool = False
         max_workers:int = 1
         batch_size:int = 10
@@ -64,6 +61,7 @@ class ServiceTemplate(ABC):
 			routing_key=config.routing_key, routing_map=config.routing_map
 		)
 		self.fail_publisher = RedisPublisher(config.failure_output_stream)
+		self.logger.info(f"config of service: {config}")
 
 	def shutdown(self, *args) -> None:
 		"""Signal handler to initiate a graceful shutdown."""
@@ -73,14 +71,16 @@ class ServiceTemplate(ABC):
 	def _handle_failure(self, message: StreamMessage | Dict[str, Any], error: Exception):
 		"""Logs the error and publishes the message to the failure stream."""
 		is_stream_message:bool = isinstance(message, StreamMessage)
-  
+		self.logger.debug(message)
+	
 		redis_id = message.redis_id if is_stream_message else message.get("redis_message_id", "N/A")
+		stream_name = message.stream if is_stream_message else message.get("stream", "N/A")
 		self.logger.error(f"Failed to process message {redis_id}: {error}")
 		
-		payload = message.data if is_stream_message else message.get("data", {})
+		payload = message.data.model_dump() if is_stream_message else message.get("data", {})
   		# Acknowledge the original message before publishing to failure queue
 		self.fail_publisher.publish_one(payload)	
-		self.message_consumer.acknowledge(redis_id)
+		self.message_consumer.acknowledge(stream_name=stream_name, redis_message_id=redis_id)
 		self.logger.info(f"Message {redis_id} acknowledged and moved to failure stream.")
   
 	def _handle_failure_batch(self, messages: List[StreamMessage | Dict[str, Any]], error: Exception):
@@ -88,23 +88,10 @@ class ServiceTemplate(ABC):
 		if not messages:
 			self.logger.error("No messages to handle failure")
 			return
-
-		is_stream_message:bool = isinstance(messages[0], StreamMessage)
-
-		payloads = [msg.data for msg in messages] if is_stream_message else  [msg.get("data", {}) for msg in messages]
-		redis_ids = [msg.redis_id for msg in messages] if is_stream_message else  [msg.get("redis_message_id", "N/A") for msg in messages]
-		self.logger.error(f"Failed to process batch of {len(payloads)} messages: {error}")
-		
-		self.fail_publisher.publish_many(payloads)	
-		count = 0
-		for redis_id in redis_ids:
-			if redis_ids == "N/A":
-				self.logger.error("This message contains no redis_id, malformed message. Leaving in pending")
-				continue
-			count +=1
-			self.message_consumer.acknowledge(redis_id)
-   
-		self.logger.info(f"{count} messages acknowledged and moved to failure stream.")
+		self.logger.error(f"Failed to process batch of {len(messages)} messages: {error}")
+  
+		for message in messages:
+			self._handle_failure(message, error)
   
 	def _parse_message(self, raw_msg: Dict[str, Any]) -> Optional[StreamMessage]:
 		"""Converts raw Redis dict to a typed StreamMessage with a nested Pydantic model."""
@@ -143,7 +130,7 @@ class ServiceTemplate(ABC):
 			if not new_redis_id:
 				raise ProcessingError("Publisher returned an empty ID.")
 			
-			self.message_consumer.acknowledge(message.redis_id)
+			self.message_consumer.acknowledge(message.stream, message.redis_id)
 			return message.redis_id, new_redis_id
 
 		except Exception as e:
@@ -190,7 +177,7 @@ class ServiceTemplate(ABC):
 				failure_count += 1
 			else:
 				# This message was successfully published. Acknowledge it.
-				self.message_consumer.acknowledge(original_message.redis_id)
+				self.message_consumer.acknowledge(message.stream, original_message.redis_id)
 				ack_count += 1
 		
 		if ack_count > 0:
@@ -246,7 +233,7 @@ class ServiceTemplate(ABC):
  
 	def run(self):
 		"""Main execution loop for the service."""
-		self.logger.info(f"Service '{self.__class__.__name__}' started. Listening on {self.input_stream}.")
+		self.logger.info(f"Service '{self.__class__.__name__}' started. Listening on {self.input_streams}.")
 		self.logger.info(f"Mode: {'Concurrent' if self.is_concurrent else 'Sequential'}.")
 
 		executor = ThreadPoolExecutor(max_workers=self.max_workers) if self.is_concurrent else None

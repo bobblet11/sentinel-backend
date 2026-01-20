@@ -17,9 +17,10 @@ from .config import (
 if __name__ == "__main__":
     setup_logging(level=DEBUG, container_name=CONSUMER_NAME)
     main_logger: Logger = getLogger("__main__")
-    routing_map = {JobType.BACKGROUND : OUTPUT_STREAM, JobType.USER : OUTPUT_STREAM}
+    routing_map = {JobType.BACKGROUND.value: OUTPUT_STREAM, JobType.USER.value: OUTPUT_STREAM}
+    main_logger.info(routing_map)
     
-    config = ServiceConfig(service_name=CONSUMER_NAME, input_streams=INPUT_STREAMS, group_name=GROUP_NAME, CONSUMER_NAME=CONSUMER_NAME, failure_output_stream=FAILURE_OUTPUT_STREAM, routing_map=routing_map,is_concurrent=False, batch_size=BATCH_SIZE )
+    config = ServiceConfig(service_name=CONSUMER_NAME, input_streams=INPUT_STREAMS, group_name=GROUP_NAME, consumer_name=CONSUMER_NAME, failure_output_stream=FAILURE_OUTPUT_STREAM, routing_map=routing_map, is_concurrent=False, batch_size=BATCH_SIZE )
     prioritiser = PrioritiserService(config)
 
     signal.signal(signal.SIGINT, prioritiser.shutdown)

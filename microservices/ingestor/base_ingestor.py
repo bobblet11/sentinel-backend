@@ -76,14 +76,14 @@ class BaseIngestor:
                     id=None,
                     uid=job_uid,
                     created_at=datetime.datetime.now().isoformat(),
-                    status=JobStatus.PENDING,
-                    type=JobType.BACKGROUND,
+                    status=JobStatus.PENDING.value,
+                    type=JobType.BACKGROUND.value,
                 ),
-                data=payload,
+                payload=payload,
                 stage_timestamps=[
                     MessageTimestamp(
                         job_uid=job_uid,
-                        stage_name=JobStage.INGESTED,
+                        stage_name=JobStage.INGESTED.value,
                         timestamp=datetime.datetime.now().isoformat(),
                     )
                 ]

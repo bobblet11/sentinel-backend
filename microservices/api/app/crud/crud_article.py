@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from microservices.api.app.models.article import Article
 from microservices.api.app.models.job import Job
-from microservices.api.app.dtos.job import JobCreate, JobResponse, JobStatus, JobType
+from microservices.api.app.dtos.job import JobCreate 
 from microservices.api.app.core.logger import logger
 
 def create_article(db: Session, job_in: JobCreate)->Article:
