@@ -13,8 +13,8 @@ class Job(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     uid = Column(UUID, nullable=False)  
     article_id = Column(Integer, nullable=False)  
-    type = Column(String(20), nullable=False, default=JobType.BACKGROUND)  
-    status = Column(String(50), nullable=False, default=JobStatus.PENDING)  
+    type = Column(String(20), nullable=False, default=JobType.BACKGROUND.value)  
+    status = Column(String(50), nullable=False, default=JobStatus.PENDING.value)  
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 class JobTimestamp(Base):

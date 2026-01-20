@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from common.models.api.dtos.job import JobStage
 
+
 """
 In redis, each message looks like this
             some redis_ID
@@ -32,7 +33,7 @@ class MessageTimestamp(BaseModel):
     """
     Represents the timestamp of a stage
     """
-    job_uid: int
+    job_uid: str
     stage_name: str
     timestamp: str
 class MessageHeader(BaseModel):
@@ -66,13 +67,29 @@ class MessagePayload(BaseModel):
     #nlp
     
     
+@dataclass
+class ParseResult:
+    text: str
+    title: Optional[str]
+    author: Optional[str]
+    published_at: Optional[str]
+    
+    def __getitem__(self, key):
+        return getattr(self, key, None)
+    
+    def __setitem__(self, key, value):
+        if hasattr(self, key):
+            setattr(self, key, value)
+        else:
+            raise KeyError(f"{key} is not a valid field")
+        
 
 class Message(BaseModel):
     """
     Represents the actual message data type passed through a message queue
     """
     header: MessageHeader
-    data: Union[MessagePayload] 
+    payload: MessagePayload
     stage_timestamps: List[MessageTimestamp]
 
 @dataclass
@@ -92,28 +109,40 @@ class StreamMessage:
     
     @property
     def link(self) -> Optional[str]:
-        return self.data.data.article_url
+        return self.data.payload.article_url
 
     @property
     def html(self) -> Optional[str]:
-        return self.data.data.raw_html
+        return self.data.payload.raw_html
     
     @property
     def text(self) -> Optional[str]:
-        return self.data.data.parsed_text
+        return self.data.payload.parsed_text
 
     
     def set_raw_html(self, page_html: str) -> None:
-        self.data.data.raw_html = page_html
+        self.data.payload.raw_html = page_html
     
-    def set_parsed_text(self, parsed_text: str) -> None:
-        self.data.data.parsed_text = parsed_text
-    
+    def set_parsed_result(self, parsed_result: ParseResult) -> None:
+        """Unpacks a ParseResult object and updates the message payload."""
+        # Use dot notation on the ParseResult object for clarity and safety
+        if not self.data.payload.parsed_text and parsed_result.text:
+            self.data.payload.parsed_text = parsed_result.text
+            
+        if not self.data.payload.title and parsed_result.title:
+            self.data.payload.title = parsed_result.title
+            
+        if not self.data.payload.author and parsed_result.author:
+            self.data.payload.author = parsed_result.author
+            
+        if not self.data.payload.publish_date and parsed_result.published_at:
+            self.data.payload.publish_date = parsed_result.published_at
+            
     def add_timestamp(self, stage_name: JobStage) -> None:
         
         timestamp_row = MessageTimestamp(
             job_uid = self.data.header.uid,
-            stage_name = stage_name,
+            stage_name = stage_name.value,
             timestamp = datetime.datetime.now().isoformat()
         )
         

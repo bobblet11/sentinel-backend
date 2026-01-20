@@ -10,7 +10,7 @@ from microservices.api.app.models.article import Article
 from microservices.api.app.models.job import Job
 
 
-routing_map = {"user": OUTPUT_STREAM, "background": OUTPUT_STREAM}
+routing_map = {JobType.USER.value: OUTPUT_STREAM, JobType.BACKGROUND.value: OUTPUT_STREAM}
 
 publisher = RedisPublisherRouter(
 	routing_key=["header","type"], routing_map=routing_map
@@ -24,12 +24,12 @@ def publish_job(job: Job, article: Article, job_dto: JobCreate)->None:
 		message = Message(
 			header=MessageHeader(
 				id=job.id,
-                    		uid=job.uid,
+                    		uid=str(job.uid),
 				created_at=datetime.datetime.now().isoformat(),
 				status=JobStatus.PENDING,
-				type=JobType.USER,
+				type=JobType.USER.value,
 			),
-			data=payload,
+			payload=payload,
 			stage_timestamps=[]
 		)
   
