@@ -3,6 +3,14 @@ from typing import Any, Dict, List, Optional
 from common.redis_client.publisher import RedisPublisher
 from logging import Logger, getLogger
 
+def get_nested_value(d: Dict, keys: List[str]) -> Any:
+    """Safely retrieves a value from a nested dictionary."""
+    for key in keys:
+        if not isinstance(d, dict) or key not in d:
+            return None
+        d = d.get(key)
+    return d
+
 class RedisPublisherRouter:
     """
     A higher-level publisher that acts as a router, forwarding messages
@@ -115,35 +123,32 @@ class RedisPublisherRouter:
         """
         
         # 1. Group messages by their destination stream
-        grouped_messages: Dict[str, List[Dict[str, Any]]] = {
-            message_type: [] for message_type in self.publishers.keys()
-        }
+        grouped_messages = {stream_name: [] for stream_name in self.publishers.keys()}
+        grouped_messages["unroutable"] = []
 
-        unroutable_count:int = 0
         for payload in message_payloads:
-            message_type:str = payload.get(self.routing_key, None)
+            routing_value:str = get_nested_value(payload, self.routing_key)
+            destination_stream = self.routing_map.get(routing_value)
             
-            if message_type not in grouped_messages:
-                unroutable_count += 1
-                continue
-            
-            grouped_messages[message_type].append(payload)
-
-        if unroutable_count > 0:
-            self.logger.warning(
-                f"{unroutable_count} messages have are not mapped to any publisher in map. These {unroutable_count} messages were not published."
-            )
-
+            if destination_stream and destination_stream in self.publishers:
+                grouped_messages[destination_stream].append(payload)
+            else:
+                grouped_messages["unroutable"].append(payload)
+                self.logger.warning(f"Message with routing value '{routing_value}' is unroutable.")
 
         # 2. Publish each group of messages to their respective stream
-        results:Dict[str, int] = {}
+        results = {}
         
-        for message_type, payloads in grouped_messages.items():
-            if len(payloads) == 0:
+        for stream_name, payloads in grouped_messages.items():
+            if not payloads:
+                    continue
+                
+            if stream_name == "unroutable":
+                results["unroutable"] = payloads
                 continue
 
-            publisher:RedisPublisher = self.publishers[message_type]
-            result_ids:List[str] = publisher.publish_many(payloads)
-            results[publisher.stream_name] = len(result_ids)
+            publisher = self.publishers[stream_name]
+            result_ids = publisher.publish_many(payloads)
+            results[stream_name] = result_ids
 
         return results
