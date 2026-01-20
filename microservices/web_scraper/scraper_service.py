@@ -7,7 +7,7 @@ from common.models.api.redis_models import StreamMessage
 from common.redis_client.consumer import RedisConsumer
 from common.redis_client.publisher import RedisPublisher
 from common.redis_client.publisher_router import RedisPublisherRouter
-from common.service.service_template import ProcessingError, ServiceTemplate
+from common.service.service_template import ProcessingError, ServiceConfig, ServiceTemplate
 from microservices.web_scraper.config import (
     BACKGROUND_OUTPUT_STREAM,
     BATCH_SIZE,
@@ -21,7 +21,7 @@ from microservices.web_scraper.config import (
 )
 from microservices.web_scraper.managers.fetch_manager_selenium import fetch_manager
 from microservices.web_scraper.managers.parse_manager import parse_manager, ParseResult
-
+import traceback
 
 PRIORITY_MAP = {
     "user": 1,
@@ -42,6 +42,9 @@ class FailedToParse(Exception):
 
 class ScraperService(ServiceTemplate):
     """Concurrently scrapes, parses, and publishes messages"""
+
+    def __init__(self, config:ServiceConfig) -> None:
+        super().__init__(config)
 
     def _fetch_article_and_update(self, message: StreamMessage) -> StreamMessage:
         try:
@@ -79,19 +82,23 @@ class ScraperService(ServiceTemplate):
                 raise FailedToParse("No html on this message")
             
             self.logger.debug(f"Attemping to parse HTML from {article_url}")
-            parsed_result:Dict[str,str] = parse_manager.parse_article_raw_html(article_html, article_url, None)
+            parsed_result:ParseResult= parse_manager.parse_article_raw_html(article_html, article_url, None)
             if not parsed_result:
                 raise FailedToFetch("Successful parse but returned text was empty")
             
             self.logger.debug(
                 f"Successfully parsed HTML for {article_url}, "
-                f"length: {len(parsed_result.get('text') or '')}"
+                f"length: {len(parsed_result.text or '')}"
             )
-            message.set_parsed_text(parsed_result)
+            
+            self.logger.debug(parsed_result)
+            message.set_parsed_result(parsed_result)
             message.add_timestamp(JobStage.PARSED)
+            self.logger.debug("HERE")
             return message
         except Exception as e:
-            self.logger.error(f"\nFailed to parse HTML of message. Publishing to failure queue.")
+            self.logger.error(f"\nFailed to parse HTML of message. Publishing to failure queue. {e}")
+            self.logger.error(f"Stack Trace:\n{traceback.format_exc()}")
             raise e
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:

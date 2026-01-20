@@ -64,7 +64,7 @@ class PrioritiserService(ServiceTemplate):
                 )
                 failure_count += 1
             else:
-                self.message_consumer.acknowledge(original_message.redis_id)
+                self.message_consumer.acknowledge(original_message.stream, original_message.redis_id)
                 ack_count += 1
 
         if ack_count > 0:

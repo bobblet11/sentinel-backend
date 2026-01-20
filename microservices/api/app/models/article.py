@@ -5,8 +5,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
 
-from microservices.api.app.dtos.job import JobType, JobStatus
-
 Base = declarative_base()
 class Article(Base):
     __tablename__ = "article"
