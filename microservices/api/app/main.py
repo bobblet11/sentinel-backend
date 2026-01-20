@@ -1,22 +1,17 @@
+
+
 from fastapi.responses import JSONResponse
 from psycopg2 import IntegrityError, OperationalError
 import uvicorn
-
-
-from logging import DEBUG, Logger, getLogger
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from common.io.logging import setup_logging
-from microservices.api.app.api.v1.api import api_router
 from microservices.api.app.core.config import API_SERVICE_PORT
+from microservices.api.app.api.v1.api import api_router
 
 CONTAINER_NAME:str = "sentinel_api_service"
 FAST_API_NAME:str = "Sentinel API Service"
 FAST_API_VERSION:str = "0.0"
-
-setup_logging(level=DEBUG,container_name=CONTAINER_NAME)
-logger:Logger = getLogger("__main__")
 
 app = FastAPI(title=FAST_API_NAME, version=FAST_API_VERSION)
 
