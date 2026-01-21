@@ -72,6 +72,9 @@
         - postgres
         - redis
 
+      profiles: 
+        - api
+
       volumes:
         - ${HOST_LOG_ROOT}/api:/app/logs
         
@@ -118,7 +121,8 @@
       volumes:
         - ${HOST_LOG_ROOT}/ingestor:/app/logs
 
-
+      profiles: 
+        - ingestor
 
       restart: unless-stopped
       networks:
@@ -161,6 +165,9 @@
         - postgres
         - redis
 
+      profiles: 
+        - scraper-prioritiser
+
       deploy:
         resources:
           limits:
@@ -182,7 +189,10 @@
       depends_on:
         - postgres
         - redis
-      
+
+      profiles: 
+        - scraper
+        
       volumes:
         - ${HOST_LOG_ROOT}/scraper/logs:/app/logs
         - ${HOST_LOG_ROOT}/scraper/screenshots:/app/screenshots
