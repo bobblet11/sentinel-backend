@@ -24,7 +24,7 @@ class FailedToParse(Exception):
         self.message = message
         super().__init__(self.message)
 
-class MessageSaver(ScraperService):
+class MessageSaver():
     def __init__(self,message_store_filename: str = "messages.json", log_directory:Path=Path("/app/logs")):    
         #create file
         if isinstance(log_directory, str):
