@@ -3,6 +3,14 @@ from typing import Any, Dict, List, Optional
 from common.redis_client.publisher import RedisPublisher
 from logging import Logger, getLogger
 
+def get_nested_value(d: Dict, keys: List[str]) -> Any:
+    """Safely retrieves a value from a nested dictionary."""
+    for key in keys:
+        if not isinstance(d, dict) or key not in d:
+            return None
+        d = d.get(key)
+    return d
+
 class RedisPublisherRouter:
     """
     A higher-level publisher that acts as a router, forwarding messages
@@ -54,33 +62,6 @@ class RedisPublisherRouter:
             
         self.logger.info(f"--- Initialized RedisPublisherRouter ---")
 
-    def publish_one(self, message_payload: Dict[str, Any]) -> str:
-        """
-        Inspects a message, determines its type using the routing_key, and
-        forwards it to the correct Redis stream publisher.
-
-        Args:
-            message: The message dictionary to be published. It must contain
-                     the routing_key.
-
-        Returns:
-            The unique Redis message ID if publishing was successful, otherwise None.
-        """
-    
-        # 1. Determine the route
-        routing_value:str = self._get_nested_value(message_payload, self.routing_key)
-        if not routing_value:
-            raise Exception(f"Routing key '{self.routing_key}' not found in message. Message not published.")
-
-        # 2. Find the correct publisher for that route
-        publisher:RedisPublisher = self.publishers.get(routing_value, None)
-        if publisher is None:
-            raise Exception(f"No publisher configured for routing value '{routing_value}'. Message not published.")
-
-        # 3. Use the dedicated publisher to send the message
-        self.logger.debug(f"Routing message of routing value '{routing_value}' to stream '{publisher.stream_name}'.")
-        # can release exception if fails
-        return publisher.publish_one(message_payload)
 
     def _get_nested_value(self, payload:Dict[str,Any], keys: List[str]) -> Any:
         """
@@ -102,6 +83,37 @@ class RedisPublisherRouter:
         value:Any = current_level[keys[-1]]
         return value
     
+    
+    def publish_one(self, message_payload: Dict[str, Any]) -> str:
+        """
+        Inspects a message, determines its type using the routing_key, and
+        forwards it to the correct Redis stream publisher.
+
+        Args:
+            message: The message dictionary to be published. It must contain
+                     the routing_key.
+
+        Returns:
+            The unique Redis message ID if publishing was successful, otherwise None.
+        """
+    
+        # 1. Determine the route
+        routing_value:str = self._get_nested_value(message_payload, self.routing_key)
+        if not routing_value:
+            self.logger.info(f"Routing map is {self.routing_map}")
+            raise Exception(f"Routing key '{self.routing_key}' not found in message. Message not published.")
+
+        # 2. Find the correct publisher for that route
+        publisher:RedisPublisher = self.publishers.get(routing_value, None)
+        if publisher is None:
+            raise Exception(f"No publisher configured for routing value '{routing_value}'. Message not published.")
+
+        # 3. Use the dedicated publisher to send the message
+        self.logger.debug(f"Routing message of routing value '{routing_value}' to stream '{publisher.stream_name}'.")
+        # can release exception if fails
+        return publisher.publish_one(message_payload)
+
+
     def publish_many(self, message_payloads: List[Dict[str, Any]]) -> Dict[str, int]:
         """
         Groups a list of messages by their type and publishes each group
@@ -115,35 +127,31 @@ class RedisPublisherRouter:
         """
         
         # 1. Group messages by their destination stream
-        grouped_messages: Dict[str, List[Dict[str, Any]]] = {
-            message_type: [] for message_type in self.publishers.keys()
-        }
+        grouped_messages: Dict[str, list] = {routing_value: [] for routing_value in self.publishers}
+        grouped_messages["unroutable"] = []
 
-        unroutable_count:int = 0
         for payload in message_payloads:
-            message_type:str = payload.get(self.routing_key, None)
+            routing_value:str = get_nested_value(payload, self.routing_key)
             
-            if message_type not in grouped_messages:
-                unroutable_count += 1
-                continue
-            
-            grouped_messages[message_type].append(payload)
-
-        if unroutable_count > 0:
-            self.logger.warning(
-                f"{unroutable_count} messages have are not mapped to any publisher in map. These {unroutable_count} messages were not published."
-            )
-
+            if routing_value in self.publishers:
+                grouped_messages[routing_value].append(payload)
+            else:
+                grouped_messages["unroutable"].append(payload)
+                self.logger.error(f"Message with routing value '{routing_value}' is unroutable.")
 
         # 2. Publish each group of messages to their respective stream
-        results:Dict[str, int] = {}
+        results = {}
         
-        for message_type, payloads in grouped_messages.items():
-            if len(payloads) == 0:
+        for routing_value, payloads in grouped_messages.items():
+            if not payloads:
+                    continue
+                
+            if routing_value == "unroutable":
+                results["unroutable"] = payloads
                 continue
 
-            publisher:RedisPublisher = self.publishers[message_type]
-            result_ids:List[str] = publisher.publish_many(payloads)
-            results[publisher.stream_name] = len(result_ids)
+            publisher = self.publishers[routing_value]
+            result_ids = publisher.publish_many(payloads)
+            results[publisher.stream_name] = result_ids
 
         return results

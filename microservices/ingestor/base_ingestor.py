@@ -2,7 +2,8 @@ import datetime
 import hashlib
 import logging
 
-from common.models.api.redis_models import Message, MessageHeader, MessageURLPayload
+from common.models.api.dtos.job import JobStage, JobStatus, JobType
+from common.models.api.redis_models import Message, MessageHeader, MessagePayload, MessageTimestamp
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
@@ -13,8 +14,9 @@ from typing import Iterator, Dict, Set, List, Any
 @dataclass(frozen=True)
 class Article:
     link: str
-    source: str = "Unknown Source"
-    
+    source: str | None = None
+    title : str | None = None
+    summary : str | None = None
 class BaseIngestor:
     """
     A base class that defines the template for an ingestion workflow.
@@ -67,16 +69,26 @@ class BaseIngestor:
         # Step 4: Publish unseen articles
         messages_to_publish: List[Any] = []
         for article in unseen_articles:
-            payload = MessageURLPayload(url=article.link, source_rss=article.source)
-            
+            payload = MessagePayload(article_url=article.link, news_outlet=article.source, title=article.title, summary=article.summary)
+            job_uid = hashlib.md5(article.link.encode()).hexdigest()[:36]
             message = Message(
                 header=MessageHeader(
-                    message_id=hashlib.md5(article.link.encode()).hexdigest(),
-                    timestamp=datetime.datetime.now().isoformat(),
-                    type="background",
+                    id=None,
+                    uid=job_uid,
+                    created_at=datetime.datetime.now().isoformat(),
+                    status=JobStatus.PENDING.value,
+                    type=JobType.BACKGROUND.value,
                 ),
-                data=payload,
+                payload=payload,
+                stage_timestamps=[
+                    MessageTimestamp(
+                        job_uid=job_uid,
+                        stage_name=JobStage.INGESTED.value,
+                        timestamp=datetime.datetime.now().isoformat(),
+                    )
+                ]
             )
+            
             message_as_dict = message.model_dump()
             messages_to_publish.append(message_as_dict)
 
