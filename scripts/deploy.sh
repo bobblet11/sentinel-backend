@@ -135,10 +135,10 @@ log_warn "Building base Docker image 2..."
 run_and_log sudo -E docker build --pull -t sentinel/base-image:1.1 -f docker/base/base2/Dockerfile .
 
 log_info "Building service images..."
-run_and_log sudo -E docker-compose build
+run_and_log sudo -E docker-compose -f "$COMPOSE_FILE" build
 
 log_info "Deploying services with the newly built images..."
-run_and_log sudo -E docker-compose up --force-recreate --renew-anon-volumes -d
+run_and_log sudo -E docker-compose -f "$COMPOSE_FILE" up --force-recreate --renew-anon-volumes -d
 
 echo -e "\n${GREEN}✅ Deployment complete! All services are running with fresh images.${NC}\n"
-echo -e "${YELLOW}Use 'sudo docker-compose logs -f' to see the output.${NC}\n"
+echo -e "${YELLOW}Use 'sudo docker-compose -f docker/compose/docker-compose.yml logs -f' to see the output.${NC}\n"

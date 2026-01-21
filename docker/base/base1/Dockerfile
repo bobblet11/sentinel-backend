@@ -1,12 +1,17 @@
 # Step 1: Start from an official Python base image.
-FROM python:3.12-slim
+FROM python:3.12-bullseye
 
 # Step 2: Set a working directory inside the container.
 WORKDIR /app
 
-# Step 3: Install common system dependencies like cron.
+# Step 3: Install common system dependencies like cron and Chromium.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cron \
+    wget \
+    gnupg \
+    ca-certificates \
+    unzip \
+    chromium \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Step 4: Copy the BASE requirements file.
