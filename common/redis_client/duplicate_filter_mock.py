@@ -4,31 +4,17 @@ from typing import List
 from common.redis_client.connection import redis_connection
 from logging import Logger, getLogger
 
-class RedisDuplicateFilter:
+class RedisDuplicateFilterMock:
     """
     A high-level, reliable wrapper for Redis set-based string caches.
     Uses a "rolling" TTL on the entire set to manage memory over time.
     """
 
-    def __init__(self, key_name: str, ttl_s: int = 604800):
-        """
-        key_name (str): The name of the Redis set to upload and check.
-        ttl_s (str): The time in seconds a value can live in redis set. Default is 1 week
-        """
-
-        
-        if not isinstance(key_name, str) or not key_name:
-            raise ValueError("key_name must be a non-empty string.")
-        
-        self.logger = getLogger(f"{key_name}.redis_duplicate_filter")
-        self.logger.info("--- Initializing RedisDuplicateFilter ---")
-        
-
-        self.key_name:str = key_name
-        self.ttl_s:str = ttl_s
-        self.client: redis.Redis = redis_connection.get_client()
-
-        self.logger.info(f"--- Initialized RedisDuplicateFilter at {key_name} ---")
+    def __init__(self):
+        self.logger = getLogger(f"MOCK.redis_duplicate_filter")
+        self.logger.info("--- Initializing RedisDuplicateFilter (MOCK)---")
+        self.duplicate_filter = set()
+        self.logger.info(f"--- Initialized RedisDuplicateFilter (MOCK) ---")
 
     def has_one(self, item: str) -> bool:
         """
@@ -37,9 +23,9 @@ class RedisDuplicateFilter:
         try:
             if not item or item == "":
                 raise Exception("No argument provided for checking")
-            return self.client.sismember(self.key_name, item)
+            return item in self.duplicate_filter
         except Exception as e:
-            self.logger.error(f"Unexpectedly failed to check if item {item} exists in set {self.key_name}! {e}")
+            self.logger.error(f"Unexpectedly failed to check if item {item} exists in set! {e}")
             raise e
 
     def has_many(self, items: list[str]) -> list[str]:
@@ -57,15 +43,14 @@ class RedisDuplicateFilter:
                 raise Exception("No items to check")
 
             # The result will be a list of booleans [1, 0, 1, ...]s
-            exists_results:List[bool] = self.client.smismember(self.key_name, items)
-            
+            exists_results:List[bool] = [1 if item in self.duplicate_filter else 0 for item in items]
             unseen_items: List[str] = [
                 item for item, exists in zip(items, exists_results) if not exists
             ]
             return unseen_items
         except Exception as e:
             self.logger.error(
-                f"Failed to check if {len(items)} items exist in set {self.key_name}! {e}"
+                f"Failed to check if {len(items)} items exist in set! {e}"
             )
             raise e
 
@@ -78,13 +63,10 @@ class RedisDuplicateFilter:
             if not item:
                 raise Exception("No item to add")
 
-            pipe = self.client.pipeline()
-            pipe.sadd(self.key_name, item)
-            pipe.expire(self.key_name, self.ttl_s)
-            pipe.execute()
+            self.duplicate_filter.add(item)
             
         except Exception as e:
-            self.logger.error(f"Failed to add item {item} to set {self.key_name}! {e}")
+            self.logger.error(f"Failed to add item {item} to set {e}")
             raise e
 
     def add_many(self, items: list[str]) -> None:
@@ -96,13 +78,10 @@ class RedisDuplicateFilter:
             if not items:
                 raise Exception("No items to add")
 
-            pipe = self.client.pipeline()
-            pipe.sadd(self.key_name, *items)
-            pipe.expire(self.key_name, self.ttl_s)
-            pipe.execute()
+            self.duplicate_filter.update(items)
             
         except Exception as e:
             self.logger.error(
-                f"Failed to add {len(items)} items to set {self.key_name}! {e}"
+                f"Failed to add {len(items)} items to set! {e}"
             )
             raise e
