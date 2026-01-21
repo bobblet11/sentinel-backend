@@ -1,6 +1,7 @@
 import time
 from typing import Any, Dict, List
 from logging import Logger, getLogger
+from common.models.api.dtos.job import JobStage
 from common.redis_client.consumer_combiner import RedisConsumerCombiner
 from common.redis_client.publisher import RedisPublisher
 from common.models.api.redis_models import StreamMessage
@@ -25,12 +26,11 @@ class PrioritiserService(ServiceTemplate):
         super().__init__(config)
     
     def _process_message(self, message: StreamMessage) -> StreamMessage:
-        # The "processing" for this service is a no-op on individual messages.
-        # The main logic is in the overridden batch method.
+        message.add_timestamp(JobStage.PRIORITISED)
         return message
 
     def _process_batch_sequentially(self, raw_messages: List[Dict[str, Any]]):
-        stream_messages: List[StreamMessage] = [msg for m in raw_messages if (msg := self._parse_message(m))]
+        stream_messages: List[StreamMessage] = [self._process_message(msg) for m in raw_messages if (msg := self._parse_message(m))]
         try:
             stream_messages.sort(key=lambda m: m.priority)
         except Exception as e:
