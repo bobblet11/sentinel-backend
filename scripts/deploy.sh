@@ -89,7 +89,23 @@ log_info "Exported HOST_LOG_ROOT=$HOST_LOG_ROOT"
 export ENV_FILE_PATH="$ENV_FILE"
 log_info "Exporting ENV_FILE_PATH=$ENV_FILE_PATH"
 
-
+if [ -f "$ENV_FILE" ]; then
+    # Grep for the line, and cut everything after the '=' sign
+    PROFILE_STRING=$(grep '^COMPOSE_PROFILES=' "$ENV_FILE" | cut -d'=' -f2-)
+    
+    if [ -n "$PROFILE_STRING" ]; then
+        log_info "Activating profiles: $PROFILE_STRING"
+        # Temporarily change the separator to a comma to split the string
+        IFS=',' read -r -a profiles_array <<< "$PROFILE_STRING"
+        
+        # Loop through the array and add a --profile flag for each item
+        for profile in "${profiles_array[@]}"; do
+            DOCKER_COMPOSE_ARGS+=("--profile" "$profile")
+        done
+    else
+        log_warn "COMPOSE_PROFILES not defined in $ENV_FILE. No profiles will be activated."
+    fi
+fi
 
 log_warn "Creating log folders at: $HOST_LOG_ROOT"
 sudo mkdir -p "$HOST_LOG_ROOT/ingestor"
