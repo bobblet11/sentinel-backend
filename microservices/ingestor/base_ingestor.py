@@ -23,9 +23,19 @@ class BaseIngestor:
     Subclasses must implement the `_fetch_articles` generator method.
     """
 
-    def __init__(self):
-        self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY)
-        self.publisher = RedisPublisher(OUTPUT_STREAM)
+    def __init__(self, duplicate_filter = None, publisher = None):
+        # If no duplicate_filter was provided, create the default one NOW.
+        if duplicate_filter is None:
+            self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY)
+        else:
+            self.duplicate_filter = duplicate_filter
+
+        # Do the exact same thing for the publisher.
+        if publisher is None:
+            self.publisher = RedisPublisher(OUTPUT_STREAM)
+        else:
+            self.publisher = publisher
+            
         self.logger: logging.Logger = logging.getLogger("base_ingestor")
 
     def fetch_articles(self) -> Iterator[Article]: 
