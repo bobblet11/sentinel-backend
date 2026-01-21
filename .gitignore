@@ -10,3 +10,5 @@ saved_proxies.json
 microservices/web_scraper/screenshots
 ./logs
 logs
+.log
+**.log
