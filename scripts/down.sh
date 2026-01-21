@@ -55,7 +55,7 @@ fi
 
 DOCKER_COMPOSE_ARGS=(
     "-f" "$BASE_COMPOSE_FILE"
-    "--project-directory" "$PROJECT_ROOT"
+
 )
 
 if [ -f "$OVERRIDE_FILE" ]; then

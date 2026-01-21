@@ -30,7 +30,7 @@ class ScraperServiceBenchmark(ScraperService):
 
     def __init__(self,config: ServiceConfig, message_store_filename: str = "messages.json", log_directory:Path=Path("/app/logs")):
         super().__init__(config)  
-        self.message_saver = MessageSaver(message_store_filename, log_directory)
+        self.message_saver = MessageSaver(group_name="scrape_group", message_store_filename=message_store_filename, log_directory=log_directory)
 
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:

@@ -54,7 +54,7 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 DOCKER_COMPOSE_ARGS=(
-    "--project-directory" "$PROJECT_ROOT"
+
     "-f" "$BASE_COMPOSE_FILE"
 )
 
