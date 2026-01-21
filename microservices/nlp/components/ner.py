@@ -1,5 +1,6 @@
-from typing import List, Dict, Any, Union
 import logging
+from typing import Any, List
+from transformers import pipeline
 
 # Local imports
 from models.base import NLPComponent
@@ -7,55 +8,83 @@ from schemas import ArticleInput, AnalysisResult, AnalysisOptions, Entity
 
 logger = logging.getLogger(__name__)
 
-# Type alias
-NERModel = Any 
-
 class EntityRecognizer(NLPComponent):
     """
-    Identifies named entities in the text.
+    Identifies named entities (PER, ORG, LOC, MISC) in the text.
+    Uses 'dslim/bert-base-NER-uncased' to handle noisy/lowercase text robustly.
     """
-    def __init__(self, ner_model: NERModel):
+    def __init__(self, ner_model: Any = None):
         """
-        Initializes the recognizer with an NER model.
         Args:
-            ner_model: The loaded HuggingFace NER pipeline.
+            ner_model: The loaded HuggingFace NER pipeline. 
         """
-        self.ner_model = ner_model
+        if ner_model:
+            self.ner_model = ner_model
+        else:
+            logger.info("EntityRecognizer: Loading default model 'dslim/bert-base-NER-uncased'...")
+            try:
+                # We default to CPU (-1) for safety, but main.py/nlp_service should pass a GPU-loaded model
+                self.ner_model = pipeline(
+                    "token-classification", 
+                    model="dslim/bert-base-NER-uncased", 
+                    aggregation_strategy="simple",
+                    device=-1 
+                )
+            except Exception as e:
+                logger.error(f"EntityRecognizer: Failed to load model: {e}")
+                raise
 
     def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
         """
         Extracts entities from the text and updates result.entities.
         """
-        # 1. Get text
-        text = getattr(article, 'text', getattr(article, 'content', ""))
+        # We perform NER on the *Full Text* of the article for better context,
+        # rather than sentence-by-sentence which is slow and loses context.
+        text = getattr(article, 'text', "")
         
         if not text:
-            logger.warning("EntityRecognizer: No text found.")
-            result.entities = []
             return
+
+        # NER models have a token limit (usually 512). 
+        # For a robust solution, we truncate or chunk. 
+        # For this sprint, we truncate to first ~10 paragraphs (approx 5000 chars) to prevent errors.
+        safe_text = text[:5000]
 
         try:
-            # 2. Run Inference
-            raw_entities = self.ner_model(text)
+            # Run Inference
+            raw_entities = self.ner_model(safe_text)
+            
         except Exception as e:
             logger.error(f"NER inference failed: {e}")
-            result.entities = []
             return
 
-        # 3. Map to Schema (Excluding confidence)
+        # Map to Schema
         entities_list: List[Entity] = []
+        unique_hashes = set() # To avoid duplicates
         
         for item in raw_entities:
-            # item structure: {'entity_group': 'ORG', 'score': 0.98, 'word': 'Google', ...}
+            # item: {'entity_group': 'ORG', 'score': 0.98, 'word': 'apple', 'start': 0, 'end': 5}
+            
+            # Confidence Threshold
+            if item['score'] < options.min_confidence:
+                continue
+
+            # Create Entity Object
             entity = Entity(
                 text=item['word'],
-                label=item['entity_group'],
-                # Removed confidence
+                label=item['entity_group'], # "PER", "ORG", "LOC", "MISC"
                 start_char=item['start'],
                 end_char=item['end']
             )
-            entities_list.append(entity)
+            
+            # Deduplicate (e.g., don't list "Trump" 50 times)
+            # We create a simple unique signature: "Trump|PER"
+            entity_hash = f"{entity.text.lower()}|{entity.label}"
+            
+            if entity_hash not in unique_hashes:
+                entities_list.append(entity)
+                unique_hashes.add(entity_hash)
 
-        # 4. Update Result
+        # Update Result
         result.entities = entities_list
-        logger.info(f"EntityRecognizer: Found {len(entities_list)} entities.")
+        logger.info(f"EntityRecognizer: Found {len(entities_list)} unique entities.")

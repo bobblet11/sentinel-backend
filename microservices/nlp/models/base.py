@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
-from microservices.nlp.types import ArticleInput, AnalysisResult, AnalysisOptions
+from schemas import ArticleInput, AnalysisResult, AnalysisOptions
 
 class NLPComponent(ABC):
     """
