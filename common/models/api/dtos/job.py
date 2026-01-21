@@ -14,10 +14,12 @@ class JobType(StrEnum):
     
 class JobStage(StrEnum):
     INGESTED = "ingested"
+    PRIORITISED = "prioritised"
     FETCHED = "fetched HTML"
     PARSED = "parsed HTML"
     NLP_START = "started NLP"
     NLP_END = "completed NLP"
+    OUT = "out"
     
 class JobCreate(BaseModel):
     article_url: str
