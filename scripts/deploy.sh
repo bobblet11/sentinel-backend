@@ -114,6 +114,7 @@ sudo mkdir -p "$HOST_LOG_ROOT/scraper/screenshots"
 sudo mkdir -p "$HOST_LOG_ROOT/scraper_prioritiser"
 sudo mkdir -p "$HOST_LOG_ROOT/api"
 sudo mkdir -p "$HOST_LOG_ROOT/nlp_prioritiser"
+sudo mkdir -p "$HOST_LOG_ROOT/nlp"
 
 log_warn "Setting permissions of log folder"
 sudo chmod -R 777 "$HOST_LOG_ROOT"

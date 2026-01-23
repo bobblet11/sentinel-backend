@@ -1,0 +1,263 @@
+{
+  "article_id": "bbc-verify-iran-crackdown-001",
+  "doc_embedding": "[STRIPPED]",
+  "sentences": [
+    {
+      "index": 0,
+      "text": "Hundreds of photos revealing the faces of those killed during Iran's violent crackdown on anti-government protests have been leaked to BBC Verify",
+      "original_text": null,
+      "score": 0.9861562391637946,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.4557897448539734,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 4,
+      "text": "The pictures, which are too graphic to show without blurring, reveal the bloodied, swollen and bruised faces of at least 326 victims - including 18 women.",
+      "original_text": null,
+      "score": 0.7562220726645856,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.7762620449066162,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 5,
+      "text": "Many of the victims were too disfigured to be identified, and 69 people had been labelled in Persian as John or Jane Doe, suggesting their identity was unknown when the photo was taken. Only 28 of the victims had labels with clearly visible names in the photos.",
+      "original_text": null,
+      "score": 0.8406929351019407,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.7851558923721313,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 7,
+      "text": "Only 28 of the victims had labels with clearly visible names in the photos. Labels on more than 100 victims, who had their date of death recorded, showed that date as 9 January, one of the deadliest nights for protesters in Tehran so far.",
+      "original_text": null,
+      "score": 0.8721541491021974,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.612027645111084,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 8,
+      "text": "Labels on more than 100 victims, who had their date of death recorded, showed that date as 9 January, one of the deadliest nights for protesters in Tehran so far.",
+      "original_text": null,
+      "score": 0.671056344096261,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.6507784128189087,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 9,
+      "text": "The city's streets were set on fire during clashes with security forces, with protesters chanting slogans against the supreme leader and the Islamic Republic.",
+      "original_text": null,
+      "score": 0.0,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.6232894062995911,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 11,
+      "text": "The leaked photos provide a small snapshot of the thousands believed to have been killed at the hands of the Iranian state.",
+      "original_text": null,
+      "score": 0.9207759908956555,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.5574467778205872,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 12,
+      "text": "Iran's Supreme Leader Ayatollah Ali Khamenei has publicly acknowledged several thousand people have been killed but blamed the US, Israel and those he described as'seditionists'.",
+      "original_text": null,
+      "score": 0.5720439653421998,
+      "is_checkworthy": false,
+      "claim_type": "opinion",
+      "confidence": 0.45454055070877075,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 14,
+      "text": "Despite the blackout entering its third week, a small number of people have managed to get some information out. Hundreds of close-up images of victims taken from inside the Kahrizak Forensic Medical Centre were leaked to BBC Verify.",
+      "original_text": null,
+      "score": 0.6588990279775552,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.5433517098426819,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 15,
+      "text": "Close-up images of victims taken from inside the Kahrizak Forensic Medical Centre were leaked to BBC Verify. We analysed 392 photos of victims and were able to identify 326 people - some had multiple pictures taken of them from different angles.",
+      "original_text": null,
+      "score": 0.8828329111812921,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.5569665431976318,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 16,
+      "text": "We analysed 392 photos of victims and were able to identify 326 people - some had multiple pictures taken of them from different angles.",
+      "original_text": null,
+      "score": 0.6874022293111697,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.48511990904808044,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 17,
+      "text": "One source, who we are not naming for their safety, told us they weren't prepared for the level of devastation they encountered inside the mortuary complex, and said they saw victims ranging from as young as 12 or 13 to 60 and 70-year-olds.",
+      "original_text": null,
+      "score": 0.5570026096517984,
+      "is_checkworthy": false,
+      "claim_type": "question",
+      "confidence": 0.45785802602767944,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    }
+  ],
+  "claims": [],
+  "entities": [
+    {
+      "text": "iran",
+      "label": "LOC",
+      "start_char": 62,
+      "end_char": 66
+    },
+    {
+      "text": "bbc",
+      "label": "ORG",
+      "start_char": 135,
+      "end_char": 138
+    },
+    {
+      "text": "tehran",
+      "label": "LOC",
+      "start_char": 337,
+      "end_char": 343
+    },
+    {
+      "text": "persian",
+      "label": "MISC",
+      "start_char": 533,
+      "end_char": 540
+    },
+    {
+      "text": "john",
+      "label": "PER",
+      "start_char": 544,
+      "end_char": 548
+    },
+    {
+      "text": "jane doe",
+      "label": "PER",
+      "start_char": 552,
+      "end_char": 560
+    },
+    {
+      "text": "islamic republic",
+      "label": "ORG",
+      "start_char": 1010,
+      "end_char": 1026
+    },
+    {
+      "text": "reza pahlavi",
+      "label": "PER",
+      "start_char": 1076,
+      "end_char": 1088
+    },
+    {
+      "text": "shah",
+      "label": "PER",
+      "start_char": 1117,
+      "end_char": 1121
+    },
+    {
+      "text": "iranian",
+      "label": "MISC",
+      "start_char": 1234,
+      "end_char": 1241
+    },
+    {
+      "text": "bbc verify",
+      "label": "ORG",
+      "start_char": 1251,
+      "end_char": 1261
+    },
+    {
+      "text": "a",
+      "label": "PER",
+      "start_char": 1552,
+      "end_char": 1553
+    },
+    {
+      "text": "##yat",
+      "label": "PER",
+      "start_char": 1553,
+      "end_char": 1556
+    },
+    {
+      "text": "##oll",
+      "label": "PER",
+      "start_char": 1556,
+      "end_char": 1559
+    },
+    {
+      "text": "##ah ali khamenei",
+      "label": "PER",
+      "start_char": 1559,
+      "end_char": 1574
+    },
+    {
+      "text": "us",
+      "label": "LOC",
+      "start_char": 1657,
+      "end_char": 1659
+    },
+    {
+      "text": "israel",
+      "label": "LOC",
+      "start_char": 1661,
+      "end_char": 1667
+    },
+    {
+      "text": "kahrizak",
+      "label": "LOC",
+      "start_char": 1888,
+      "end_char": 1896
+    }
+  ],
+  "bias_profile": null,
+  "processing_metadata": {}
+}
