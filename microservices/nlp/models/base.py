@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
 from schemas import ArticleInput, AnalysisResult, AnalysisOptions
 
-class NLPComponent(ABC):
+class NLPComponent(ABC): 
     """
     Abstract base class for all NLP pipeline stages.
     Each component (NER, Bias, etc.) must implement 'run'.

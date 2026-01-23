@@ -228,6 +228,87 @@
             cpus: '${WEB_SCRAPER_CPU_RESERVATION:-0.5}'
             memory: '${WEB_SCRAPER_MEMORY_RESERVATION:-1G}'
       
+    nlp-prioritiser:  
+      <<: [*prioritiser-service, *common-env]
+      container_name: sentinel-nlp-prioritiser-service-container
+
+      environment:
+        - INPUT_STREAMS=background:to.be.nlp, user:to.be.nlp
+        - OUTPUT_STREAM=prioritised:to.be.nlp
+        - GROUP_NAME=default
+        - CONSUMER_NAME=nlp-prioritiser-1
+        - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.nlp
+        # performance tuning 
+        - BATCH_SIZE=${NLP_PRIORITISER_BATCH_SIZE:-100}
+        - MAX_PUBLISH_WORKERS=${NLP_PRIORITISER_MAX_PUBLISH_WORKERS:-10}
+
+      volumes:
+        - ${HOST_LOG_ROOT}/nlp_prioritiser:/app/logs
+
+      depends_on:
+        - postgres
+        - redis
+
+      profiles: 
+        - nlp-prioritiser
+
+      deploy:
+        resources:
+          limits:
+            cpus: '${PRIORITISER_CPU_LIMIT:-0.5}'
+            memory: '${PRIORITISER_MEMORY_LIMIT:-512M}'
+          reservations:
+            cpus: '${PRIORITISER_CPU_RESERVATION:-0.25}'
+            memory: '${PRIORITISER_MEMORY_RESERVATION:-256M}'
+
+    nlp-service:
+      container_name: sentinel-nlp-service-container
+      image: sentinel/nlp-service:latest
+      build: 
+        context: ../../
+        dockerfile: ./microservices/nlp/Dockerfile
+      shm_size: '${NLP_SHM_SIZE:-4gb}'
+
+      depends_on:
+        - postgres
+        - redis
+
+      profiles: 
+        - nlp
+        
+      volumes:
+        - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
+
+      restart: always
+      networks:
+        - sentinel-net
+
+      <<: *common-env
+      environment:
+        - INPUT_STREAM=prioritised:to.be.nlp
+        - USER_OUTPUT_STREAM=user:to.be.retrieval
+        - BACKGROUND_OUTPUT_STREAM=background:to.be.stored
+        - FAILURE_OUTPUT_STREAM=failure:to.be.nlp
+        - GROUP_NAME=default
+        - CONSUMER_NAME=nlp-1
+
+        # performance tuning
+        - BATCH_SIZE=${NLP_BATCH_SIZE:-10}
+        - NLP_MAX_WORKERS=${NLP_MAX_WORKERS:-2}
+        - NLP_EMBEDDING_MODEL=${NLP_EMBEDDING_MODEL}
+        - NLP_NER_MODEL=${NLP_NER_MODEL}
+        - NLP_BIAS_MODEL=${NLP_BIAS_MODEL}
+        - USE_GPU=${USE_GPU}
+
+      deploy:
+        resources:
+          limits:
+            cpus: '${NLP_SCRAPER_CPU_LIMIT:-1.0}'
+            memory: '${NLP_SCRAPER_MEMORY_LIMIT:-2G}'
+          reservations:
+            cpus: '${NLP_SCRAPER_CPU_RESERVATION:-0.5}'
+            memory: '${NLP_SCRAPER_MEMORY_RESERVATION:-1G}'
+      
   volumes:
     redis_data: {}
     postgres_data: {}

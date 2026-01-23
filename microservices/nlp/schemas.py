@@ -4,23 +4,11 @@ from typing import List, Optional, Dict, Any
 @dataclass
 class ArticleInput:
     """The raw data received by the NLP service."""
-    id: str
     text: str
     title: Optional[str] = None
     url: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
 
-@dataclass
-class AnalysisOptions:
-    """Toggles and thresholds to control the pipeline's execution."""
-    enable_bias_detection: bool = True
-    enable_ner: bool = True
-    enable_centrality: bool = True
-    enable_claim_extraction: bool = True
-    max_claims: int = 10
-    min_confidence: float = 0.75 # Updated default to match CheckWorthinessFilter
-    # If True, include high-dimensional embeddings in the final response
-    return_embeddings: bool = True 
+
 
 @dataclass
 class Entity:
@@ -86,8 +74,6 @@ class Claim:
 @dataclass
 class AnalysisResult:
     """The aggregate object containing all insights produced by the pipeline."""
-    article_id: str
-    
     # Global document-level embedding (e.g., average of sentence embeddings)
     doc_embedding: Optional[List[float]] = None
     
