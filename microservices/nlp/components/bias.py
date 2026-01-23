@@ -1,6 +1,6 @@
 import logging
-from models.base import NLPComponent
-from schemas import ArticleInput, AnalysisResult, AnalysisOptions, BiasProfile
+from microservices.nlp.models.base import NLPComponent
+from common.models.api.redis_models import Article, NLPOptions, NLPResult
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ class BiasDetector(NLPComponent):
         """
         self.model = model
 
-    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
+    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """
         Populates result with dummy bias scores.
         """

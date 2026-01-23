@@ -3,8 +3,8 @@ import numpy as np
 from typing import List
 
 # Local imports
-from models.base import NLPComponent
-from schemas import ArticleInput, AnalysisResult, AnalysisOptions
+from microservices.nlp.models.base import NLPComponent
+from common.models.api.redis_models import Article, NLPOptions, NLPResult
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class CentralityScorer(NLPComponent):
         # No specific model needed here; it operates on existing embeddings.
         pass
 
-    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
+    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """
         Assigns a centrality score (0.0 - 1.0) to each sentence based on its 
         similarity to all other sentences in the document.

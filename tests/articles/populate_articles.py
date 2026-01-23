@@ -8,7 +8,7 @@ os.environ['MAX_INGESTOR_WORKERS'] = '10'
 os.environ['REDIS_DUPLICATE_FILTER_KEY'] = ''
 os.environ['OUTPUT_STREAM'] = ''
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Dict, List
 from dataclasses import asdict
 from pydantic import TypeAdapter
 

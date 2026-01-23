@@ -19,6 +19,7 @@ class JobStage(StrEnum):
     PARSED = "parsed HTML"
     NLP_START = "started NLP"
     NLP_END = "completed NLP"
+    IN = "in"
     OUT = "out"
     
 class JobCreate(BaseModel):

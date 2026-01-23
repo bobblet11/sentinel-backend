@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Tuple
 from common.io.save_message import MessageSaver
+from common.models.api.dtos.job import JobStage
 from common.models.api.redis_models import StreamMessage
 from common.service.service_template import ProcessingError, ServiceConfig
 from microservices.web_scraper.scraper_service import ScraperService
@@ -35,8 +36,10 @@ class ScraperServiceBenchmark(ScraperService):
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
         try:
+            message.add_timestamp(JobStage.IN)
             fetched_message:StreamMessage = self._fetch_article_and_update(message)
             parsed_message:StreamMessage = self._parse_article_and_update(fetched_message)
+            message.add_timestamp(JobStage.OUT)
             self.message_saver.save_new_message(parsed_message)
             return parsed_message
         

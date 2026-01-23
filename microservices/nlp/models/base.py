@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
-from schemas import ArticleInput, AnalysisResult, AnalysisOptions
+from common.models.api.redis_models import Article, NLPOptions, NLPResult
+
 
 class NLPComponent(ABC): 
     """
@@ -8,7 +9,7 @@ class NLPComponent(ABC):
     Each component (NER, Bias, etc.) must implement 'run'.
     """
     @abstractmethod
-    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
+    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """
         Executes the component logic and updates the shared AnalysisResult in-place.
         """

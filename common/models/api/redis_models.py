@@ -1,4 +1,5 @@
 import datetime
+from datetime import timezone
 from typing import Any, List, Union, Dict, Optional
 from dataclasses import dataclass, field
 from pydantic import BaseModel
@@ -229,11 +230,11 @@ class StreamMessage:
             self.data.payload.bias_profile = nlp_result.bias_profile
             
     def add_timestamp(self, stage_name: JobStage) -> None:
-        
+        utc_now = datetime.datetime.now(datetime.timezone.utc)
         timestamp_row = MessageTimestamp(
             job_uid = self.data.header.uid,
             stage_name = stage_name.value,
-            timestamp = datetime.datetime.now().isoformat()
+            timestamp = utc_now.isoformat() 
         )
         
         self.data.stage_timestamps.append(timestamp_row)

@@ -16,17 +16,10 @@ GROUP_NAME: str = get_env_var("GROUP_NAME",str, config_logger)
 CONSUMER_NAME: str = get_env_var("CONSUMER_NAME",str, config_logger)
 NLP_MAX_WORKERS: int  = get_env_var("NLP_MAX_WORKERS",str, config_logger)
 BATCH_SIZE: int = get_env_var("BATCH_SIZE", int, config_logger)
-MAX_PUBLISH_WORKERS: int = get_env_var("MAX_PUBLISH_WORKERS", int, config_logger)
 
-# Embedding Model: optimized for semantic search (384 dimensions)
-# Matches the 'vector(384)' requirement for pgvector
 EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, "all-MiniLM-L6-v2") 
-# NER Model: Standard BERT-based NER
 NER_MODEL = get_env_var("NLP_NER_MODEL", str, config_logger, "dslim/bert-base-NER") 
-# Bias/Zero-Shot Model: For political leaning and tone
-# 'facebook/bart-large-mnli' is great for zero-shot classification
 BIAS_MODEL = get_env_var("NLP_BIAS_MODEL", str, config_logger, "facebook/bart-large-mnli") 
-# Device selection (cuda if available, else cpu)
 DEVICE = "cuda" if get_env_var("USE_GPU", str, config_logger, "false").lower() == "true" else "cpu"
 
 input_source:str = INPUT_STREAM
