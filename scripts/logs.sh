@@ -58,6 +58,9 @@ DOCKER_COMPOSE_ARGS=(
 
 )
 
+log_info "Using environment file for substitution: $ENV_FILE"
+DOCKER_COMPOSE_ARGS+=("--env-file" "$ENV_FILE")
+
 if [ -f "$OVERRIDE_FILE" ]; then
     log_info "Override file found at '$OVERRIDE_FILE', adding to command."
     DOCKER_COMPOSE_ARGS+=("-f" "$OVERRIDE_FILE")
