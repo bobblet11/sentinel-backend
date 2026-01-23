@@ -3,20 +3,13 @@ import hashlib
 import logging
 
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
-from common.models.api.redis_models import Message, MessageHeader, MessagePayload, MessageTimestamp
+from common.models.api.redis_models import Article, Message, MessageHeader, MessagePayload, MessageTimestamp
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
 from dataclasses import dataclass
 from typing import Iterator, Dict, Set, List, Any
 
-
-@dataclass(frozen=True)
-class Article:
-    link: str
-    source: str | None = None
-    title : str | None = None
-    summary : str | None = None
 class BaseIngestor:
     """
     A base class that defines the template for an ingestion workflow.

@@ -1,6 +1,6 @@
 import datetime
 from typing import Any, List, Union, Dict, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pydantic import BaseModel
 
 from common.models.api.dtos.job import JobStage
@@ -28,6 +28,25 @@ In redis, each message looks like this
 """
 
 #redis message wraps a message/job object
+@dataclass
+class NLPOptions:
+    """Toggles and thresholds to control the pipeline's execution."""
+    enable_bias_detection: bool = True
+    enable_ner: bool = True
+    enable_centrality: bool = True
+    enable_claim_extraction: bool = True
+    max_claims: int = 10
+    min_confidence: float = 0.75 # Updated default to match CheckWorthinessFilter
+    # If True, include high-dimensional embeddings in the final response
+    return_embeddings: bool = True 
+    
+@dataclass(frozen=True)
+class Article:
+    link: str
+    source: str | None = None
+    title : str | None = None
+    summary : str | None = None
+    text: str | None = None
 
 class MessageTimestamp(BaseModel):
     """
@@ -48,6 +67,63 @@ class MessageHeader(BaseModel):
     created_at: str
 
 
+
+@dataclass
+class ParseResult:
+    text: str
+    title: Optional[str]
+    author: Optional[str]
+    published_at: Optional[str]
+    
+    def __getitem__(self, key):
+        return getattr(self, key, None)
+    
+    def __setitem__(self, key, value):
+        if hasattr(self, key):
+            setattr(self, key, value)
+        else:
+            raise KeyError(f"{key} is not a valid field")
+
+        
+@dataclass
+class Entity:
+    """A named entity (Person, Organization, Location) found in the text."""
+    entity_text: str
+    type_of_entity: str
+    start_char: int
+    end_char: int
+    
+    
+@dataclass
+class Claim:
+    """
+    A specific factual claim extracted for verification.
+    This is usually a filtered subset of SentenceScore objects, formatted for DB storage.
+    """
+    confidence: float
+    source_sentence_indices: List[int] # which sentences are used to form the claim
+    contextualised_claim_text: str
+    decontextualised_claim_text: Optional[str] = None
+    decontextualised_claim_embedding: Optional[List[float]] = None
+    NER_entities: List[Entity] = field(default_factory=list)
+
+
+@dataclass
+class BiasProfile:
+    """Result of political and emotional bias analysis."""
+    political_bias: str  # e.g., "Left", "Center", "Right"
+    confidence: float
+    scores: Dict[str, float]  # e.g., {"left": 0.1, "right": 0.8}
+    emotional_tone: Optional[str] = None
+
+
+@dataclass
+class NLPResult:
+    """The aggregate object containing all insights produced by the pipeline."""
+    claims_in_article: List[Claim] = field(default_factory=list)
+    entities_in_article: List[Entity] = field(default_factory=list)
+    bias_profile: Optional[BiasProfile] = None
+
 class MessagePayload(BaseModel):
     """
     Represents the payload between ingestor and web scraper service
@@ -65,25 +141,11 @@ class MessagePayload(BaseModel):
     parsed_text: str    | None     = None
     
     #nlp
+    claims_in_article: List[Claim] = field(default_factory=list)
+    entities_in_article: List[Entity] = field(default_factory=list)
+    bias_profile: Optional[BiasProfile] = None
     
     
-@dataclass
-class ParseResult:
-    text: str
-    title: Optional[str]
-    author: Optional[str]
-    published_at: Optional[str]
-    
-    def __getitem__(self, key):
-        return getattr(self, key, None)
-    
-    def __setitem__(self, key, value):
-        if hasattr(self, key):
-            setattr(self, key, value)
-        else:
-            raise KeyError(f"{key} is not a valid field")
-        
-
 class Message(BaseModel):
     """
     Represents the actual message data type passed through a message queue
@@ -118,6 +180,22 @@ class StreamMessage:
     @property
     def text(self) -> Optional[str]:
         return self.data.payload.parsed_text
+    
+    @property
+    def title(self) -> Optional[str]:
+        return self.data.payload.title
+    
+    @property
+    def all_claims(self) -> Optional[List[Claim]]:
+        return self.data.payload.claims_in_article
+    
+    @property
+    def all_entities(self) -> Optional[List[Entity]]:
+        return self.data.payload.entities_in_article
+    
+    @property
+    def bias_result(self) -> Optional[BiasProfile]:
+        return self.data.payload.bias_profile
 
     
     def set_raw_html(self, page_html: str) -> None:
@@ -137,6 +215,18 @@ class StreamMessage:
             
         if not self.data.payload.publish_date and parsed_result.published_at:
             self.data.payload.publish_date = parsed_result.published_at
+            
+    def set_nlp_result(self, nlp_result: NLPResult) -> None:
+        """Unpacks a ParseResult object and updates the message payload."""
+        # Use dot notation on the ParseResult object for clarity and safety
+        if not self.data.payload.claims_in_article and nlp_result.claims_in_article:
+            self.data.payload.claims_in_article = nlp_result.claims_in_article
+            
+        if not self.data.payload.entities_in_article and nlp_result.entities_in_article:
+            self.data.payload.entities_in_article = nlp_result.entities_in_article
+            
+        if not self.data.payload.bias_profile and nlp_result.bias_profile:
+            self.data.payload.bias_profile = nlp_result.bias_profile
             
     def add_timestamp(self, stage_name: JobStage) -> None:
         
