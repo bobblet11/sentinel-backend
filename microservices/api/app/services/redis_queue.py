@@ -27,7 +27,7 @@ def publish_job(job: Job, article: Article, job_dto: JobCreate)->None:
                     		uid=str(job.uid),
 				created_at=datetime.datetime.now().isoformat(),
 				status=JobStatus.PENDING,
-				type=JobType.USER.value,
+				type=job.type,
 			),
 			payload=payload,
 			stage_timestamps=[

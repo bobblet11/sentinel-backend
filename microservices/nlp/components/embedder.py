@@ -4,8 +4,8 @@ from typing import Any, List
 from sentence_transformers import SentenceTransformer
 
 # Local imports
-from models.base import NLPComponent
-from schemas import ArticleInput, AnalysisResult, AnalysisOptions
+from microservices.nlp.models.base import NLPComponent
+from common.models.api.redis_models import Article, NLPOptions, NLPResult
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class Embedder(NLPComponent):
                 logger.error(f"Embedder: Failed to load model: {e}")
                 raise
 
-    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
+    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """
         Generates embeddings for all sentences in result.sentences.
         Updates result.sentences[i].embedding.

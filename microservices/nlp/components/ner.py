@@ -3,8 +3,8 @@ from typing import Any, List
 from transformers import pipeline
 
 # Local imports
-from models.base import NLPComponent
-from schemas import ArticleInput, AnalysisResult, AnalysisOptions, Entity
+from microservices.nlp.models.base import NLPComponent
+from common.models.api.redis_models import Article, NLPOptions, NLPResult
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class EntityRecognizer(NLPComponent):
                 logger.error(f"EntityRecognizer: Failed to load model: {e}")
                 raise
 
-    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
+    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """
         Extracts entities from the text and updates result.entities.
         """

@@ -3,8 +3,8 @@ import torch
 from typing import Any, List
 
 # Local imports
-from models.base import NLPComponent
-from schemas import ArticleInput, AnalysisResult, AnalysisOptions
+from microservices.nlp.models.base import NLPComponent
+from common.models.api.redis_models import Article, NLPOptions, NLPResult
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class Decontextualizer(NLPComponent):
                 logger.error(f"Decontextualizer: Failed to load model: {e}")
                 raise
 
-    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
+    def run(self, article: Article, result: NLPOptions, options: NLPResult) -> None:
         """
         Iterates through sentences and rewrites them using previous sentences as context.
         Updates result.sentences[i].text in-place.

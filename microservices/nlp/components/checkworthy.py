@@ -3,8 +3,8 @@ import torch
 from typing import Any, List
 
 # Local imports
-from models.base import NLPComponent
-from schemas import ArticleInput, AnalysisResult, AnalysisOptions
+from microservices.nlp.models.base import NLPComponent
+from common.models.api.redis_models import Article, NLPOptions, NLPResult
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class CheckWorthinessFilter(NLPComponent):
                 logger.error(f"CheckWorthinessFilter: Failed to load model: {e}")
                 raise
 
-    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
+    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """
         Classifies each sentence in result.sentences.
         Adds 'is_checkworthy', 'claim_type', and 'confidence' attributes to the sentence objects.

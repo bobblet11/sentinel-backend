@@ -5,8 +5,8 @@ import numpy as np
 from typing import List, Set, Tuple
 
 # Local imports
-from models.base import NLPComponent
-from schemas import ArticleInput, AnalysisResult, AnalysisOptions
+from microservices.nlp.models.base import NLPComponent
+from common.models.api.redis_models import Article, NLPOptions, NLPResult
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class Deduplicator(NLPComponent):
         
         return True, "Safe"
 
-    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
+    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """
         Filters result.sentences in-place using Hybrid Deduplication.
         """

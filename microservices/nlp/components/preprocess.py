@@ -3,8 +3,8 @@ import spacy
 from typing import List
 
 # Local imports
-from models.base import NLPComponent
-from schemas import ArticleInput, AnalysisResult, AnalysisOptions, SentenceScore
+from microservices.nlp.models.base import NLPComponent
+from common.models.api.redis_models import Article, NLPOptions, NLPResult
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,8 @@ class Preprocessor(NLPComponent):
             logger.error("Spacy model 'en_core_web_sm' not found. Run: python -m spacy download en_core_web_sm")
             raise
 
-    def run(self, article: ArticleInput, result: AnalysisResult, options: AnalysisOptions) -> None:
+
+    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """
         Cleans the input text, splits it into sentences using Spacy, and populates result.sentences.
         """

@@ -26,6 +26,8 @@ class JobCreate(BaseModel):
     title: str | None = None
     news_outlet: str | None = None
     summary: str  | None = None
+    
+    is_background: bool = False
 
 class JobResponse(BaseModel):
     id: int

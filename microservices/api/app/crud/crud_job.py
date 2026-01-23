@@ -11,8 +11,8 @@ def create_job(db: Session, job_in: JobCreate, article_id: int)->Job:
     db_obj = Job(
         uid = uid,
         article_id = article_id,
-        type = JobType.USER.value,
-        status = JobStatus.PENDING.value
+        type = JobType.USER.value if not job_in.is_background else JobType.BACKGROUND.value,
+        status = JobStatus.PENDING.value 
     )
 
 

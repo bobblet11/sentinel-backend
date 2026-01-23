@@ -102,10 +102,12 @@ class ScraperService(ServiceTemplate):
             raise e
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
+        
         try:
+            message.add_timestamp(JobStage.IN)
             fetched_message:StreamMessage = self._fetch_article_and_update(message)
             parsed_message:StreamMessage = self._parse_article_and_update(fetched_message)
-            
+            message.add_timestamp(JobStage.OUT)
             return parsed_message
         
         except FailedToFetch as e:

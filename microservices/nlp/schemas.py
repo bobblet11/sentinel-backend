@@ -18,6 +18,7 @@ class Entity:
     start_char: int
     end_char: int
 
+
 @dataclass
 class SentenceScore:
     """
