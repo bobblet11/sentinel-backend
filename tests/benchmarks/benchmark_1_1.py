@@ -12,7 +12,7 @@ class Benchmark_1(BenchmarkTemplate):
 		
 	def execute(self):
 		jobs = self.load_articles(1,0,offset=0)
-		self._submit_jobs_concurrently(jobs,max_workers=max(len(jobs), 10))
+		self._submit_jobs_concurrently(jobs,max_workers=max(len(jobs), 1))
 
 
 

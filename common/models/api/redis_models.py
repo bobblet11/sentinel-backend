@@ -1,5 +1,6 @@
 import datetime
 from datetime import timezone
+import time
 from typing import Any, List, Union, Dict, Optional
 from dataclasses import dataclass, field
 from pydantic import BaseModel
@@ -48,14 +49,16 @@ class Article:
     title : str | None = None
     summary : str | None = None
     text: str | None = None
-
+    
+job_start_mono = time.monotonic()
 class MessageTimestamp(BaseModel):
     """
     Represents the timestamp of a stage
     """
     job_uid: str
     stage_name: str
-    timestamp: str
+    wall_time: str
+    offset_s: float
 class MessageHeader(BaseModel):
     """
     Represents the basic information used to identify and get stats on Messages
@@ -230,11 +233,29 @@ class StreamMessage:
             self.data.payload.bias_profile = nlp_result.bias_profile
             
     def add_timestamp(self, stage_name: JobStage) -> None:
-        utc_now = datetime.datetime.now(datetime.timezone.utc)
+        
+        
+        wall = datetime.datetime.now(datetime.timezone.utc)
+        offset = time.monotonic() - job_start_mono
+
         timestamp_row = MessageTimestamp(
             job_uid = self.data.header.uid,
             stage_name = stage_name.value,
-            timestamp = utc_now.isoformat() 
+            wall_time = wall.isoformat(),
+            offset_s = offset
         )
-        
+
         self.data.stage_timestamps.append(timestamp_row)
+        
+def add_timestamp_to_message(message:Message, stage_name: JobStage) -> Message:
+    wall = datetime.datetime.now(datetime.timezone.utc)
+    offset = time.monotonic() - job_start_mono
+
+    timestamp_row = MessageTimestamp(
+        job_uid = message.header.uid,
+        stage_name = stage_name.value,
+        wall_time = wall.isoformat(),
+        offset_s = offset
+    )
+    message.stage_timestamps.append(timestamp_row)
+    return message

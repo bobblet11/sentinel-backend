@@ -15,8 +15,10 @@ class JobType(StrEnum):
 class JobStage(StrEnum):
     INGESTED = "ingested"
     PRIORITISED = "prioritised"
-    FETCHED = "fetched HTML"
-    PARSED = "parsed HTML"
+    FETCHED_IN = "starting fetch HTML"
+    FETCHED_OUT = "ending fetch HTML"
+    PARSED_IN = "starting parsing HTML"
+    PARSED_OUT = "ending parsing HTML"
     NLP_START = "started NLP"
     NLP_END = "completed NLP"
     IN = "in"

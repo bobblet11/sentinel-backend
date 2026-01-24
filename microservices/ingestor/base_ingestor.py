@@ -3,7 +3,7 @@ import hashlib
 import logging
 
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
-from common.models.api.redis_models import Article, Message, MessageHeader, MessagePayload, MessageTimestamp
+from common.models.api.redis_models import Article, Message, MessageHeader, MessagePayload, MessageTimestamp, add_timestamp_to_message
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
@@ -78,19 +78,15 @@ class BaseIngestor:
                 header=MessageHeader(
                     id=None,
                     uid=job_uid,
-                    created_at=datetime.datetime.now().isoformat(),
+                    created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                     status=JobStatus.PENDING.value,
                     type=JobType.BACKGROUND.value,
                 ),
                 payload=payload,
-                stage_timestamps=[
-                    MessageTimestamp(
-                        job_uid=job_uid,
-                        stage_name=JobStage.INGESTED.value,
-                        timestamp=datetime.datetime.now().isoformat(),
-                    )
-                ]
+                stage_timestamps=[]
             )
+            
+            message = add_timestamp_to_message(message=message, stage_name=JobStage.INGESTED)
             
             message_as_dict = message.model_dump()
             messages_to_publish.append(message_as_dict)

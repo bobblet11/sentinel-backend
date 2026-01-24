@@ -63,7 +63,6 @@ class ScraperService(ServiceTemplate):
             
             self.logger.debug(f"Successfully fetched HTML for {article_url}, length: {len(article_html)}")
             message.set_raw_html(article_html)
-            message.add_timestamp(JobStage.FETCHED)
             return message
         
         except Exception as e:
@@ -93,7 +92,6 @@ class ScraperService(ServiceTemplate):
             
             self.logger.debug(parsed_result)
             message.set_parsed_result(parsed_result)
-            message.add_timestamp(JobStage.PARSED)
             self.logger.debug("HERE")
             return message
         except Exception as e:
@@ -105,8 +103,14 @@ class ScraperService(ServiceTemplate):
         
         try:
             message.add_timestamp(JobStage.IN)
+            
+            message.add_timestamp(JobStage.FETCHED_IN)
             fetched_message:StreamMessage = self._fetch_article_and_update(message)
+            message.add_timestamp(JobStage.FETCHED_OUT)
+            message.add_timestamp(JobStage.PARSED_IN)
             parsed_message:StreamMessage = self._parse_article_and_update(fetched_message)
+            message.add_timestamp(JobStage.PARSED_OUT)
+            
             message.add_timestamp(JobStage.OUT)
             return parsed_message
         
