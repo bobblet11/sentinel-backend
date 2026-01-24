@@ -18,7 +18,7 @@ class BenchmarkResults():
         total_time_elapsed:float
 
 TOTAL_ARTICLES_IN_POOL:int = 7372
-API_URL = "http://192.168.56.1:8001/api/v1/jobs"
+API_URL = "http://192.168.0.101:8001/api/v1/jobs"
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://sentinel_user:your_secure_password@localhost:5432/sentinel_db")
 POLL_INTERVAL_S = 0.5
 ARTICLES_PATH = Path("tests/articles/articles.jsonl")
@@ -91,7 +91,7 @@ class BenchmarkTemplate(ABC):
    
 		with open(str(ARTICLES_PATH), 'r') as file:
 			for current_line_num, line in enumerate(file, start=1):
-				if current_line_num < offset:
+				if current_line_num <= offset:
 					continue
 				if current_line_num <= offset + no_user_articles:
 					user_articles.append(json.loads(line))

@@ -37,8 +37,14 @@ class ScraperServiceBenchmark(ScraperService):
     def _process_message(self, message: StreamMessage) -> StreamMessage:
         try:
             message.add_timestamp(JobStage.IN)
+            
+            message.add_timestamp(JobStage.FETCHED_IN)
             fetched_message:StreamMessage = self._fetch_article_and_update(message)
+            message.add_timestamp(JobStage.FETCHED_OUT)
+            message.add_timestamp(JobStage.PARSED_IN)
             parsed_message:StreamMessage = self._parse_article_and_update(fetched_message)
+            message.add_timestamp(JobStage.PARSED_OUT)
+            
             message.add_timestamp(JobStage.OUT)
             self.message_saver.save_new_message(parsed_message)
             return parsed_message
@@ -57,5 +63,8 @@ class ScraperServiceBenchmark(ScraperService):
             return "0","0"
 
         except Exception as e:
-            self.logger.error(e)
+            # Catch any exception, including ProcessingError, and route to failure.
+            self._handle_failure(message, e)
+            # Raise it again so as_completed knows the future failed
             raise
+	

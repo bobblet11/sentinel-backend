@@ -17,12 +17,11 @@ def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
         new_article: Article = create_article(db=db, job_in=job_in)
         new_job: Job = create_job(db=db, job_in=job_in, article_id=new_article.id)
         
-        # All database operations are prepared. Now, commit them as one transaction.
-        db.commit() 
-    
         # Only publish to Redis if the database commit was successful.
         publish_job(new_job, new_article, job_in)
         
+        # All database operations are prepared. Now, commit them as one transaction.
+        db.commit() 
         return new_job
 
     except IntegrityError as e:
