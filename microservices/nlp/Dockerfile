@@ -13,6 +13,10 @@ RUN apt-get update && apt-get install -y cron && \
     python -m spacy download en_core_web_sm && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
     
+
+RUN python3 -m spacy download en_core_web_sm
+RUN python3 -c 'import torch; print(torch.cuda.is_available())'
+
 # Step 5: Copy the rest of your application's source code.
 COPY microservices/nlp/ /app/microservices/nlp
 
