@@ -12,7 +12,7 @@ dependencies:
     # --- Core Data Science Libraries ---
   - numpy
   - pandas
-
+  - matplotlib
 
   - pip:
     # Code Quality & Formatting
