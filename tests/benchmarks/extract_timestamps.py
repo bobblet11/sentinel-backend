@@ -4,11 +4,11 @@ from typing import List
 
 
 KEY = "scrape_group"
-BENCHMARK_RESULT_1 = Path("tests/logs/benchmark-1-1.json")
-BENCHMARK_RESULT_2 = Path("tests/logs/benchmark-1-2.json")
-BENCHMARK_RESULT_3 = Path("tests/logs/benchmark-1-3.json")
+BENCHMARK_RESULT_1 = Path("tests/logs/benchmark_1_1.json")
+BENCHMARK_RESULT_2 = Path("tests/logs/benchmark_1_2.json")
+BENCHMARK_RESULT_3 = Path("tests/logs/benchmark_1_3.json")
 
-def load_results(result_path:Path)-> List:
+def extract_timestamps(result_path:Path)-> List:
         
 	timestamps = []
 	file_data = None
@@ -30,6 +30,6 @@ def load_results(result_path:Path)-> List:
 		json.dump(new_data, file, indent=4)
         
 if __name__ == "__main__":
-        load_results(BENCHMARK_RESULT_1)
-        load_results(BENCHMARK_RESULT_2)
-        load_results(BENCHMARK_RESULT_3)
+        extract_timestamps(BENCHMARK_RESULT_1)
+        extract_timestamps(BENCHMARK_RESULT_2)
+        extract_timestamps(BENCHMARK_RESULT_3)
