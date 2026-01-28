@@ -10,8 +10,9 @@ COPY microservices/nlp/requirements.txt .
 # Step 4: Install cron and python packages
 RUN apt-get update && apt-get install -y cron && \
     pip install --no-cache-dir -r requirements.txt && \
+    python -m spacy download en_core_web_sm && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
-
+    
 # Step 5: Copy the rest of your application's source code.
 COPY microservices/nlp/ /app/microservices/nlp
 
