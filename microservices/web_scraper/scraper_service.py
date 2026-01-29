@@ -104,12 +104,15 @@ class ScraperService(ServiceTemplate):
         try:
             message.add_timestamp(JobStage.IN)
             
-            message.add_timestamp(JobStage.FETCHED_IN)
-            fetched_message:StreamMessage = self._fetch_article_and_update(message)
-            message.add_timestamp(JobStage.FETCHED_OUT)
-            message.add_timestamp(JobStage.PARSED_IN)
-            parsed_message:StreamMessage = self._parse_article_and_update(fetched_message)
-            message.add_timestamp(JobStage.PARSED_OUT)
+            if not message.html:
+                message.add_timestamp(JobStage.FETCHED_IN)
+                fetched_message:StreamMessage = self._fetch_article_and_update(message)
+                message.add_timestamp(JobStage.FETCHED_OUT)
+                
+            if not message.text:
+                message.add_timestamp(JobStage.PARSED_IN)
+                parsed_message:StreamMessage = self._parse_article_and_update(fetched_message)
+                message.add_timestamp(JobStage.PARSED_OUT)
             
             message.add_timestamp(JobStage.OUT)
             return parsed_message
