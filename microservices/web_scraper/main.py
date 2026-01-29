@@ -26,7 +26,7 @@ if __name__ == "__main__":
     routing_map = {JobType.USER.value: USER_OUTPUT_STREAM, JobType.BACKGROUND.value: BACKGROUND_OUTPUT_STREAM}
     
     config = ServiceConfig(max_workers=SCRAPER_MAX_WORKERS, service_name=SERVICE_NAME, input_streams=[INPUT_STREAM], group_name=GROUP_NAME, consumer_name=CONSUMER_NAME, failure_output_stream=FAILURE_OUTPUT_STREAM, routing_map=routing_map,is_concurrent=True, batch_size=BATCH_SIZE )
-    scraper_service = ScraperServiceBenchmark(config)
+    scraper_service = ScraperService(config)
     signal.signal(signal.SIGINT, scraper_service.shutdown)
     signal.signal(signal.SIGTERM, scraper_service.shutdown)
     scraper_service.run()
