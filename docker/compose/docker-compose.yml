@@ -41,11 +41,23 @@
       container_name: sentinel-postgres-container
       image: pgvector/pgvector:pg15
       ports:
-        - "${POSTGRES_PORT:-5432}:5432"
+        - "${POSTGRES_PORT}:5432"
+      environment:
+        POSTGRES_USER: ${POSTGRES_USER}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        POSTGRES_DB: ${POSTGRES_DB}
+        POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
       volumes:
         - postgres_data:/var/lib/postgresql/data
-        - ${HOST_ROOT}/microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
-
+        # --- INJECT INIT SQL INTO DB
+        # Note: On Docker Desktop for Mac, uncomment below and add /workspaces to Docker -> Preferences -> Resources -> File Sharing
+        # - ${HOST_ROOT}/microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # healthcheck:
+      #   test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      #   interval: 10s
+      #   timeout: 5s
+      #   retries: 5
+      <<: *common-env
       restart: unless-stopped
       networks:
         - sentinel-net
@@ -75,8 +87,9 @@
       profiles: 
         - api
 
-      volumes:
-        - ${HOST_LOG_ROOT}/api:/app/logs
+      # volumes:
+        # Note: On Docker Desktop for Mac, uncomment below and add /workspaces to Docker -> Preferences -> Resources -> File Sharing
+        # - ${HOST_LOG_ROOT}/api:/app/logs
         
       ports:
         - "${API_SERVICE_PORT:-8001}:8001"
