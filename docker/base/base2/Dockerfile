@@ -37,7 +37,3 @@ RUN pip install --no-cache-dir -r core-requirements.txt
 # Step 6: Install the foundational Python packages.
 COPY common/requirements.txt /app/common/requirements.txt
 RUN pip install --no-cache-dir -r /app/common/requirements.txt
-
-# Step 7: Copy the shared common code.
-COPY common/ /app/common/
-

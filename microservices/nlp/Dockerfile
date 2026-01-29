@@ -19,6 +19,7 @@ RUN python3 -c 'import torch; print(torch.cuda.is_available())'
 
 # Step 5: Copy the rest of your application's source code.
 COPY microservices/nlp/ /app/microservices/nlp
+COPY common/ /app/common/
 
 # Step 7: Define the command to run your application.
 CMD ["python", "-m", "microservices.nlp.main"]
