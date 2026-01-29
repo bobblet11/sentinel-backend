@@ -6,14 +6,9 @@ from common.redis_client.publisher import RedisPublisher
 from common.models.api.redis_models import StreamMessage
 from dataclasses import dataclass
 
-from .config import (
-    BATCH_SIZE,
-    CONSUMER_NAME,
-    GROUP_NAME,
-    INPUT_STREAMS,
-    MAX_PUBLISH_WORKERS,    #unused cse sequential now
-    OUTPUT_STREAM,
-)
+from common.service.service_template import RoutingError, ServiceConfig, ServiceTemplate
+
+
 
 PRIORITY_MAP = {
     "user": 1,
@@ -24,101 +19,56 @@ PRIORITY_MAP = {
 LOWEST_PRIORITY: float = float("inf")
 SERVICE_NAME="prioritiser"
 
-class PrioritiserService:
+class PrioritiserService(ServiceTemplate):
     """Sequentially prioritises messages based on whether they are user or background jobs"""
-    def __init__(self) -> None:
-        self.logger: Logger = getLogger(SERVICE_NAME)
-        self.keep_running = True
-        self.combiner = RedisConsumerCombiner(
-            streams=INPUT_STREAMS, group_name=GROUP_NAME, consumer_name=CONSUMER_NAME
-        )
-        self.publisher = RedisPublisher(stream_name=OUTPUT_STREAM)
+    def __init__(self, config:ServiceConfig) -> None:
+        super().__init__(config)
     
-    def shutdown(self, *args) -> None:
-        """Signal handler to initiate a graceful shutdown."""
-        self.logger.info("\nShutdown signal received. Finishing current batch...")
-        self.keep_running = False
+    def _process_message(self, message: StreamMessage) -> StreamMessage:
+        # The "processing" for this service is a no-op on individual messages.
+        # The main logic is in the overridden batch method.
+        return message
 
-    def _parse_message(self, raw_msg: Dict[str, Any]) -> StreamMessage:
-        """Converts raw Redis dict to a typed Dataclass and calculates priority."""
-        msg_data = raw_msg.get("data", {})
-        msg_type = msg_data.get("header", {}).get("type")
-        
-        # Calculate priority once during parsing
-        priority = PRIORITY_MAP.get(msg_type, LOWEST_PRIORITY)
-        
-        return StreamMessage(
-            stream=raw_msg["stream"],
-            redis_id=raw_msg["redis_message_id"],
-            data=msg_data,
-            priority=priority
-        )
-    
-    def _process_batch(self, raw_messages: List[Dict[str, Any]]) -> int:
-        # 2. Parse and Prioritize
-        self.logger.info(f"Fetched {len(raw_messages)} messages. Prioritising...")
-        stream_messages: List[StreamMessage] = [self._parse_message(m) for m in raw_messages]
-        stream_messages.sort(key=lambda m: m.priority)
-        
-        
-        self.logger.info(f"Publishing {len(stream_messages)} messages concurrently...")
+    def _process_batch_sequentially(self, raw_messages: List[Dict[str, Any]]):
+        stream_messages: List[StreamMessage] = [msg for m in raw_messages if (msg := self._parse_message(m))]
+        try:
+            stream_messages.sort(key=lambda m: m.priority)
+        except Exception as e:
+            #entire batch fails
+            self._handle_failure_batch(stream_messages, e)
+            return
 
-        # 3. Publish and Ack
-        if stream_messages:
-            payloads: List[Dict, Any] = [message.data for message in stream_messages]
-            published_ids: List[str] = self.publisher.publish_many(payloads)
-            if published_ids:
-                ack_count = 0
-            
-            for original_msg in stream_messages:
-                self.combiner.acknowledge(original_msg.stream, original_msg.redis_id)
+        payloads_to_publish: List[Dict[str, Any]] = []
+        payload_to_message_map: Dict[int, StreamMessage] = {}
+
+        for msg in stream_messages:
+            payload = msg.data.model_dump()
+            payload_to_message_map[id(payload)] = msg 
+            payloads_to_publish.append(payload)
+
+        if not payloads_to_publish:
+            self.logger.info("No messages were successfully processed to be published.")
+            return
+
+        publish_results = self.success_publish_router.publish_many(payloads_to_publish)
+        ack_count = 0
+        failure_count = 0
+        unroutable_payloads = publish_results.get("unroutable", [])
+        unroutable_payload_ids = {id(p) for p in unroutable_payloads}
+
+        for payload_id, original_message in payload_to_message_map.items():
+            if payload_id in unroutable_payload_ids:
+                self._handle_failure(
+                    original_message, 
+                    RoutingError("Message was unroutable; no valid key in routing map")
+                )
+                failure_count += 1
+            else:
+                self.message_consumer.acknowledge(original_message.stream, original_message.redis_id)
                 ack_count += 1
-            
-            self.logger.info(
-                f"Batch Complete: Published and Acked {ack_count} messages."
-            )
-        else:
-            self.logger.error(
-                "Batch Publish Failed. RedisPublisher returned None. "
-                "Messages will NOT be acknowledged and will be re-delivered."
-            )
 
-        
-    def run(self) -> None:
-        """
-        Main execution loop. Fetches and processes messages sequentially.
-        """
-        self.logger.info(f"Service started. Listening on {INPUT_STREAMS}")
+        if ack_count > 0:
+            self.logger.info(f"Successfully published and acknowledged {ack_count} routable messages.")
 
-        while self.keep_running:
-            try:
-                
-                # 0. Check & deal with pending messagess
-                self.logger.info(f"Checking for pending messages...")
-                pending_messages = self.combiner.consume_pending()
-
-                if pending_messages:
-                    self.logger.info(f"Found {len(pending_messages)} pending messages. Processing them...")
-                    self._process_batch(pending_messages)
-
-                
-                # 1. Fetch
-                self.logger.info(f"Waiting for up to {BATCH_SIZE} messages...")
-                raw_messages:List[Dict[str, Any]] = []
-                while True:
-                    raw_messages = self.combiner.consume_many(
-                        num_to_consume=BATCH_SIZE, block=2000
-                    )
-                    if not raw_messages:
-                        time.sleep(2)
-                        continue
-                    break
-                
-                self.logger.info(f"Found {len(raw_messages)} messages. Processing them...")
-                self._process_batch(raw_messages)
-               
-            except Exception as e:
-                self.logger.error(f"Unexpected error in main loop {e}")
-                self.shutdown()
-                
-        self.logger.info("SHUTTING DOWN")
+        if failure_count > 0:
+            self.logger.info(f"Handled {failure_count} unroutable messages by sending to failure stream.")
