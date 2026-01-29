@@ -125,7 +125,8 @@ class ServiceTemplate(ABC):
 		"""Worker for concurrent mode. Processes, then publishes."""
 		try:
 			processed_message:StreamMessage = self._process_message(message)
-			new_redis_id = self.success_publish_router.publish_one(processed_message.data)
+			payload = processed_message.data.model_dump()
+			new_redis_id = self.success_publish_router.publish_one(payload)
    
 			if not new_redis_id:
 				raise ProcessingError("Publisher returned an empty ID.")
