@@ -10,6 +10,8 @@ from microservices.api.app.services.redis_queue import publish_job
 from sqlalchemy.orm import Session
 router = APIRouter()
 
+# Accept both /jobs and /jobs/ to avoid 307 redirects
+@router.post("", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 @router.post("/", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
     try:
