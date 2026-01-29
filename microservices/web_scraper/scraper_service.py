@@ -76,6 +76,7 @@ class ScraperService(ServiceTemplate):
             if not article_url:
                 self.logger.error(f"No link on this message {message}")
                 raise FailedToParse("No link on this message")
+            
             if not article_html:
                 self.logger.error(f"No html on this message {message}")
                 raise FailedToParse("No html on this message")
@@ -106,16 +107,16 @@ class ScraperService(ServiceTemplate):
             
             if not message.html:
                 message.add_timestamp(JobStage.FETCHED_IN)
-                fetched_message:StreamMessage = self._fetch_article_and_update(message)
+                message:StreamMessage = self._fetch_article_and_update(message)
                 message.add_timestamp(JobStage.FETCHED_OUT)
                 
             if not message.text:
                 message.add_timestamp(JobStage.PARSED_IN)
-                parsed_message:StreamMessage = self._parse_article_and_update(fetched_message)
+                message:StreamMessage = self._parse_article_and_update(message)
                 message.add_timestamp(JobStage.PARSED_OUT)
             
             message.add_timestamp(JobStage.OUT)
-            return parsed_message
+            return message
         
         except FailedToFetch as e:
             raise ProcessingError(f"Failed to fetch {message.link}: {e}")

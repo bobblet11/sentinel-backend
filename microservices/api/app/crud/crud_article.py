@@ -7,7 +7,8 @@ from microservices.api.app.core.logger import logger
 def create_article(db: Session, job_in: JobCreate)->Article:
     db_obj = Article(
         url = job_in.article_url,
-        html = job_in.article_html
+        html = job_in.article_html,
+        text = job_in.article_text
     )
 
     db.add(db_obj)
