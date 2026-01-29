@@ -1,4 +1,7 @@
 dependencies:
+  # --- Core Python ---
+  - python=3.12
+
   # --- Application Runtime Dependencies ---
   - fastapi
   - pydantic

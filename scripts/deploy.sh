@@ -44,9 +44,11 @@ log_warn "Creating log folders"
 
 if [ -n "${LOCAL_WORKSPACE_FOLDER:-}" ]; then
     log_info "Detected Dev Container. Using Host Path."
+    HOST_ROOT="${LOCAL_WORKSPACE_FOLDER}"
     HOST_LOG_ROOT="${LOCAL_WORKSPACE_FOLDER}/logs"
 else
     log_info "No Dev Container"
+    HOST_ROOT="$PROJECT_ROOT"
     HOST_LOG_ROOT="$PROJECT_ROOT/logs"
 fi
 
@@ -119,6 +121,7 @@ cat .env | sudo tee "$COMPOSE_ENV" > /dev/null
 # 3. Append our HOST_LOG_ROOT variable to that file
 echo "" | sudo tee -a "$COMPOSE_ENV" > /dev/null
 echo "HOST_LOG_ROOT=$HOST_LOG_ROOT" | sudo tee -a "$COMPOSE_ENV" > /dev/null
+echo "HOST_ROOT=$HOST_ROOT" | sudo tee -a "$COMPOSE_ENV" > /dev/null
 
 # Check if it was written correctly (for debug)
 log_info "Env file generated. HOST_LOG_ROOT is set to: $(grep HOST_LOG_ROOT $COMPOSE_ENV)"
@@ -132,10 +135,10 @@ log_warn "Building base Docker image 2..."
 run_and_log sudo -E docker build --pull -t sentinel/base-image:1.1 -f docker/base/base2/Dockerfile .
 
 log_info "Building service images..."
-run_and_log sudo -E docker-compose build
+run_and_log sudo -E docker-compose -f "$COMPOSE_FILE" build
 
 log_info "Deploying services with the newly built images..."
-run_and_log sudo -E docker-compose up --force-recreate --renew-anon-volumes -d
+run_and_log sudo -E docker-compose -f "$COMPOSE_FILE" up --force-recreate --renew-anon-volumes -d
 
 echo -e "\n${GREEN}✅ Deployment complete! All services are running with fresh images.${NC}\n"
-echo -e "${YELLOW}Use 'sudo docker-compose logs -f' to see the output.${NC}\n"
+echo -e "${YELLOW}Use 'sudo docker-compose -f docker/compose/docker-compose.yml logs -f' to see the output.${NC}\n"

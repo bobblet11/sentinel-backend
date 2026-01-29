@@ -146,10 +146,12 @@ class ParseManager:
             
         return result
     
+    
+    
     def parse_article_raw_html(self, 
         raw_html: str,
         article_url: Optional[str] = None,
-        article_metadata: Optional[Dict[str, Any]] = None) -> Dict[str,str]:
+        article_metadata: Optional[Dict[str, Any]] = None) -> ParseResult:
         
         if not raw_html or len(raw_html) < 20:
             raise ValueError("raw_html content too short or empty during parsing")
@@ -169,10 +171,11 @@ class ParseManager:
             
             if result and self._is_sufficient(result):
                 self._hydrate_missing_fields(result, soup) 
-                return {k: v for k, v in asdict(result).items() if v is not None}
+                return result
                 
         fallback_result: ParseResult = self._strategy_fallback(soup)
-        return {k: v for k, v in asdict(fallback_result).items() if v is not None}
+        self._hydrate_missing_fields(result, soup) 
+        return fallback_result
 
     def _extract_text_with_trafilatura(self, raw_html: str) -> Optional[str]:
         """
