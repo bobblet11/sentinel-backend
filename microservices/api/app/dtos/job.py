@@ -22,11 +22,11 @@ class JobStage(StrEnum):
 class JobCreate(BaseModel):
     article_url: str
     article_html: str | None = None
+    article_text: str | None = None
+    article_title: str | None = None
+    article_summary: str  | None = None
     
-    title: str | None = None
     news_outlet: str | None = None
-    summary: str  | None = None
-    
     is_background: bool = False
 
 class JobResponse(BaseModel):
