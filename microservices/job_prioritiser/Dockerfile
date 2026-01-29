@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y cron && \
 
 # Step 5: Copy the rest of your application's source code.
 COPY microservices/job_prioritiser/ /app/microservices/job_prioritiser
+COPY common/ /app/common/
 
 # Step 7: Define the command to run your application.
 CMD ["python", "-m", "microservices.job_prioritiser.main"]
