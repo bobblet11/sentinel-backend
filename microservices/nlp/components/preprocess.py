@@ -1,11 +1,10 @@
 import logging
-from microservices.nlp.schemas import SentenceScore
 import spacy
 from typing import List
 
 # Local imports
 from microservices.nlp.models.base import NLPComponent
-from common.models.api.redis_models import Article, NLPOptions, NLPResult
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
 
 logger = logging.getLogger(__name__)
 

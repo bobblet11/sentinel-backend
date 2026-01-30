@@ -4,7 +4,7 @@ from typing import Any, List
 
 # Local imports
 from microservices.nlp.models.base import NLPComponent
-from common.models.api.redis_models import Article, NLPOptions, NLPResult
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, Claim
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,9 @@ class CheckWorthinessFilter(NLPComponent):
             classifier: Loaded pipeline("zero-shot-classification")
         """
         self.classifier = classifier
-        self.candidate_labels = ["factual claim", "opinion", "spam", "question"]
-        # Threshold: We need high confidence to treat it as a claim worth checking
-        self.threshold = 0.75 
+        self.candidate_labels = ["fact", "opinion"]
+        # Threshold: Lowered to capture descriptive news reporting
+        self.threshold = 0.50
 
         # Load model if not provided
         if not self.classifier:
@@ -59,20 +59,25 @@ class CheckWorthinessFilter(NLPComponent):
 
         try:
             # Run Inference (Batch)
-            # multi_label=False means the probabilities across candidates sum to 1.0
-            predictions = self.classifier(texts, self.candidate_labels, multi_label=False)
+            predictions = self.classifier(
+                texts, 
+                self.candidate_labels, 
+                multi_label=False
+                # Removed hypothesis_template to use the default "This example is {}." which is often more robust for simple labels.
+            )
 
             count = 0
+            claims_discovered = []
+            
             for i, pred in enumerate(predictions):
                 # pred format: 
-                # {'sequence': '...', 'labels': ['factual claim', 'opinion', ...], 'scores': [0.85, 0.10, ...]}
+                # {'sequence': '...', 'labels': ['fact', 'opinion'], 'scores': [0.85, 0.15]}
                 
                 top_label = pred['labels'][0]
                 top_score = pred['scores'][0]
 
                 # Determine checkworthiness
-                # Must be a 'factual claim' AND have high confidence
-                is_worthy = (top_label == "factual claim" and top_score >= self.threshold)
+                is_worthy = (top_label == "fact" and top_score >= self.threshold)
 
                 # Assign attributes to the Sentence object
                 # NOTE: Ensure schemas.py is updated to support these fields (Task B.2)
@@ -82,8 +87,22 @@ class CheckWorthinessFilter(NLPComponent):
 
                 if is_worthy:
                     count += 1
+                    
+                    # Construct and store the Claim object
+                    claim_obj = Claim(
+                        confidence=top_score,
+                        source_sentence_indices=[i],
+                        contextualised_claim_text=result.sentences[i].text,
+                        decontextualised_claim_text=result.sentences[i].text, # Assuming text is already processed/clean
+                        decontextualised_claim_embedding=result.sentences[i].embedding,
+                        NER_entities=result.sentences[i].entities
+                    )
+                    claims_discovered.append(claim_obj)
+                    
                     # logger.debug(f"Claim: {texts[i][:50]}... ({top_score:.2f})")
 
+            # Update the result object
+            result.claims_in_article = claims_discovered
             logger.info(f"CheckWorthiness: Identified {count} factual claims out of {len(texts)} sentences.")
 
         except Exception as e:
