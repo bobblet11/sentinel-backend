@@ -4,7 +4,7 @@ from transformers import pipeline
 
 # Local imports
 from microservices.nlp.models.base import NLPComponent
-from common.models.api.redis_models import Article, NLPOptions, NLPResult
+from common.models.api.redis_models import Article, Entity, NLPOptions, NLPResult
 
 logger = logging.getLogger(__name__)
 
