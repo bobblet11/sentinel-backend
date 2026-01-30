@@ -1,4 +1,5 @@
 import logging
+from microservices.nlp.schemas import SentenceScore
 import spacy
 from typing import List
 

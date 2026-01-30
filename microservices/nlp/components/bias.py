@@ -1,6 +1,6 @@
 import logging
 from microservices.nlp.models.base import NLPComponent
-from common.models.api.redis_models import Article, NLPOptions, NLPResult
+from common.models.api.redis_models import Article, BiasProfile, NLPOptions, NLPResult
 
 logger = logging.getLogger(__name__)
 
