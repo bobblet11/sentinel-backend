@@ -127,22 +127,52 @@ class FetchManagerSelenium:
         self.display.start()
 
         # We download/patch the driver ONCE here, then copy it for threads later.
-        self.logger.info("Detecting Chrome version and preparing driver...")
+        self.logger.info("Detecting Chrome/Chromium version and preparing driver...")
         try:
-            # 1. Get installed Chrome version
-            result = subprocess.run(["google-chrome", "--version"], capture_output=True, text=True)
+            # 1. Find installed Chrome/Chromium binary
+            browser_candidates = [
+                "google-chrome",
+                "chromium",
+                "chromium-browser",
+                "/usr/bin/google-chrome",
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser",
+            ]
+            browser_binary = None
+            for candidate in browser_candidates:
+                resolved = shutil.which(candidate) or (candidate if os.path.exists(candidate) else None)
+                if resolved:
+                    browser_binary = resolved
+                    break
+
+            if not browser_binary:
+                raise FileNotFoundError("No Chrome/Chromium binary found. Expected one of: google-chrome, chromium.")
+
+            self.chrome_binary_path = browser_binary
+            browser_name = os.path.basename(browser_binary)
+            is_chromium = "chromium" in browser_name
+
+            # 2. Get installed browser version
+            result = subprocess.run([browser_binary, "--version"], capture_output=True, text=True)
             version_output = result.stdout.strip().split()[-1]
             major_version = int(version_output.split('.')[0])
-            self.logger.info(f"Detected Google Chrome Version: {version_output} (Major: {major_version})")
+            self.logger.info(f"Detected Browser Version: {version_output} (Major: {major_version}) using {browser_binary}")
             user_agent_manager.set_max_browser_version(major_version)
-            
-            # 2. Download matching driver
-            patcher = Patcher(version_main=major_version)
-            patcher.auto() 
-            self.base_driver_path = patcher.executable_path
-            os.chmod(self.base_driver_path, 0o755)
-            self.logger.info(f"Master driver ready at: {self.base_driver_path}")
-            
+
+            # 3. Prefer system chromedriver when using Chromium (arm64)
+            system_chromedriver = shutil.which("chromedriver")
+            if is_chromium and system_chromedriver:
+                self.base_driver_path = system_chromedriver
+                os.chmod(self.base_driver_path, 0o755)
+                self.logger.info(f"Using system chromedriver at: {self.base_driver_path}")
+            else:
+                # Download matching driver for Google Chrome
+                patcher = Patcher(version_main=major_version)
+                patcher.auto()
+                self.base_driver_path = patcher.executable_path
+                os.chmod(self.base_driver_path, 0o755)
+                self.logger.info(f"Master driver ready at: {self.base_driver_path}")
+
         except Exception as e:
             self.logger.error(f"Failed to prepare driver: {e}")
             raise e
@@ -238,7 +268,7 @@ class FetchManagerSelenium:
         options.add_argument(f"--user-data-dir={user_data_dir}")
         options.add_argument(f"--user-agent={config.browser_profile.user_agent_string}")
         options.add_argument(f"--window-size={config.browser_profile.screen_width},{config.browser_profile.screen_height}")
-        options.binary_location = "/usr/bin/google-chrome"
+        options.binary_location = getattr(self, "chrome_binary_path", "/usr/bin/google-chrome")
         
 
         

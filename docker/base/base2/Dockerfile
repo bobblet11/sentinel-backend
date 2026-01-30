@@ -12,9 +12,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     ca-certificates \
     unzip \
+    xvfb \
+    xfonts-base \
     && if [ "$TARGETARCH" = "arm64" ]; then \
-        # ARM: Install Chromium from apt
-        apt-get install -y chromium; \
+        # ARM: Install Chromium + chromedriver from apt
+        apt-get install -y chromium chromium-driver; \
     else \
         # x86_64: Install Google Chrome
         apt-get install -y \

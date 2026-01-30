@@ -41,7 +41,7 @@
       container_name: sentinel-postgres-container
       image: pgvector/pgvector:pg15
       ports:
-        - "${POSTGRES_PORT}:5432"
+        - "${POSTGRES_EXTERNAL_PORT}:5432"
       environment:
         POSTGRES_USER: ${POSTGRES_USER}
         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -298,7 +298,7 @@
 
       <<: *common-env
       environment:
-        - INPUT_STREAM=prioritised:to.be.nlp
+        - INPUT_STREAM=user:to.be.nlp,prioritised:to.be.nlp
         - USER_OUTPUT_STREAM=user:to.be.retrieval
         - BACKGROUND_OUTPUT_STREAM=background:to.be.stored
         - FAILURE_OUTPUT_STREAM=failure:to.be.nlp
