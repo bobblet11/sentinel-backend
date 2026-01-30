@@ -5,17 +5,18 @@ import logging
 import dataclasses
 from pathlib import Path
 
-# Adjusting path to find the microservice modules
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Adjusting path to find the workspace modules
+# We need to add the workspace root to sys.path to resolve 'common' and 'microservices'
+# Root is ../../../ relative to this file
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from schemas import ArticleInput, AnalysisResult, AnalysisOptions
-from components.preprocess import Preprocessor
-from components.decontext import Decontextualizer
-from components.checkworthy import CheckWorthinessFilter
-from components.ner import EntityRecognizer
-from components.embedder import Embedder
-from components.centrality import CentralityScorer
-from components.dedupe import Deduplicator
+from common.models.api.redis_models import Article, NLPResult, NLPOptions
+from microservices.nlp.components.preprocess import Preprocessor
+from microservices.nlp.components.embedder import Embedder
+from microservices.nlp.components.centrality import CentralityScorer
+from microservices.nlp.components.bias import BiasDetector
+from microservices.nlp.components.ner import EntityRecognizer
+from microservices.nlp.components.checkworthy import CheckWorthinessFilter
 
 def run_local_pipeline_test():
     # 1. Arrange: Load data from JSON
@@ -27,68 +28,72 @@ def run_local_pipeline_test():
     with open(json_path, 'r') as f:
         data = json.load(f)
 
-    article = ArticleInput(
-        id=data['job_id'],
-        title=data['title'],
-        text=data['text'],
-        url=data['url']
+    # Article(text=..., title=..., link=...) - based on nlp_service.py usage
+    article = Article(
+        title=data.get('title', 'Unknown Title'),
+        text=data.get('text', ''),
+        link=data.get('url', data.get('link', 'http://example.com'))
     )
-    result = AnalysisResult(article_id=article.id)
-    options = AnalysisOptions()
+    result = NLPResult()
+    options = NLPOptions()
 
     # Initialize Components
     pre = Preprocessor()
-    dec = Decontextualizer()
-    chk = CheckWorthinessFilter()
-    ner = EntityRecognizer()
     emb = Embedder()
     cen = CentralityScorer()
-    ded = Deduplicator()
+    bias = BiasDetector()
+    ner = EntityRecognizer()
+    chk = CheckWorthinessFilter()
 
     # 2. Act: Execute Pipeline Steps
-    print(f"\n--- Testing Job: {article.id} ---")
+    print(f"\n--- Testing Job: {article.link} ---")
     
-    pre.run(article, result, options)
-    print(f"✓ Preprocessed into {len(result.sentences)} sentences.")
+    # Matching the order in nlp_service.py
+    try:
+        pre.run(article, result, options)
+        print(f"✓ Preprocessed into {len(result.sentences) if result.sentences else 0} sentences.")
 
-    dec.run(article, result, options)
-    print("✓ Decontextualization applied.")
+        emb.run(article, result, options)
+        print("✓ Embeddings generated.")
 
-    chk.run(article, result, options)
-    print(f"✓ Check-worthiness score assigned.")
+        cen.run(article, result, options)
+        print("✓ Centrality calculated.")
 
-    ner.run(article, result, options)
-    print(f"✓ Found {len(result.entities)} entities.")
+        bias.run(article, result, options)
+        print("✓ Bias detection complete.")
 
-    emb.run(article, result, options)
-    cen.run(article, result, options)
-    print("✓ Embeddings and Centrality calculated.")
+        ner.run(article, result, options)
+        print(f"✓ Found {len(result.entities_in_article)} entities.") 
+        
+        chk.run(article, result, options)
+        print(f"✓ Claims extracted.")
 
-    ded.run(article, result, options)
-    print("✓ Deduplication complete.")
+    except Exception as e:
+        print(f"Error during pipeline execution: {e}")
+        import traceback
+        traceback.print_exc()
 
     # 3. Assert / Inspect Results
     print("\n" + "="*50)
     print("FINAL ANALYSIS OUTPUT")
     print("="*50)
     
-    for i, s in enumerate(result.sentences):
-        worthy_tag = "[CLAIM]" if s.is_checkworthy else "[INFO]"
-        print(f"{worthy_tag} Sent {i} (Centrality: {s.score:.2f}):")
-        print(f"  Text: {s.text}")
-        if hasattr(s, 'entities') and s.entities:
-            print(f"  Entities: {[e.text for e in s.entities]}")
-        print("-" * 30)
+    if result.sentences:
+        print(f"Total Sentences: {len(result.sentences)}")
+        for i, s in enumerate(result.sentences): 
+             # Print details for every sentence to debug classification
+             print(f"Sent {i}: [{s.claim_type or 'N/A'}] ({s.confidence:.2f}) - Checkworthy: {s.is_checkworthy}")
+             print(f"    Text: {s.text[:100]}...")
 
-    # Output as JSON only if the file does not already exist
-    output_file = Path('test_output.json')
-    if not output_file.exists():
-        output_dict = dataclasses.asdict(result)
-        with open(output_file, 'w') as out_f:
-            json.dump(output_dict, out_f, indent=2)
-        print(f"\nFull output saved to '{output_file}'")
-    else:
-        print(f"\nSkipping write: '{output_file}' already exists.")
+    print(f"\nTotal Claims Extracted: {len(result.claims_in_article)}")
+
+    # Output as JSON
+    output_file = Path(os.path.join(os.path.dirname(__file__), 'test_output.json'))
+    
+    with open(output_file, 'w') as out_f:
+        json.dump(dataclasses.asdict(result), out_f, indent=2, default=str)
+    print(f"\nFull output saved to '{output_file}'")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
