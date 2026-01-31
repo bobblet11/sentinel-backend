@@ -71,20 +71,20 @@ class EntityRecognizer(NLPComponent):
 
             # Create Entity Object
             entity = Entity(
-                text=item['word'],
-                label=item['entity_group'], # "PER", "ORG", "LOC", "MISC"
+                entity_text=item['word'],
+                type_of_entity=item['entity_group'], # "PER", "ORG", "LOC", "MISC"
                 start_char=item['start'],
                 end_char=item['end']
             )
             
             # Deduplicate (e.g., don't list "Trump" 50 times)
             # We create a simple unique signature: "Trump|PER"
-            entity_hash = f"{entity.text.lower()}|{entity.label}"
+            entity_hash = f"{entity.entity_text.lower()}|{entity.type_of_entity}"
             
             if entity_hash not in unique_hashes:
                 entities_list.append(entity)
                 unique_hashes.add(entity_hash)
 
         # Update Result
-        result.entities = entities_list
+        result.entities_in_article = entities_list
         logger.info(f"EntityRecognizer: Found {len(entities_list)} unique entities.")

@@ -4,30 +4,31 @@ import inspect
 
 # 1. SETUP PATH
 current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.abspath(os.path.join(current_dir, '..'))
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
+# Add root workspace to path to support 'common' imports
+root_dir = os.path.abspath(os.path.join(current_dir, '../../..'))
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
 
 print(f"Checking environment...")
-print(f"Root dir set to: {parent_dir}")
+print(f"Root dir set to: {root_dir}")
 
 def run_sanity_check():
     print("\n--- STEP 1: Import Check ---")
     try:
-        # Now importing from schemas.py
-        import schemas as nlp_schemas
-        print(f"✅ Successfully imported local 'schemas.py' from {nlp_schemas.__file__}")
-
+        # Checking for common models
+        from common.models.api import redis_models
+        print(f"✅ Successfully imported 'common.models.api.redis_models' from {redis_models.__file__}")
+        
     except ImportError as e:
-        print(f"❌ Failed to import schemas.py: {e}")
+        print(f"❌ Failed to import common.models.api.redis_models: {e}")
         return
 
     print("\n--- STEP 2: Structure Inspection ---")
-    # Inspect the classes inside schemas.py
-    classes = [m[0] for m in inspect.getmembers(nlp_schemas, inspect.isclass) if m[1].__module__ == nlp_schemas.__name__]
+    # Inspect the classes inside redis_models
+    classes = [m[0] for m in inspect.getmembers(redis_models, inspect.isclass) if m[1].__module__ == redis_models.__name__]
     
     if not classes:
-        print("❌ No classes found in schemas.py. Did you save the file?")
+        print("❌ No classes found in redis_models.py.")
         return
     
     print(f"Found classes: {classes}")
@@ -36,7 +37,7 @@ def run_sanity_check():
     found_embedding = False
     
     for cls_name in classes:
-        cls_obj = getattr(nlp_schemas, cls_name)
+        cls_obj = getattr(redis_models, cls_name)
         annotations = getattr(cls_obj, '__annotations__', {})
         
         # Check for embedding fields
