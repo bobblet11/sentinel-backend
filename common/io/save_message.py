@@ -3,8 +3,6 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Tuple, List
 from common.models.api.redis_models import StreamMessage
-from common.service.service_template import ProcessingError, ServiceConfig
-from microservices.web_scraper.scraper_service import ScraperService
 from filelock import FileLock 
 
 
