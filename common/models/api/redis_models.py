@@ -96,6 +96,33 @@ class Entity:
     type_of_entity: str
     start_char: int
     end_char: int
+
+
+@dataclass
+class SentenceScore:
+    """
+    Represents an individual sentence, its calculated importance, and metadata.
+    Acts as the primary unit of analysis in the pipeline.
+    """
+    index: int
+    text: str # This holds the FINAL (Decontextualized) text
+    original_text: Optional[str] = None # Stores raw text before rewriting
+    
+    # Centrality (LexRank)
+    score: float = 0.0
+    
+    # Claim Verification Data
+    is_checkworthy: bool = False
+    claim_type: Optional[str] = None # e.g., "factual claim", "opinion"
+    confidence: float = 0.0
+    
+    # Vector Embedding (MPNet: 768 dim)
+    embedding: Optional[List[float]] = None
+    
+    # Linked Entities specific to this sentence
+    entities: List[Entity] = field(default_factory=list)
+
+    metadata: Dict[str, Any] = field(default_factory=dict)
     
     
 @dataclass
@@ -124,6 +151,7 @@ class BiasProfile:
 @dataclass
 class NLPResult:
     """The aggregate object containing all insights produced by the pipeline."""
+    sentences: List[SentenceScore] = field(default_factory=list)
     claims_in_article: List[Claim] = field(default_factory=list)
     entities_in_article: List[Entity] = field(default_factory=list)
     bias_profile: Optional[BiasProfile] = None
@@ -145,6 +173,7 @@ class MessagePayload(BaseModel):
     parsed_text: str    | None     = None
     
     #nlp
+    sentences: List[SentenceScore] = field(default_factory=list)
     claims_in_article: List[Claim] = field(default_factory=list)
     entities_in_article: List[Entity] = field(default_factory=list)
     bias_profile: Optional[BiasProfile] = None
@@ -223,6 +252,9 @@ class StreamMessage:
     def set_nlp_result(self, nlp_result: NLPResult) -> None:
         """Unpacks a ParseResult object and updates the message payload."""
         # Use dot notation on the ParseResult object for clarity and safety
+        if not self.data.payload.sentences and nlp_result.sentences:
+            self.data.payload.sentences = nlp_result.sentences
+
         if not self.data.payload.claims_in_article and nlp_result.claims_in_article:
             self.data.payload.claims_in_article = nlp_result.claims_in_article
             
