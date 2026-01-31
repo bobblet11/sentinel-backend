@@ -7,8 +7,7 @@ load_dotenv()
 
 config_logger: Logger = getLogger("config")
 
-INPUT_STREAM_: str = get_env_var("INPUT_STREAM",str, config_logger)
-INPUT_STREAM: List[str] = INPUT_STREAM_.split(", ")
+INPUT_STREAM: List[str] = get_env_var("INPUT_STREAM",str, config_logger).split(",")
 USER_OUTPUT_STREAM: str = get_env_var("USER_OUTPUT_STREAM",str, config_logger)
 BACKGROUND_OUTPUT_STREAM: str = get_env_var("BACKGROUND_OUTPUT_STREAM",str, config_logger)
 FAILURE_OUTPUT_STREAM: str = get_env_var("FAILURE_OUTPUT_STREAM",str, config_logger)
@@ -27,7 +26,7 @@ input_source: List[str] = INPUT_STREAM
 output_streams:str = [USER_OUTPUT_STREAM, BACKGROUND_OUTPUT_STREAM, FAILURE_OUTPUT_STREAM]
 
 env_variables: List[EnvVariable] = [
-    EnvVariable("INPUT_STREAM", INPUT_STREAM_),
+    EnvVariable("INPUT_STREAM", INPUT_STREAM),
     EnvVariable("USER_OUTPUT_STREAM", USER_OUTPUT_STREAM),
     EnvVariable("BACKGROUND_OUTPUT_STREAM", BACKGROUND_OUTPUT_STREAM),
     EnvVariable("FAILURE_OUTPUT_STREAM", FAILURE_OUTPUT_STREAM),

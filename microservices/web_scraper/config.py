@@ -14,7 +14,7 @@ PRIORITY_MAP = {
 }
 LOWEST_PRIORITY: float = float("inf")
 
-INPUT_STREAM: str = get_env_var("INPUT_STREAM",str, config_logger)
+INPUT_STREAM: List[str] = get_env_var("INPUT_STREAM",str, config_logger).split(", ")
 USER_OUTPUT_STREAM: str = get_env_var("USER_OUTPUT_STREAM",str, config_logger)
 BACKGROUND_OUTPUT_STREAM: str = get_env_var("BACKGROUND_OUTPUT_STREAM",str, config_logger)
 FAILURE_OUTPUT_STREAM: str = get_env_var("FAILURE_OUTPUT_STREAM",str, config_logger)
