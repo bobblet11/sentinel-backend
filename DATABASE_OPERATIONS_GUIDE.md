@@ -34,7 +34,7 @@ curl http://localhost:8000/database/status
 1. **Update `.env` file:**
    ```bash
    # Change external port (currently 15432)
-   POSTGRES_PORT=15433
+   POSTGRES_EXTERNAL_PORT=15433
    
    # Change database service port (currently 8001)
    API_SERVICE_PORT=8002
@@ -248,7 +248,7 @@ class DatabaseConnection:
         if cls._pool is None:
             cls._pool = await asyncpg.create_pool(
                 host=os.getenv("POSTGRES_HOST", "postgres"),
-                port=int(os.getenv("POSTGRES_PORT", 5432)),
+                port=int(os.getenv("POSTGRES_EXTERNAL_PORT", 5432)),
                 database=os.getenv("POSTGRES_DB", "sentinel_db"),
                 user=os.getenv("POSTGRES_USER", "sentinel_user"),
                 password=os.getenv("POSTGRES_PASSWORD"),
