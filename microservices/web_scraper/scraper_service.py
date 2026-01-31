@@ -9,27 +9,11 @@ from common.redis_client.publisher import RedisPublisher
 from common.redis_client.publisher_router import RedisPublisherRouter
 from common.service.service_template import ProcessingError, ServiceConfig, ServiceTemplate
 from microservices.web_scraper.config import (
-    BACKGROUND_OUTPUT_STREAM,
-    BATCH_SIZE,
-    CONSUMER_NAME,
-    FAILURE_OUTPUT_STREAM,
-    GROUP_NAME,
-    INPUT_STREAM,
-    SCRAPER_MAX_WORKERS,
-    USER_OUTPUT_STREAM,
     MAX_FETCH_RETRIES
 )
 from microservices.web_scraper.managers.fetch_manager_selenium import fetch_manager
 from microservices.web_scraper.managers.parse_manager import parse_manager, ParseResult
 import traceback
-
-PRIORITY_MAP = {
-    "user": 1,
-    "admin": 1,  
-    "background": 2,
-    "logging": 3,
-}
-LOWEST_PRIORITY: float = float("inf")
 
 class FailedToFetch(Exception):
     def __init__(self, message):

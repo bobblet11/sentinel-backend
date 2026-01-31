@@ -9,15 +9,6 @@ from dataclasses import dataclass
 
 from common.service.service_template import RoutingError, ServiceConfig, ServiceTemplate
 
-
-
-PRIORITY_MAP = {
-    "user": 1,
-    "admin": 1,  
-    "background": 2,
-    "logging": 3,
-}
-LOWEST_PRIORITY: float = float("inf")
 SERVICE_NAME="prioritiser"
 
 class PrioritiserService(ServiceTemplate):

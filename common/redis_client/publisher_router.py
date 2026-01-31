@@ -155,3 +155,23 @@ class RedisPublisherRouter:
             results[publisher.stream_name] = result_ids
 
         return results
+
+
+    @staticmethod
+    def generate_router_mapping(output_streams:List[str], router_key_values:List[str]):
+        """Assume that the order of the list of input streams indicated priority order. First is highest priority."""
+        if not output_streams:
+            raise ValueError("Missing output_streams")
+        
+        if not router_key_values:
+            raise ValueError("Missing router_key_values")
+        
+        if len(output_streams) != len(router_key_values):
+            raise ValueError("Incompatible output_streams router_key_values")
+        
+        mapping = {}
+        for router_key, stream  in zip(router_key_values, output_streams):
+            mapping[router_key] = stream
+            
+        return mapping
+    

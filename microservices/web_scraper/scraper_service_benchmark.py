@@ -9,14 +9,6 @@ from common.service.service_template import ProcessingError, ServiceConfig
 from microservices.web_scraper.scraper_service import ScraperService
 
 
-PRIORITY_MAP = {
-    "user": 1,
-    "admin": 1,  
-    "background": 2,
-    "logging": 3,
-}
-LOWEST_PRIORITY: float = float("inf")
-
 class FailedToFetch(Exception):
     def __init__(self, message):
         self.message = message
