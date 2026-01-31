@@ -8,9 +8,10 @@ from microservices.nlp.models.base import NLPComponent
 # We will implement these empty skeletons in the next step
 from microservices.nlp.components.preprocess import Preprocessor
 from microservices.nlp.components.centrality import CentralityScorer
+from microservices.nlp.components.embedder import Embedder
 from microservices.nlp.components.bias import BiasDetector
 from microservices.nlp.components.ner import EntityRecognizer
-# from microservices.nlp.components.checkworthy import ClaimExtractor
+from microservices.nlp.components.checkworthy import CheckWorthinessFilter
 
 class NLPService(ServiceTemplate):
 
@@ -22,10 +23,11 @@ class NLPService(ServiceTemplate):
         # Define the execution order of the pipeline
         self.pipeline: List[NLPComponent] = [
             Preprocessor(),
+            Embedder(),
             CentralityScorer(),
             BiasDetector(),
             EntityRecognizer(),
-            # ClaimExtractor()
+            CheckWorthinessFilter()
         ]
     
     

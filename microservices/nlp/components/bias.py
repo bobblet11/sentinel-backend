@@ -34,14 +34,13 @@ class BiasDetector(NLPComponent):
         # 2. Dummy Global Bias Profile
         # Create a BiasProfile with hardcoded values
         dummy_profile = BiasProfile(
-            label="Center", 
-            score=0.15
-            # Add other fields if your BiasProfile schema requires them
+            political_bias="Center", 
+            confidence=0.15,
+            scores={"left": 0.4, "center": 0.2, "right": 0.4},
+            emotional_tone="Neutral"
         )
         
         # 3. Update Result
-        # Assuming AnalysisResult has a 'bias' field of type BiasProfile
-        if hasattr(result, 'bias'):
-            result.bias = dummy_profile
+        result.bias_profile = dummy_profile
         
         logger.info("BiasDetector: Populated dummy bias profile and sentence scores.")
