@@ -97,6 +97,19 @@ class Entity:
     start_char: int
     end_char: int
     
+
+
+@dataclass
+class SentenceScore:
+    """
+    Represents a sentence and its analysis scores across the pipeline.
+    """
+    index: int
+    text: str
+    score: float = 0.0  # Centrality or relevance score
+    embedding: Optional[List[float]] = None  # Vector representation
+    label: Optional[str] = None  # e.g., "CLAIM", "BIASED", "NEUTRAL"
+
     
 @dataclass
 class Claim:
@@ -124,6 +137,7 @@ class BiasProfile:
 @dataclass
 class NLPResult:
     """The aggregate object containing all insights produced by the pipeline."""
+    sentences: List[SentenceScore] = field(default_factory=list)
     claims_in_article: List[Claim] = field(default_factory=list)
     entities_in_article: List[Entity] = field(default_factory=list)
     bias_profile: Optional[BiasProfile] = None

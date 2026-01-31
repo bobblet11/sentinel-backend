@@ -19,7 +19,7 @@ publisher = RedisPublisherRouter(
 def publish_job(job: Job, article: Article, job_dto: JobCreate)->None:
 	try:	
          
-		payload = MessagePayload(article_url=article.url, raw_html=article.html, parsed_text=article.text, news_outlet=job_dto.news_outlet, title=job_dto.article_title, summary=job_dto.article_summary)
+		payload = MessagePayload(article_url=article.url, raw_html=job_dto.article_html, parsed_text=job_dto.article_text, news_outlet=job_dto.news_outlet, title=job_dto.article_title, summary=job_dto.article_summary)
 		
 		message = Message(
 			header=MessageHeader(
