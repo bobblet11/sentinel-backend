@@ -39,7 +39,7 @@ if __name__ == "__main__":
         is_concurrent=True, 
         batch_size=BATCH_SIZE)
     
-    scraper_service = ScraperService(config)
+    scraper_service = ScraperServiceBenchmark(config)
     signal.signal(signal.SIGINT, scraper_service.shutdown)
     signal.signal(signal.SIGTERM, scraper_service.shutdown)
     scraper_service.run()
