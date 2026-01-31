@@ -7,18 +7,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
 
+from common.models.api.dtos.job import JobType
 from common.models.api.redis_models import Message, StreamMessage
 from common.redis_client.consumer_combiner import RedisConsumerCombiner
+from common.redis_client.prioritised_consumer_combiner import BlockPrioritisationLevel, PrioritisedRedisConsumerCombiner
 from common.redis_client.publisher import RedisPublisher
 from common.redis_client.publisher_router import RedisPublisherRouter
-
-PRIORITY_MAP = {
-    "user": 1,
-    "admin": 1,  
-    "background": 2,
-    "logging": 3,
-}
-LOWEST_PRIORITY: float = float("inf")
 
 class ProcessingError(Exception):
     def __init__(self, message):
@@ -35,10 +29,12 @@ class RoutingError(Exception):
 class ServiceConfig():
         service_name:str
         input_streams:List[str]
+        output_streams:List[str]
+        router_key_values:List[str]
         group_name:str
         consumer_name:str
+        block_prioritisation_level:BlockPrioritisationLevel
         failure_output_stream: str | None # if none, then failed batches will just not be published and will be pending for next cycle
-        routing_map: Dict[str,str]
         routing_key:List[str] = field(default_factory=lambda: ["header", "type"])
         is_concurrent: bool = False
         max_workers:int = 1
@@ -51,14 +47,24 @@ class ServiceTemplate(ABC):
 
 	def __init__(self, config: ServiceConfig ) -> None:
 		self.logger: Logger = getLogger(config.service_name)
-		self.input_streams = config.input_streams
 		self.max_workers = config.max_workers
 		self.batch_size = config.batch_size
 		self.keep_running: bool = True
 		self.is_concurrent = config.is_concurrent
-		self.message_consumer = RedisConsumerCombiner(config.input_streams, config.group_name, config.consumer_name)
+		self.input_streams = config.input_streams
+		stream_to_priority_map = PrioritisedRedisConsumerCombiner.generate_stream_to_priority_mapping(config.input_streams)
+		stream_to_block_map = PrioritisedRedisConsumerCombiner.generate_stream_to_block_mapping(input_streams=config.input_streams, level=config.block_prioritisation_level)
+		routing_map = RedisPublisherRouter.generate_router_mapping(config.output_streams, config.router_key_values)
+  
+		self.message_consumer = PrioritisedRedisConsumerCombiner(
+			stream_to_priority_map=stream_to_priority_map,
+			stream_to_block_map=stream_to_block_map,
+          		group_name=config.group_name, 
+            		consumer_name=config.consumer_name
+              	)
+  
 		self.success_publish_router = RedisPublisherRouter(
-			routing_key=config.routing_key, routing_map=config.routing_map
+			routing_key=config.routing_key, routing_map=routing_map
 		)
 		self.fail_publisher = RedisPublisher(config.failure_output_stream)
 		self.logger.info(f"config of service: {config}")
@@ -103,7 +109,8 @@ class ServiceTemplate(ABC):
 
 			# Calculate priority based on the validated object
 			msg_type:str = parsed_message.header.type
-			priority = PRIORITY_MAP.get(msg_type, LOWEST_PRIORITY)
+			#temp
+			priority = 0
 
 			return StreamMessage(
 				stream=raw_msg["stream"],
@@ -210,7 +217,7 @@ class ServiceTemplate(ABC):
 	def _get_raw_messages(self) -> List[Dict[str,Any]]:
 		"""Blocks until messages are available, then returns a batch."""
 		while self.keep_running:
-			raw_messages = self.message_consumer.consume_many(num_to_consume=self.batch_size, block=2000)
+			raw_messages = self.message_consumer.consume_many(num_to_consume=self.batch_size)
 			if raw_messages:
 				return raw_messages
 			self.logger.debug("No new messages, waiting...")

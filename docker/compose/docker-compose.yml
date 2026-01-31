@@ -47,16 +47,11 @@
         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
         POSTGRES_DB: ${POSTGRES_DB}
         POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+
       volumes:
         - postgres_data:/var/lib/postgresql/data
-        # --- INJECT INIT SQL INTO DB
-        # Note: On Docker Desktop for Mac, uncomment below and add /workspaces to Docker -> Preferences -> Resources -> File Sharing
         - ${HOST_ROOT}/microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
-      # healthcheck:
-      #   test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      #   interval: 10s
-      #   timeout: 5s
-      #   retries: 5
+        
       <<: *common-env
       restart: unless-stopped
       networks:
@@ -101,7 +96,7 @@
       
       <<: *common-env
       environment:
-        - OUTPUT_STREAM=ingestor:to.be.scraped
+        - OUTPUT_STREAM=user:to.be.scraped
 
       deploy:
         resources:
@@ -144,7 +139,7 @@
       <<: *common-env
       environment:
         - REDIS_DUPLICATE_FILTER_KEY=ingestor:seen.articles
-        - OUTPUT_STREAM=ingestor:to.be.scraped
+        - OUTPUT_STREAM=background:to.be.scraped
         # performance tuning 
         - MAX_INGESTOR_WORKERS=${INGESTOR_MAX_WORKERS:-10}
 
@@ -157,38 +152,38 @@
             cpus: '${INGESTOR_CPU_RESERVATION:-0.25}'
             memory: '${INGESTOR_MEMORY_RESERVATION:-256M}'
 
-    scraper-prioritiser:  
-      <<: [*prioritiser-service, *common-env]
-      container_name: sentinel-scraper-prioritiser-service-container
+    # scraper-prioritiser:  
+    #   <<: [*prioritiser-service, *common-env]
+    #   container_name: sentinel-scraper-prioritiser-service-container
 
-      environment:
-        - INPUT_STREAMS=ingestor:to.be.scraped, user:to.be.scraped
-        - OUTPUT_STREAM=prioritised:to.be.scraped
-        - GROUP_NAME=default
-        - CONSUMER_NAME=scraper-prioritiser-1
-        - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.scraper
-        # performance tuning 
-        - BATCH_SIZE=${SCRAPER_PRIORITISER_BATCH_SIZE:-100}
-        - MAX_PUBLISH_WORKERS=${SCRAPER_PRIORITISER_MAX_PUBLISH_WORKERS:-10}
+    #   environment:
+    #     - INPUT_STREAMS=ingestor:to.be.scraped, user:to.be.scraped
+    #     - OUTPUT_STREAM=prioritised:to.be.scraped
+    #     - GROUP_NAME=default
+    #     - CONSUMER_NAME=scraper-prioritiser-1
+    #     - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.scraper
+    #     # performance tuning 
+    #     - BATCH_SIZE=${SCRAPER_PRIORITISER_BATCH_SIZE:-100}
+    #     - MAX_PUBLISH_WORKERS=${SCRAPER_PRIORITISER_MAX_PUBLISH_WORKERS:-10}
 
-      volumes:
-        - ${HOST_LOG_ROOT}/scraper_prioritiser:/app/logs
+    #   volumes:
+    #     - ${HOST_LOG_ROOT}/scraper_prioritiser:/app/logs
 
-      depends_on:
-        - postgres
-        - redis
+    #   depends_on:
+    #     - postgres
+    #     - redis
 
-      profiles: 
-        - scraper-prioritiser
+    #   profiles: 
+    #     - scraper-prioritiser
 
-      deploy:
-        resources:
-          limits:
-            cpus: '${PRIORITISER_CPU_LIMIT:-0.5}'
-            memory: '${PRIORITISER_MEMORY_LIMIT:-512M}'
-          reservations:
-            cpus: '${PRIORITISER_CPU_RESERVATION:-0.25}'
-            memory: '${PRIORITISER_MEMORY_RESERVATION:-256M}'
+    #   deploy:
+    #     resources:
+    #       limits:
+    #         cpus: '${PRIORITISER_CPU_LIMIT:-0.5}'
+    #         memory: '${PRIORITISER_MEMORY_LIMIT:-512M}'
+    #       reservations:
+    #         cpus: '${PRIORITISER_CPU_RESERVATION:-0.25}'
+    #         memory: '${PRIORITISER_MEMORY_RESERVATION:-256M}'
 
     web_scraper-service:
       container_name: sentinel-web-scraper-service-container
@@ -218,7 +213,7 @@
 
       <<: *common-env
       environment:
-        - INPUT_STREAM=prioritised:to.be.scraped
+        - INPUT_STREAMS=user:to.be.scraped, background:to.be.scraped
         - USER_OUTPUT_STREAM=user:to.be.nlp
         - BACKGROUND_OUTPUT_STREAM=background:to.be.nlp
         - FAILURE_OUTPUT_STREAM=failure:to.be.scraped
@@ -241,38 +236,38 @@
             cpus: '${WEB_SCRAPER_CPU_RESERVATION:-0.5}'
             memory: '${WEB_SCRAPER_MEMORY_RESERVATION:-1G}'
       
-    nlp-prioritiser:  
-      <<: [*prioritiser-service, *common-env]
-      container_name: sentinel-nlp-prioritiser-service-container
+    # nlp-prioritiser:  
+    #   <<: [*prioritiser-service, *common-env]
+    #   container_name: sentinel-nlp-prioritiser-service-container
 
-      environment:
-        - INPUT_STREAMS=background:to.be.nlp, user:to.be.nlp
-        - OUTPUT_STREAM=prioritised:to.be.nlp
-        - GROUP_NAME=default
-        - CONSUMER_NAME=nlp-prioritiser-1
-        - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.nlp
-        # performance tuning 
-        - BATCH_SIZE=${NLP_PRIORITISER_BATCH_SIZE:-100}
-        - MAX_PUBLISH_WORKERS=${NLP_PRIORITISER_MAX_PUBLISH_WORKERS:-10}
+    #   environment:
+    #     - INPUT_STREAMS=background:to.be.nlp, user:to.be.nlp
+    #     - OUTPUT_STREAM=prioritised:to.be.nlp
+    #     - GROUP_NAME=default
+    #     - CONSUMER_NAME=nlp-prioritiser-1
+    #     - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.nlp
+    #     # performance tuning 
+    #     - BATCH_SIZE=${NLP_PRIORITISER_BATCH_SIZE:-100}
+    #     - MAX_PUBLISH_WORKERS=${NLP_PRIORITISER_MAX_PUBLISH_WORKERS:-10}
 
-      volumes:
-        - ${HOST_LOG_ROOT}/nlp_prioritiser:/app/logs
+    #   volumes:
+    #     - ${HOST_LOG_ROOT}/nlp_prioritiser:/app/logs
 
-      depends_on:
-        - postgres
-        - redis
+    #   depends_on:
+    #     - postgres
+    #     - redis
 
-      profiles: 
-        - nlp-prioritiser
+    #   profiles: 
+    #     - nlp-prioritiser
 
-      deploy:
-        resources:
-          limits:
-            cpus: '${PRIORITISER_CPU_LIMIT:-0.5}'
-            memory: '${PRIORITISER_MEMORY_LIMIT:-512M}'
-          reservations:
-            cpus: '${PRIORITISER_CPU_RESERVATION:-0.25}'
-            memory: '${PRIORITISER_MEMORY_RESERVATION:-256M}'
+    #   deploy:
+    #     resources:
+    #       limits:
+    #         cpus: '${PRIORITISER_CPU_LIMIT:-0.5}'
+    #         memory: '${PRIORITISER_MEMORY_LIMIT:-512M}'
+    #       reservations:
+    #         cpus: '${PRIORITISER_CPU_RESERVATION:-0.25}'
+    #         memory: '${PRIORITISER_MEMORY_RESERVATION:-256M}'
 
     nlp-service:
       container_name: sentinel-nlp-service-container
@@ -298,7 +293,7 @@
 
       <<: *common-env
       environment:
-        - INPUT_STREAM=prioritised:to.be.nlp
+        - INPUT_STREAMS=user:to.be.nlp, background:to.be.nlp
         - USER_OUTPUT_STREAM=user:to.be.retrieval
         - BACKGROUND_OUTPUT_STREAM=background:to.be.stored
         - FAILURE_OUTPUT_STREAM=failure:to.be.nlp

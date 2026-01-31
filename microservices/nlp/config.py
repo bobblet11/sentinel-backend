@@ -7,7 +7,7 @@ load_dotenv()
 
 config_logger: Logger = getLogger("config")
 
-INPUT_STREAM: List[str] = get_env_var("INPUT_STREAM",str, config_logger).split(",")
+INPUT_STREAMS: List[str] = get_env_var("INPUT_STREAMS",str, config_logger).split(", ")
 USER_OUTPUT_STREAM: str = get_env_var("USER_OUTPUT_STREAM",str, config_logger)
 BACKGROUND_OUTPUT_STREAM: str = get_env_var("BACKGROUND_OUTPUT_STREAM",str, config_logger)
 FAILURE_OUTPUT_STREAM: str = get_env_var("FAILURE_OUTPUT_STREAM",str, config_logger)
@@ -22,11 +22,11 @@ NER_MODEL = get_env_var("NLP_NER_MODEL", str, config_logger, "dslim/bert-base-NE
 BIAS_MODEL = get_env_var("NLP_BIAS_MODEL", str, config_logger, "facebook/bart-large-mnli") 
 DEVICE = "cuda" if get_env_var("USE_GPU", str, config_logger, "false").lower() == "true" else "cpu"
 
-input_source: List[str] = INPUT_STREAM
+input_streams: List[str] = INPUT_STREAMS
 output_streams:str = [USER_OUTPUT_STREAM, BACKGROUND_OUTPUT_STREAM, FAILURE_OUTPUT_STREAM]
 
 env_variables: List[EnvVariable] = [
-    EnvVariable("INPUT_STREAM", INPUT_STREAM),
+    EnvVariable("INPUT_STREAMS", INPUT_STREAMS),
     EnvVariable("USER_OUTPUT_STREAM", USER_OUTPUT_STREAM),
     EnvVariable("BACKGROUND_OUTPUT_STREAM", BACKGROUND_OUTPUT_STREAM),
     EnvVariable("FAILURE_OUTPUT_STREAM", FAILURE_OUTPUT_STREAM),
@@ -40,4 +40,4 @@ env_variables: List[EnvVariable] = [
     EnvVariable("DEVICE", DEVICE)
 ]
 
-print_env(Config(env_variables, input_source, output_streams), config_logger)
+print_env(Config(env_variables, input_streams, output_streams), config_logger)
