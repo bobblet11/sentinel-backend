@@ -13,7 +13,18 @@ if __name__ == "__main__":
     main_logger: Logger = getLogger("__main__")
     routing_map = {JobType.USER.value: USER_OUTPUT_STREAM, JobType.BACKGROUND.value: BACKGROUND_OUTPUT_STREAM}
     
-    config = ServiceConfig(routing_key=["header","type"], max_workers=1, service_name=SERVICE_NAME, input_streams=INPUT_STREAM, group_name=GROUP_NAME, consumer_name=CONSUMER_NAME, failure_output_stream=FAILURE_OUTPUT_STREAM, routing_map=routing_map, is_concurrent=False, batch_size=BATCH_SIZE )
+    config = ServiceConfig(
+        routing_key=["header","type"], 
+        max_workers=1, 
+        service_name=SERVICE_NAME, 
+        input_streams=INPUT_STREAM, 
+        group_name=GROUP_NAME, 
+        consumer_name=CONSUMER_NAME, 
+        failure_output_stream=FAILURE_OUTPUT_STREAM, 
+        routing_map=routing_map, 
+        is_concurrent=False, 
+        batch_size=BATCH_SIZE)
+    
     nlp_service = NLPService(config, options=None)
     
     signal.signal(signal.SIGINT, nlp_service.shutdown)

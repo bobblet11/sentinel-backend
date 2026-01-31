@@ -29,7 +29,7 @@ if __name__ == "__main__":
         routing_key=["header","type"],
         max_workers=SCRAPER_MAX_WORKERS, 
         service_name=SERVICE_NAME, 
-        input_streams=[INPUT_STREAM], 
+        input_streams=INPUT_STREAM, 
         group_name=GROUP_NAME, 
         consumer_name=CONSUMER_NAME, 
         failure_output_stream=FAILURE_OUTPUT_STREAM, 
