@@ -22,7 +22,7 @@ MAX_PROXY_VALIDATION_WORKERS: int = get_env_var("MAX_PROXY_VALIDATION_WORKERS",i
 MAX_FETCH_RETRIES: int = get_env_var("MAX_FETCH_RETRIES",int, config_logger)
 INITIAL_FETCH_DELAY_S: float = get_env_var("INITIAL_FETCH_DELAY_S",float, config_logger)
 FETCH_DELAY_GROWTH_RATE: float = get_env_var("FETCH_DELAY_GROWTH_RATE",float, config_logger)
-
+LOG_MODE:int = get_env_var("LOG_MODE", int, config_logger)
 
 env_variables: List[EnvVariable] = [    
     EnvVariable("INPUT_STREAMS", INPUT_STREAMS),
@@ -40,7 +40,8 @@ env_variables: List[EnvVariable] = [
     EnvVariable("MAX_PROXY_VALIDATION_WORKERS", MAX_PROXY_VALIDATION_WORKERS), 
     EnvVariable("MAX_FETCH_RETRIES", MAX_FETCH_RETRIES), 
     EnvVariable("INITIAL_FETCH_DELAY_S", INITIAL_FETCH_DELAY_S), 
-    EnvVariable("FETCH_DELAY_GROWTH_RATE", FETCH_DELAY_GROWTH_RATE), 
+    EnvVariable("FETCH_DELAY_GROWTH_RATE", FETCH_DELAY_GROWTH_RATE),
+    EnvVariable("LOG_MODE", LOG_MODE),
 ]
 
 input_streams:List[str] = INPUT_STREAMS
