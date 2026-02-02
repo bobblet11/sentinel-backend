@@ -42,7 +42,7 @@ if __name__ == "__main__":
     
     
     
-    scraper_service = ScraperServiceBenchmark(config)
+    scraper_service = ScraperService(config)
     signal.signal(signal.SIGINT, scraper_service.shutdown)
     signal.signal(signal.SIGTERM, scraper_service.shutdown)
     scraper_service.run()
