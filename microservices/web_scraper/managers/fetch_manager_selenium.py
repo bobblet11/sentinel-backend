@@ -58,7 +58,8 @@ LONG_DELAY_S:int = 6
 MEDIUM_DELAY_S:int = 4
 SHORT_DELAY_S:int = 2
 MAX_NUMBER_SCROLLS:int = 5
-PAGE_LOAD_TIMEOUT_S:int = 45
+PAGE_LOAD_TIMEOUT_S:int = 300
+SCRIPT_LOAD_TIMEOUT_S:int = 300
 
 @dataclass(frozen=True)
 class DriverConfig:
@@ -376,18 +377,25 @@ class FetchManagerSelenium:
 
     def _handle_scroll(self, driver: Chrome) -> None:
         self.logger.debug("Scrolling down...")
+        wait = WebDriverWait(driver, 5) 
+        
         last_height:int = driver.execute_script("return document.body.scrollHeight")
         
         for _ in range(MAX_NUMBER_SCROLLS):
             driver.execute_script("window.scrollBy(0, 800);")
-            time.sleep(SHORT_DELAY_S)
-            new_height:int = driver.execute_script("return document.body.scrollHeight")
             
-            if new_height == last_height:
+            try:
+                wait.until(
+                    lambda d: d.execute_script("return document.body.scrollHeight") > last_height
+                )
+                
+                last_height = driver.execute_script("return document.body.scrollHeight")
+                self.logger.debug(f"Page height increased to {last_height}px.")
+
+            except TimeoutException:
+                self.logger.debug("Page height did not change. Reached the bottom!")
                 break
-            
-            last_height = new_height
-            
+                    
         self.logger.debug("Reached the bottom!")
 
     def _generate_xpath_dict(self, hint_config: Dict[str, Dict[str,Any]]) -> Dict[str,List[str]]:
@@ -419,13 +427,12 @@ class FetchManagerSelenium:
             self.logger.warning(f"No xpath rules found for {source_name}")
             return
 
-        def click_xpath(context_driver : Chrome, xpath : str) -> bool:
-            
+        waiter = WebDriverWait(driver, timeout=2)
+        
+        def click_xpath(context_driver : Chrome, xpath : str, waiter: WebDriverWait) -> bool:
             self.logger.debug(f"Trying to click {xpath}")
-            
             try:
-
-                element = WebDriverWait(context_driver, 1).until(
+                element = waiter.until(
                     EC.presence_of_element_located((By.XPATH, xpath))
                 )
                 
@@ -452,8 +459,7 @@ class FetchManagerSelenium:
             driver.switch_to.default_content()
             
             # Successfully clicked a button
-            if click_xpath(driver, button_to_close):
-                time.sleep(SHORT_DELAY_S)
+            if click_xpath(driver, button_to_close, waiter):
                 continue 
 
             # If not found, iterate ALL iframes
@@ -462,8 +468,7 @@ class FetchManagerSelenium:
                 try:
                     driver.switch_to.default_content() 
                     driver.switch_to.frame(iframe) 
-                    if click_xpath(driver, button_to_close):
-                        time.sleep(SHORT_DELAY_S)
+                    if click_xpath(driver, button_to_close, waiter):
                         break 
                 except Exception:
                     # Iframes sometimes unload or deny access, just skip
@@ -526,7 +531,6 @@ class FetchManagerSelenium:
         try:
             self._handle_scroll(driver)
             self._take_and_save_screenshot(driver, article_url)
-            time.sleep(LONG_DELAY_S)
             self._handle_pop_ups(source_name, driver)
             self._take_and_save_screenshot(driver, article_url)
             self._handle_scroll(driver)
@@ -586,16 +590,18 @@ class FetchManagerSelenium:
             driver:Chrome = self._generate_new_driver(driver_config)
             
             driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT_S)
-
+            driver.set_script_timeout(SCRIPT_LOAD_TIMEOUT_S)
+            
             driver.get(article_url)
+            
             self._scroll_and_close_popups(driver, article_url, driver_config.source_name)
+            
             body_element:str = self._extract_html(driver)           
             self.logger.debug(f"[SUCCESS] Successfully fetched {len(body_element)} bytes from {article_url}")
             return body_element
         
         except Exception as e:
-            self.logger.info(f"[ERROR] Could not fetch {article_url}: {e}")
-            # traceback.print_exc()
+            self.logger.error(f"[ERROR] Could not fetch {article_url}: {e}")
             raise e
 
         finally:
