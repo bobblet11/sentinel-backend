@@ -1,326 +1,359 @@
-  version: '3.8'
+version: '3.8'
 
-  x-common-env: &common-env
-    env_file:
-      - ${ENV_FILE_PATH} 
+x-common-env: &common-env
+  env_file:
+    - ${ENV_FILE_PATH}
 
-  x-prioritiser-service: &prioritiser-service
-    image: sentinel/job-prioritiser:latest
-    build:
-      context: ../../
-      dockerfile: ./microservices/job_prioritiser/Dockerfile
-    depends_on:
-      - redis
+x-prioritiser-service: &prioritiser-service
+  image: sentinel/job-prioritiser:latest
+  build:
+    context: ../../
+    dockerfile: ./microservices/job_prioritiser/Dockerfile
+  depends_on:
+    - redis
+  restart: unless-stopped
+  networks:
+    - sentinel-net
+
+services:
+  # --- INFRASTRUCTURE ---
+  redis:
+    container_name: sentinel-redis-container
+    image: "redis:alpine"
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - sentinel-net
+    <<: *common-env
+    deploy:
+      resources:
+        limits:
+          cpus: '${REDIS_CPU_LIMIT:-0.5}'
+          memory: '${REDIS_MEMORY_LIMIT:-512M}'
+        reservations:
+          cpus: '${REDIS_CPU_RESERVATION:-0.25}'
+          memory: '${REDIS_MEMORY_RESERVATION:-256M}'
+
+  postgres:
+    container_name: sentinel-postgres-container
+    image: pgvector/pgvector:pg15
+    ports:
+      - "${POSTGRES_EXTERNAL_PORT}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ${HOST_ROOT}/microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    <<: *common-env
     restart: unless-stopped
     networks:
       - sentinel-net
 
-  services:
-    # --- INFRASTRUCTURE ---
-    redis:
-      container_name: sentinel-redis-container
-      image: "redis:alpine"
-      ports:
-        - "${REDIS_PORT:-6379}:6379"
-      volumes:
-        - redis_data:/data
-      restart: unless-stopped
-      networks:
-        - sentinel-net
-      <<: *common-env
-      deploy:
-        resources:
-          limits:
-            cpus: '${REDIS_CPU_LIMIT:-0.5}'
-            memory: '${REDIS_MEMORY_LIMIT:-512M}'
-          reservations:
-            cpus: '${REDIS_CPU_RESERVATION:-0.25}'
-            memory: '${REDIS_MEMORY_RESERVATION:-256M}'
+    command: postgres -c shared_preload_libraries=vector
+    deploy:
+      resources:
+        limits:
+          cpus: '${POSTGRES_CPU_LIMIT:-1.0}'
+          memory: '${POSTGRES_MEMORY_LIMIT:-2G}'
+        reservations:
+          cpus: '${POSTGRES_CPU_RESERVATION:-0.5}'
+          memory: '${POSTGRES_MEMORY_RESERVATION:-1G}'
 
-    postgres:
-      container_name: sentinel-postgres-container
-      image: pgvector/pgvector:pg15
-      ports:
-        - "${POSTGRES_EXTERNAL_PORT}:5432"
-      environment:
-        POSTGRES_USER: ${POSTGRES_USER}
-        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-        POSTGRES_DB: ${POSTGRES_DB}
-        POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
+  # --- MICROSERVICES ---
+  api-service:
+    container_name: sentinel-api-service-container
+    image: sentinel/api-service:latest
+    build:
+      context: ../../
+      dockerfile: ./microservices/api/Dockerfile
 
-      volumes:
-        - postgres_data:/var/lib/postgresql/data
-        - ${HOST_ROOT}/microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
-        
-      <<: *common-env
-      restart: unless-stopped
-      networks:
-        - sentinel-net
+    depends_on:
+      - postgres
+      - redis
 
-      command: postgres -c shared_preload_libraries=vector
-      deploy:
-        resources:
-          limits:
-            cpus: '${POSTGRES_CPU_LIMIT:-1.0}'
-            memory: '${POSTGRES_MEMORY_LIMIT:-2G}'
-          reservations:
-            cpus: '${POSTGRES_CPU_RESERVATION:-0.5}'
-            memory: '${POSTGRES_MEMORY_RESERVATION:-1G}'
-
-    # --- MICROSERVICES ---
-    api-service:
-      container_name: sentinel-api-service-container
-      image: sentinel/api-service:latest
-      build:
-        context: ../../
-        dockerfile: ./microservices/api/Dockerfile
-
-      depends_on:
-        - postgres
-        - redis
-
-      profiles: 
-        - api
-
+    profiles:
+      - api
       # volumes:
-        # Note: On Docker Desktop for Mac, uncomment below and add /workspaces to Docker -> Preferences -> Resources -> File Sharing
-        # - ${HOST_LOG_ROOT}/api:/app/logs
-        
-      ports:
-        - "${API_SERVICE_PORT:-8001}:8001"
+      # Note: On Docker Desktop for Mac, uncomment below and add /workspaces to Docker -> Preferences -> Resources -> File Sharing
+      # - ${HOST_LOG_ROOT}/api:/app/logs
+
+    ports:
+      - "${API_SERVICE_PORT:-8001}:8001"
+
+    restart: unless-stopped
+    networks:
+      - sentinel-net
+
+    <<: *common-env
+    environment:
+      - OUTPUT_STREAM=user:to.be.scraped
+
+    deploy:
+      resources:
+        limits:
+          cpus: '${API_CPU_LIMIT:-0.5}'
+          memory: '${API_MEMORY_LIMIT:-512M}'
+        reservations:
+          cpus: '${API_CPU_RESERVATION:-0.25}'
+          memory: '${API_MEMORY_RESERVATION:-256M}'
+
+  # what to do with failure streams???
+  # you inspect them manually
+  # fix bugs that caused them
+  # then create a replay service and deploy it here
+  # replay service will fix the message formats and process them, then publish to correct stream to reintegrate
 
 
-      restart: unless-stopped
-      networks:
-        - sentinel-net
-      
-      <<: *common-env
-      environment:
-        - OUTPUT_STREAM=user:to.be.scraped
 
-      deploy:
-        resources:
-          limits:
-            cpus: '${API_CPU_LIMIT:-0.5}'
-            memory: '${API_MEMORY_LIMIT:-512M}'
-          reservations:
-            cpus: '${API_CPU_RESERVATION:-0.25}'
-            memory: '${API_MEMORY_RESERVATION:-256M}'
+  ingestor-service:
+    container_name: sentinel-ingestor-service-container
+    image: sentinel/ingestor-service:latest
+    build:
+      context: ../../
+      dockerfile: ./microservices/ingestor/Dockerfile
 
-    # what to do with failure streams???
-    # you inspect them manually
-    # fix bugs that caused them
-    # then create a replay service and deploy it here
-    # replay service will fix the message formats and process them, then publish to correct stream to reintegrate
+    depends_on:
+      - postgres
+      - redis
 
+    volumes:
+      - ${HOST_LOG_ROOT}/ingestor:/app/logs
 
+    profiles:
+      - ingestor
 
-    ingestor-service:
-      container_name: sentinel-ingestor-service-container
-      image: sentinel/ingestor-service:latest
-      build: 
-        context: ../../
-        dockerfile: ./microservices/ingestor/Dockerfile
+    restart: unless-stopped
+    networks:
+      - sentinel-net
 
-      depends_on:
-        - postgres
-        - redis
+    <<: *common-env
+    environment:
+      - REDIS_DUPLICATE_FILTER_KEY=ingestor:seen.articles
+      - OUTPUT_STREAM=background:to.be.scraped
+      # performance tuning 
+      - MAX_INGESTOR_WORKERS=${INGESTOR_MAX_WORKERS:-10}
 
-      volumes:
-        - ${HOST_LOG_ROOT}/ingestor:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '${INGESTOR_CPU_LIMIT:-0.5}'
+          memory: '${INGESTOR_MEMORY_LIMIT:-512M}'
+        reservations:
+          cpus: '${INGESTOR_CPU_RESERVATION:-0.25}'
+          memory: '${INGESTOR_MEMORY_RESERVATION:-256M}'
 
-      profiles: 
-        - ingestor
+  # scraper-prioritiser:  
+  #   <<: [*prioritiser-service, *common-env]
+  #   container_name: sentinel-scraper-prioritiser-service-container
 
-      restart: unless-stopped
-      networks:
-        - sentinel-net
-      
-      <<: *common-env
-      environment:
-        - REDIS_DUPLICATE_FILTER_KEY=ingestor:seen.articles
-        - OUTPUT_STREAM=background:to.be.scraped
-        # performance tuning 
-        - MAX_INGESTOR_WORKERS=${INGESTOR_MAX_WORKERS:-10}
+  #   environment:
+  #     - INPUT_STREAMS=ingestor:to.be.scraped, user:to.be.scraped
+  #     - OUTPUT_STREAM=prioritised:to.be.scraped
+  #     - GROUP_NAME=default
+  #     - CONSUMER_NAME=scraper-prioritiser-1
+  #     - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.scraper
+  #     # performance tuning 
+  #     - BATCH_SIZE=${SCRAPER_PRIORITISER_BATCH_SIZE:-100}
+  #     - MAX_PUBLISH_WORKERS=${SCRAPER_PRIORITISER_MAX_PUBLISH_WORKERS:-10}
 
-      deploy:
-        resources:
-          limits:
-            cpus: '${INGESTOR_CPU_LIMIT:-0.5}'
-            memory: '${INGESTOR_MEMORY_LIMIT:-512M}'
-          reservations:
-            cpus: '${INGESTOR_CPU_RESERVATION:-0.25}'
-            memory: '${INGESTOR_MEMORY_RESERVATION:-256M}'
+  #   volumes:
+  #     - ${HOST_LOG_ROOT}/scraper_prioritiser:/app/logs
 
-    # scraper-prioritiser:  
-    #   <<: [*prioritiser-service, *common-env]
-    #   container_name: sentinel-scraper-prioritiser-service-container
+  #   depends_on:
+  #     - postgres
+  #     - redis
 
-    #   environment:
-    #     - INPUT_STREAMS=ingestor:to.be.scraped, user:to.be.scraped
-    #     - OUTPUT_STREAM=prioritised:to.be.scraped
-    #     - GROUP_NAME=default
-    #     - CONSUMER_NAME=scraper-prioritiser-1
-    #     - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.scraper
-    #     # performance tuning 
-    #     - BATCH_SIZE=${SCRAPER_PRIORITISER_BATCH_SIZE:-100}
-    #     - MAX_PUBLISH_WORKERS=${SCRAPER_PRIORITISER_MAX_PUBLISH_WORKERS:-10}
+  #   profiles: 
+  #     - scraper-prioritiser
 
-    #   volumes:
-    #     - ${HOST_LOG_ROOT}/scraper_prioritiser:/app/logs
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '${PRIORITISER_CPU_LIMIT:-0.5}'
+  #         memory: '${PRIORITISER_MEMORY_LIMIT:-512M}'
+  #       reservations:
+  #         cpus: '${PRIORITISER_CPU_RESERVATION:-0.25}'
+  #         memory: '${PRIORITISER_MEMORY_RESERVATION:-256M}'
 
-    #   depends_on:
-    #     - postgres
-    #     - redis
+  web_scraper-service:
+    container_name: sentinel-web-scraper-service-container
+    image: sentinel/web-scraper-service:latest
+    build:
+      context: ../../
+      dockerfile: ./microservices/web_scraper/Dockerfile
+    shm_size: '${WEB_SCRAPER_SHM_SIZE:-4gb}'
+    ipc: host
 
-    #   profiles: 
-    #     - scraper-prioritiser
+    depends_on:
+      - postgres
+      - redis
 
-    #   deploy:
-    #     resources:
-    #       limits:
-    #         cpus: '${PRIORITISER_CPU_LIMIT:-0.5}'
-    #         memory: '${PRIORITISER_MEMORY_LIMIT:-512M}'
-    #       reservations:
-    #         cpus: '${PRIORITISER_CPU_RESERVATION:-0.25}'
-    #         memory: '${PRIORITISER_MEMORY_RESERVATION:-256M}'
+    profiles:
+      - scraper
 
-    web_scraper-service:
-      container_name: sentinel-web-scraper-service-container
-      image: sentinel/web-scraper-service:latest
-      build: 
-        context: ../../
-        dockerfile: ./microservices/web_scraper/Dockerfile
-      shm_size: '${WEB_SCRAPER_SHM_SIZE:-4gb}'
-      ipc: host 
+    volumes:
+      - ${HOST_LOG_ROOT}/scraper/logs:/app/logs
+      - ${HOST_LOG_ROOT}/scraper/screenshots:/app/screenshots
 
-      depends_on:
-        - postgres
-        - redis
+    restart: always
+    networks:
+      - sentinel-net
 
-      profiles: 
-        - scraper
-        
-      volumes:
-        - ${HOST_LOG_ROOT}/scraper/logs:/app/logs
-        - ${HOST_LOG_ROOT}/scraper/screenshots:/app/screenshots
-      
+    <<: *common-env
+    environment:
+      - INPUT_STREAMS=user:to.be.scraped, background:to.be.scraped
+      - USER_OUTPUT_STREAM=user:to.be.nlp
+      - BACKGROUND_OUTPUT_STREAM=background:to.be.nlp
+      - FAILURE_OUTPUT_STREAM=failure:to.be.scraped
+      - GROUP_NAME=default
+      - CONSUMER_NAME=web-scraper-1
+      # performance tuning
+      - BATCH_SIZE=${WEB_SCRAPER_BATCH_SIZE:-10}
+      - SCRAPER_MAX_WORKERS=${WEB_SCRAPER_MAX_WORKERS:-2}
+      - MAX_PROXY_VALIDATION_WORKERS=${WEB_SCRAPER_MAX_PROXY_VALIDATION_WORKERS:-100}
+      - MAX_FETCH_RETRIES=${WEB_SCRAPER_MAX_FETCH_RETRIES:-3}
+      - INITIAL_FETCH_DELAY_S=${WEB_SCRAPER_INITIAL_FETCH_DELAY_S:-1}
+      - FETCH_DELAY_GROWTH_RATE=${WEB_SCRAPER_FETCH_DELAY_GROWTH_RATE:-1.2}
 
+    deploy:
+      resources:
+        limits:
+          cpus: '${WEB_SCRAPER_CPU_LIMIT:-1.0}'
+          memory: '${WEB_SCRAPER_MEMORY_LIMIT:-2G}'
+        reservations:
+          cpus: '${WEB_SCRAPER_CPU_RESERVATION:-0.5}'
+          memory: '${WEB_SCRAPER_MEMORY_RESERVATION:-1G}'
 
-      restart: always
-      networks:
-        - sentinel-net
+  # nlp-prioritiser:  
+  #   <<: [*prioritiser-service, *common-env]
+  #   container_name: sentinel-nlp-prioritiser-service-container
 
-      <<: *common-env
-      environment:
-        - INPUT_STREAMS=user:to.be.scraped, background:to.be.scraped
-        - USER_OUTPUT_STREAM=user:to.be.nlp
-        - BACKGROUND_OUTPUT_STREAM=background:to.be.nlp
-        - FAILURE_OUTPUT_STREAM=failure:to.be.scraped
-        - GROUP_NAME=default
-        - CONSUMER_NAME=web-scraper-1
-        # performance tuning
-        - BATCH_SIZE=${WEB_SCRAPER_BATCH_SIZE:-10}
-        - SCRAPER_MAX_WORKERS=${WEB_SCRAPER_MAX_WORKERS:-2}
-        - MAX_PROXY_VALIDATION_WORKERS=${WEB_SCRAPER_MAX_PROXY_VALIDATION_WORKERS:-100}
-        - MAX_FETCH_RETRIES=${WEB_SCRAPER_MAX_FETCH_RETRIES:-3}
-        - INITIAL_FETCH_DELAY_S=${WEB_SCRAPER_INITIAL_FETCH_DELAY_S:-1}
-        - FETCH_DELAY_GROWTH_RATE=${WEB_SCRAPER_FETCH_DELAY_GROWTH_RATE:-1.2}
+  #   environment:
+  #     - INPUT_STREAMS=background:to.be.nlp, user:to.be.nlp
+  #     - OUTPUT_STREAM=prioritised:to.be.nlp
+  #     - GROUP_NAME=default
+  #     - CONSUMER_NAME=nlp-prioritiser-1
+  #     - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.nlp
+  #     # performance tuning 
+  #     - BATCH_SIZE=${NLP_PRIORITISER_BATCH_SIZE:-100}
+  #     - MAX_PUBLISH_WORKERS=${NLP_PRIORITISER_MAX_PUBLISH_WORKERS:-10}
 
-      deploy:
-        resources:
-          limits:
-            cpus: '${WEB_SCRAPER_CPU_LIMIT:-1.0}'
-            memory: '${WEB_SCRAPER_MEMORY_LIMIT:-2G}'
-          reservations:
-            cpus: '${WEB_SCRAPER_CPU_RESERVATION:-0.5}'
-            memory: '${WEB_SCRAPER_MEMORY_RESERVATION:-1G}'
-      
-    # nlp-prioritiser:  
-    #   <<: [*prioritiser-service, *common-env]
-    #   container_name: sentinel-nlp-prioritiser-service-container
+  #   volumes:
+  #     - ${HOST_LOG_ROOT}/nlp_prioritiser:/app/logs
 
-    #   environment:
-    #     - INPUT_STREAMS=background:to.be.nlp, user:to.be.nlp
-    #     - OUTPUT_STREAM=prioritised:to.be.nlp
-    #     - GROUP_NAME=default
-    #     - CONSUMER_NAME=nlp-prioritiser-1
-    #     - FAILURE_OUTPUT_STREAM=failure:to.be.prioritised.nlp
-    #     # performance tuning 
-    #     - BATCH_SIZE=${NLP_PRIORITISER_BATCH_SIZE:-100}
-    #     - MAX_PUBLISH_WORKERS=${NLP_PRIORITISER_MAX_PUBLISH_WORKERS:-10}
+  #   depends_on:
+  #     - postgres
+  #     - redis
 
-    #   volumes:
-    #     - ${HOST_LOG_ROOT}/nlp_prioritiser:/app/logs
+  #   profiles: 
+  #     - nlp-prioritiser
 
-    #   depends_on:
-    #     - postgres
-    #     - redis
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '${PRIORITISER_CPU_LIMIT:-0.5}'
+  #         memory: '${PRIORITISER_MEMORY_LIMIT:-512M}'
+  #       reservations:
+  #         cpus: '${PRIORITISER_CPU_RESERVATION:-0.25}'
+  #         memory: '${PRIORITISER_MEMORY_RESERVATION:-256M}'
 
-    #   profiles: 
-    #     - nlp-prioritiser
+  nlp-service:
+    container_name: sentinel-nlp-service-container
+    image: sentinel/nlp-service:latest
+    build:
+      context: ../../
+      dockerfile: ./microservices/nlp/Dockerfile
+    shm_size: '${NLP_SHM_SIZE:-4gb}'
 
-    #   deploy:
-    #     resources:
-    #       limits:
-    #         cpus: '${PRIORITISER_CPU_LIMIT:-0.5}'
-    #         memory: '${PRIORITISER_MEMORY_LIMIT:-512M}'
-    #       reservations:
-    #         cpus: '${PRIORITISER_CPU_RESERVATION:-0.25}'
-    #         memory: '${PRIORITISER_MEMORY_RESERVATION:-256M}'
+    depends_on:
+      - postgres
+      - redis
 
-    nlp-service:
-      container_name: sentinel-nlp-service-container
-      image: sentinel/nlp-service:latest
-      build: 
-        context: ../../
-        dockerfile: ./microservices/nlp/Dockerfile
-      shm_size: '${NLP_SHM_SIZE:-4gb}'
+    profiles:
+      - nlp
 
-      depends_on:
-        - postgres
-        - redis
+    volumes:
+      - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
 
-      profiles: 
-        - nlp
-        
-      volumes:
-        - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
+    restart: always
+    networks:
+      - sentinel-net
 
-      restart: always
-      networks:
-        - sentinel-net
+    <<: *common-env
+    environment:
+      - INPUT_STREAMS=user:to.be.nlp, background:to.be.nlp
+      - USER_OUTPUT_STREAM=user:to.be.retrieval
+      - BACKGROUND_OUTPUT_STREAM=background:to.be.stored
+      - FAILURE_OUTPUT_STREAM=failure:to.be.nlp
+      - GROUP_NAME=default
+      - CONSUMER_NAME=nlp-1
 
-      <<: *common-env
-      environment:
-        - INPUT_STREAMS=user:to.be.nlp, background:to.be.nlp
-        - USER_OUTPUT_STREAM=user:to.be.retrieval
-        - BACKGROUND_OUTPUT_STREAM=background:to.be.stored
-        - FAILURE_OUTPUT_STREAM=failure:to.be.nlp
-        - GROUP_NAME=default
-        - CONSUMER_NAME=nlp-1
+      # performance tuning
+      - BATCH_SIZE=${NLP_BATCH_SIZE:-10}
+      - NLP_MAX_WORKERS=${NLP_MAX_WORKERS:-2}
+      - NLP_EMBEDDING_MODEL=${NLP_EMBEDDING_MODEL}
+      - NLP_NER_MODEL=${NLP_NER_MODEL}
+      - NLP_BIAS_MODEL=${NLP_BIAS_MODEL}
+      - USE_GPU=${USE_GPU}
 
-        # performance tuning
-        - BATCH_SIZE=${NLP_BATCH_SIZE:-10}
-        - NLP_MAX_WORKERS=${NLP_MAX_WORKERS:-2}
-        - NLP_EMBEDDING_MODEL=${NLP_EMBEDDING_MODEL}
-        - NLP_NER_MODEL=${NLP_NER_MODEL}
-        - NLP_BIAS_MODEL=${NLP_BIAS_MODEL}
-        - USE_GPU=${USE_GPU}
+    deploy:
+      resources:
+        limits:
+          cpus: '${NLP_SCRAPER_CPU_LIMIT:-1.0}'
+          memory: '${NLP_SCRAPER_MEMORY_LIMIT:-2G}'
+        reservations:
+          cpus: '${NLP_SCRAPER_CPU_RESERVATION:-0.5}'
+          memory: '${NLP_SCRAPER_MEMORY_RESERVATION:-1G}'
 
-      deploy:
-        resources:
-          limits:
-            cpus: '${NLP_SCRAPER_CPU_LIMIT:-1.0}'
-            memory: '${NLP_SCRAPER_MEMORY_LIMIT:-2G}'
-          reservations:
-            cpus: '${NLP_SCRAPER_CPU_RESERVATION:-0.5}'
-            memory: '${NLP_SCRAPER_MEMORY_RESERVATION:-1G}'
-      
-  volumes:
-    redis_data: {}
-    postgres_data: {}
+  retrieval-layer-service:
+    container_name: sentinel-retrieval-layer-service-container
+    image: sentinel/retrieval-layer-service:latest
+    build:
+      context: ../../
+      dockerfile: ./microservices/retrieval_layer/Dockerfile
 
-  networks:
-    sentinel-net:
-      driver: bridge
+    depends_on:
+      - postgres
+      - redis
+
+    profiles:
+      - retrieval
+
+    restart: unless-stopped
+    networks:
+      - sentinel-net
+
+    <<: *common-env
+
+    environment:
+      - INPUT_STREAMS=user:to.be.retrieval
+      - USER_OUTPUT_STREAM=user:retrieval.results
+      - FAILURE_OUTPUT_STREAM=failure:to.be.retrieval
+
+      - GROUP_NAME=default
+      - CONSUMER_NAME=retrieval-layer-1
+
+    deploy:
+      resources:
+        limits:
+          cpus: '${RETRIEVAL_CPU_LIMIT:-0.5}'
+          memory: '${RETRIEVAL_MEMORY_LIMIT:-512M}'
+        reservations:
+          cpus: '${RETRIEVAL_CPU_RESERVATION:-0.25}'
+          memory: '${RETRIEVAL_MEMORY_RESERVATION:-256M}'
+
+volumes:
+  redis_data: {}
+  postgres_data: {}
+
+networks:
+  sentinel-net:
+    driver: bridge
