@@ -12,3 +12,4 @@ microservices/web_scraper/screenshots
 logs
 .log
 **.log
+**.rdb
