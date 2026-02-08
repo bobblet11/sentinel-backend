@@ -66,7 +66,7 @@
       container_name: sentinel-postgres-container
       image: pgvector/pgvector:pg15
       ports:
-        - "${POSTGRES_PORT}:5432"
+        - ${POSTGRES_PORT}:5432
       environment:
         POSTGRES_USER: ${POSTGRES_USER}
         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -112,7 +112,7 @@
         # - ${HOST_LOG_ROOT}/api:/app/logs
         
       ports:
-        - "${API_SERVICE_PORT:-8001}:8001"
+        - ${API_SERVICE_PORT:-8001}:8001
 
 
       restart: unless-stopped
@@ -123,11 +123,11 @@
       environment:
         - API_SERVICE_PORT=${API_SERVICE_PORT:-8001}
         - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-        - POSTGRES_DB="${POSTGRES_DB:-sentinel}"
-        - POSTGRES_USER="${POSTGRES_USER:-sentinel}"
-        - POSTGRES_HOST="${POSTGRES_HOST:-postgres}"
-        - POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-sentinelpass}"
-        - OUTPUT_STREAM="${API_OUTPUT_STREAM:-user:to.be.scraped}"
+        - POSTGRES_DB=${POSTGRES_DB:-sentinel}
+        - POSTGRES_USER=${POSTGRES_USER:-sentinel}
+        - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+        - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sentinelpass}
+        - OUTPUT_STREAM=${API_OUTPUT_STREAM:-user:to.be.scraped}
 
       deploy:
         resources:
@@ -161,10 +161,10 @@
       
       <<: *common-env
       environment:
-        - REDIS_DUPLICATE_FILTER_KEY="${INGESTOR_REDIS_DUPLICATE_FILTER_KEY:-ingestor:seen.articles}"
-        - OUTPUT_STREAM="${INGESTOR_OUTPUT_STREAM:-background:to.be.scraped}"
+        - REDIS_DUPLICATE_FILTER_KEY=${INGESTOR_REDIS_DUPLICATE_FILTER_KEY:-ingestor:seen.articles}
+        - OUTPUT_STREAM=${INGESTOR_OUTPUT_STREAM:-background:to.be.scraped}
         # performance tuning 
-        - MAX_INGESTOR_WORKERS="${INGESTOR_MAX_WORKERS:-10}"
+        - MAX_INGESTOR_WORKERS=${INGESTOR_MAX_WORKERS:-10}
 
       deploy:
         resources:
@@ -202,12 +202,12 @@
       <<: *common-env
       environment:
      
-        - INPUT_STREAMS="${WEB_SCRAPER_INPUT_STREAMS:-user:to.be.scraped, background:to.be.scraped}"
-        - USER_OUTPUT_STREAM="${WEB_SCRAPER_USER_OUTPUT_STREAM:-user:to.be.nlp}"
-        - BACKGROUND_OUTPUT_STREAM="${WEB_SCRAPER_BACKGROUND_OUTPUT_STREAM:-background:to.be.nlp}"
-        - FAILURE_OUTPUT_STREAM="${WEB_SCRAPER_FAILURE_OUTPUT_STREAM:-failure:to.be.scraped}"
-        - GROUP_NAME="${WEB_SCRAPER_GROUP_NAME:-default}"
-        - CONSUMER_NAME="${WEB_SCRAPER_CONSUMER_NAME:-web-scraper-1}"
+        - INPUT_STREAMS=${WEB_SCRAPER_INPUT_STREAMS:-user:to.be.scraped, background:to.be.scraped}
+        - USER_OUTPUT_STREAM=${WEB_SCRAPER_USER_OUTPUT_STREAM:-user:to.be.nlp}
+        - BACKGROUND_OUTPUT_STREAM=${WEB_SCRAPER_BACKGROUND_OUTPUT_STREAM:-background:to.be.nlp}
+        - FAILURE_OUTPUT_STREAM=${WEB_SCRAPER_FAILURE_OUTPUT_STREAM:-failure:to.be.scraped}
+        - GROUP_NAME=${WEB_SCRAPER_GROUP_NAME:-default}
+        - CONSUMER_NAME=${WEB_SCRAPER_CONSUMER_NAME:-web-scraper-1}
         - LOG_MODE=${WEB_SCRAPER_LOG_MODE:-10}
         - MAX_SCREENSHOT_FOLDER_SIZE=${WEB_SCRAPER_MAX_SCREENSHOT_FOLDER_SIZE:-10000000}
 
@@ -252,19 +252,19 @@
 
       <<: *common-env
       environment:
-        - INPUT_STREAMS="${NLP_INPUT_STREAMS:-user:to.be.nlp, background:to.be.nlp}"
-        - USER_OUTPUT_STREAM="${NLP_USER_OUTPUT_STREAM:-user:to.be.retrieval}"
-        - BACKGROUND_OUTPUT_STREAM="${NLP_BACKGROUND_OUTPUT_STREAM:-background:to.be.retrieval}"
-        - FAILURE_OUTPUT_STREAM="${NLP_FAILURE_OUTPUT_STREAM:-failure:to.be.nlp}"
-        - GROUP_NAME="${NLP_GROUP_NAME:-default}"
-        - CONSUMER_NAME="${NLP_CONSUMER_NAME:-nlp-1}"
+        - INPUT_STREAMS=${NLP_INPUT_STREAMS:-user:to.be.nlp, background:to.be.nlp}
+        - USER_OUTPUT_STREAM=${NLP_USER_OUTPUT_STREAM:-user:to.be.retrieval}
+        - BACKGROUND_OUTPUT_STREAM=${NLP_BACKGROUND_OUTPUT_STREAM:-background:to.be.retrieval}
+        - FAILURE_OUTPUT_STREAM=${NLP_FAILURE_OUTPUT_STREAM:-failure:to.be.nlp}
+        - GROUP_NAME=${NLP_GROUP_NAME:-default}
+        - CONSUMER_NAME=${NLP_CONSUMER_NAME:-nlp-1}
 
         # performance tuning
         - BATCH_SIZE=${NLP_BATCH_SIZE:-10}
         - NLP_MAX_WORKERS=${NLP_MAX_WORKERS:-2}
-        - NLP_EMBEDDING_MODEL="${NLP_EMBEDDING_MODEL}"
-        - NLP_NER_MODEL="${NLP_NER_MODEL}"
-        - NLP_BIAS_MODEL="${NLP_BIAS_MODEL}"
+        - NLP_EMBEDDING_MODEL=${NLP_EMBEDDING_MODEL}
+        - NLP_NER_MODEL=${NLP_NER_MODEL}
+        - NLP_BIAS_MODEL=${NLP_BIAS_MODEL}
         - USE_GPU=${USE_GPU}
 
       deploy:
