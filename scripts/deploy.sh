@@ -124,10 +124,10 @@ sudo mkdir -p "$HOST_ROOT/data/postgres_data"
 
 log_warn "Setting permissions of log folder"
 sudo chmod -R 777 "$HOST_LOG_ROOT"
-sudo chown -R 999:999 "$HOST_LOG_ROOT"
-
-sudo chown -R 999:999 "$HOST_ROOT/data"
-sudo chmod -R 644 "$HOST_ROOT/data"
+sudo chown -R 999:999 "$HOST_ROOT/data/postgres_data"
+sudo chmod -R u+rwX "$HOST_ROOT/data/postgres_data"
+sudo chown -R 999:999 "$HOST_ROOT/data/redis_data"
+sudo chmod -R u+rwX "$HOST_ROOT/data/redis_data"
 echo "        Completed log directory setup"
 
 log_warn "Forcefully removing ':latest' images, protecting the dev container's image..."
