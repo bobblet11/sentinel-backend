@@ -32,6 +32,7 @@ from microservices.web_scraper.config import (
     FETCH_DELAY_GROWTH_RATE,
     INITIAL_FETCH_DELAY_S,
     MAX_FETCH_RETRIES,
+    MAX_SCREENSHOT_FOLDER_SIZE
 )
 from dataclasses import dataclass
 from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
@@ -612,5 +613,5 @@ class FetchManagerSelenium:
 fetch_manager = FetchManagerSelenium(
     proxy_manager=proxy_manager_paid,
     hint_path=HINTS_PATH,
-    screenshot_handler=RotatingScreenshotHandler()
+    screenshot_handler=RotatingScreenshotHandler(max_bytes=MAX_SCREENSHOT_FOLDER_SIZE)
 )
