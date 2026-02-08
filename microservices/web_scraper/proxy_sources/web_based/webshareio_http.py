@@ -45,6 +45,10 @@ class WebshareIOHttpSource(HttpProxySource):
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=MAX_PROXY_VALIDATION_WORKERS
         ) as executor:
+            
+            if proxies is None:
+                self.logger.warning("No proxies returned from Webshare")
+                return {}
             future_proxy_countries = executor.map(ProxyUtils.get_proxy_country, proxies)
             ip_country_mapping:Dict[str, str] = {}
             country_ip_mapping:Dict[str, str] = {}
