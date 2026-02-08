@@ -13,3 +13,6 @@ logs
 .log
 **.log
 **.rdb
+./data
+data/**
+

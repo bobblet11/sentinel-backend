@@ -19,7 +19,7 @@ class File:
  
 class RotatingScreenshotHandler():
         
-	def __init__(self, screenshot_directory:Path | str = Path("/app/screenshots"), max_bytes: int = MAX_SIZE_OF_SCREENSHOT_FOLDER, goal_bytes:int = GOAL_SIZE_OF_SCREENSHOT_FOLDER) -> None:
+	def __init__(self, screenshot_directory:Path | str = Path("/app/screenshots"), max_bytes: int = MAX_SIZE_OF_SCREENSHOT_FOLDER) -> None:
 		self.logger: Logger = getLogger(f"screenshot_handler")
 		self.logger.info("--- Initializing ScreenshotHandler ---")
   
@@ -30,7 +30,7 @@ class RotatingScreenshotHandler():
 		self.screenshot_directory: Path = screenshot_directory
   
 		self.max_bytes = max_bytes
-		self.goal_bytes = goal_bytes
+		self.goal_bytes = 0.5 * max_bytes
 		self.current_bytes = 0
 
 		self.remove_oldest_screenshots()
@@ -40,37 +40,35 @@ class RotatingScreenshotHandler():
 	def remove_oldest_screenshots(self):
 		total_size:int = 0
 		files:List[File] = []
-  
+		
 		for entry in os.scandir(str(self.screenshot_directory)):
 			if entry.is_file() and entry.name.lower().endswith(".png"):
 				st = entry.stat()
 				total_size += st.st_size
 				files.append(File(st.st_mtime, st.st_size, entry.path))
-		
-		files.sort(key=lambda file: file.mtime)
-  
-		self.current_bytes = total_size
-  
-		if total_size <= self.max_bytes:
-			self.logger.debug(f"Directory {self.screenshot_directory} is not over {self.max_bytes}B")
-			return
- 
-		for file in files:
-			if total_size < self.goal_bytes:
-				break
 			
+		files.sort(key=lambda file: file.mtime)  # Oldest first
+		self.current_bytes = total_size
+		
+		# Delete until UNDER max_bytes
+		while total_size >= self.goal_bytes and files:
+			file = files.pop(0)  # Remove OLDEST
 			try:
 				os.unlink(file.file_path)
 				total_size -= file.file_size
-    
 			except FileNotFoundError:
 				self.logger.error(f"Screenshot {file.file_path} not found!")
-
+		
+		self.current_bytes = total_size
+		self.logger.info(f"Trimmed to {total_size} bytes ({len(files)} left)")
+  
 	def save_screenshot(self, png_data: bytes, filename:Optional[str]) -> None:
 		try:
-			while self.current_bytes + len(png_data) >= self.max_bytes:
-				self.logger.info("Too many bytes in screenshot directory! Trimming screenshots...")
-				self.remove_oldest_screenshots()
+			self.remove_oldest_screenshots()
+			
+			if self.current_bytes + len(png_data) > self.max_bytes:
+				self.logger.warning("Still over limit after trim - skipping screenshot")
+				return
 
 			self.logger.debug("Saving screenshot")
    

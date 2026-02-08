@@ -44,11 +44,13 @@
         - sentinel-net
       command: >
         redis-server 
-        --appendonly yes                  
+        --appendonly no                  
         --appendfsync everysec        
         --save 60 1                   
         --timeout 300             
         --tcp-keepalive 60        
+        --dbfilename "dump.rdb"
+        --dir /data
 
       <<: *common-env
       deploy:
@@ -123,6 +125,7 @@
         - POSTGRES_PORT=${POSTGRES_PORT:-5432}
         - POSTGRES_DB="${POSTGRES_DB:-sentinel}"
         - POSTGRES_USER="${POSTGRES_USER:-sentinel}"
+        - POSTGRES_HOST="${POSTGRES_HOST:-postgres}"
         - POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-sentinelpass}"
         - OUTPUT_STREAM="${API_OUTPUT_STREAM:-user:to.be.scraped}"
 
