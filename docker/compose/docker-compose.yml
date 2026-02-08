@@ -119,6 +119,11 @@
       
       <<: *common-env
       environment:
+        - API_SERVICE_PORT=${API_SERVICE_PORT:-8001}
+        - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+        - POSTGRES_DB="${POSTGRES_DB:-sentinel}"
+        - POSTGRES_USER="${POSTGRES_USER:-sentinel}"
+        - POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-sentinelpass}"
         - OUTPUT_STREAM="${API_OUTPUT_STREAM:-user:to.be.scraped}"
 
       deploy:
