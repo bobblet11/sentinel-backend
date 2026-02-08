@@ -38,7 +38,7 @@
       ports:
         - "${REDIS_PORT:-6379}:6379"
       volumes:
-        - redis_data:/data
+        - ${HOST_ROOT}/data/redis_data:/data
       restart: unless-stopped
       networks:
         - sentinel-net
@@ -74,7 +74,7 @@
         POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-md5}
 
       volumes:
-        - postgres_data:/var/lib/postgresql/data
+        - ${HOST_ROOT}/data/postgres_data:/var/lib/postgresql/data
         - ${HOST_ROOT}/microservices/db/init.sql:/docker-entrypoint-initdb.d/init.sql
         
       <<: *common-env
@@ -275,10 +275,6 @@
           reservations:
             cpus: '${NLP_CPU_RESERVATION:-0.5}'
             memory: '${NLP_MEMORY_RESERVATION:-1G}'
-      
-  volumes:
-    redis_data: {}
-    postgres_data: {}
 
   networks:
     sentinel-net:
