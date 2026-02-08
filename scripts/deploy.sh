@@ -120,7 +120,7 @@ sudo mkdir -p "$HOST_LOG_ROOT/nlp_prioritiser"
 sudo mkdir -p "$HOST_LOG_ROOT/nlp"
 
 sudo mkdir -p "$HOST_ROOT/data/redis_data"
-sudo mkdir -p "$HOST_ROO/data/postgres_data"
+sudo mkdir -p "$HOST_ROOT/data/postgres_data"
 
 log_warn "Setting permissions of log folder"
 sudo chmod -R 777 "$HOST_LOG_ROOT"
