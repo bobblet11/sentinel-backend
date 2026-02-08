@@ -28,7 +28,7 @@ class RedisDuplicateFilter:
         self.ttl_s:str = ttl_s
         self.client: redis.Redis = redis_connection.get_client()
 
-        self.logger.info(f"--- Initialized RedisConsumerCombiner at {key_name} ---")
+        self.logger.info(f"--- Initialized RedisDuplicateFilter at {key_name} ---")
 
     def has_one(self, item: str) -> bool:
         """

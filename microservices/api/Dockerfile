@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Step 5: Copy the rest of your application's source code.
 COPY microservices/api /app/microservices/api
+COPY common/ /app/common/
 
 # Expose the service port
 EXPOSE 8001

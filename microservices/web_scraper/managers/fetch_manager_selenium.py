@@ -58,7 +58,8 @@ LONG_DELAY_S:int = 6
 MEDIUM_DELAY_S:int = 4
 SHORT_DELAY_S:int = 2
 MAX_NUMBER_SCROLLS:int = 5
-PAGE_LOAD_TIMEOUT_S:int = 45
+PAGE_LOAD_TIMEOUT_S:int = 300
+SCRIPT_LOAD_TIMEOUT_S:int = 300
 
 @dataclass(frozen=True)
 class DriverConfig:
@@ -127,22 +128,52 @@ class FetchManagerSelenium:
         self.display.start()
 
         # We download/patch the driver ONCE here, then copy it for threads later.
-        self.logger.info("Detecting Chrome version and preparing driver...")
+        self.logger.info("Detecting Chrome/Chromium version and preparing driver...")
         try:
-            # 1. Get installed Chrome version
-            result = subprocess.run(["google-chrome", "--version"], capture_output=True, text=True)
+            # 1. Find installed Chrome/Chromium binary
+            browser_candidates = [
+                "google-chrome",
+                "chromium",
+                "chromium-browser",
+                "/usr/bin/google-chrome",
+                "/usr/bin/chromium",
+                "/usr/bin/chromium-browser",
+            ]
+            browser_binary = None
+            for candidate in browser_candidates:
+                resolved = shutil.which(candidate) or (candidate if os.path.exists(candidate) else None)
+                if resolved:
+                    browser_binary = resolved
+                    break
+
+            if not browser_binary:
+                raise FileNotFoundError("No Chrome/Chromium binary found. Expected one of: google-chrome, chromium.")
+
+            self.chrome_binary_path = browser_binary
+            browser_name = os.path.basename(browser_binary)
+            is_chromium = "chromium" in browser_name
+
+            # 2. Get installed browser version
+            result = subprocess.run([browser_binary, "--version"], capture_output=True, text=True)
             version_output = result.stdout.strip().split()[-1]
             major_version = int(version_output.split('.')[0])
-            self.logger.info(f"Detected Google Chrome Version: {version_output} (Major: {major_version})")
+            self.logger.info(f"Detected Browser Version: {version_output} (Major: {major_version}) using {browser_binary}")
             user_agent_manager.set_max_browser_version(major_version)
-            
-            # 2. Download matching driver
-            patcher = Patcher(version_main=major_version)
-            patcher.auto() 
-            self.base_driver_path = patcher.executable_path
-            os.chmod(self.base_driver_path, 0o755)
-            self.logger.info(f"Master driver ready at: {self.base_driver_path}")
-            
+
+            # 3. Prefer system chromedriver when using Chromium (arm64)
+            system_chromedriver = shutil.which("chromedriver")
+            if is_chromium and system_chromedriver:
+                self.base_driver_path = system_chromedriver
+                os.chmod(self.base_driver_path, 0o755)
+                self.logger.info(f"Using system chromedriver at: {self.base_driver_path}")
+            else:
+                # Download matching driver for Google Chrome
+                patcher = Patcher(version_main=major_version)
+                patcher.auto()
+                self.base_driver_path = patcher.executable_path
+                os.chmod(self.base_driver_path, 0o755)
+                self.logger.info(f"Master driver ready at: {self.base_driver_path}")
+
         except Exception as e:
             self.logger.error(f"Failed to prepare driver: {e}")
             raise e
@@ -238,7 +269,7 @@ class FetchManagerSelenium:
         options.add_argument(f"--user-data-dir={user_data_dir}")
         options.add_argument(f"--user-agent={config.browser_profile.user_agent_string}")
         options.add_argument(f"--window-size={config.browser_profile.screen_width},{config.browser_profile.screen_height}")
-        options.binary_location = "/usr/bin/google-chrome"
+        options.binary_location = getattr(self, "chrome_binary_path", "/usr/bin/google-chrome")
         
 
         
@@ -346,18 +377,25 @@ class FetchManagerSelenium:
 
     def _handle_scroll(self, driver: Chrome) -> None:
         self.logger.debug("Scrolling down...")
+        wait = WebDriverWait(driver, 5) 
+        
         last_height:int = driver.execute_script("return document.body.scrollHeight")
         
         for _ in range(MAX_NUMBER_SCROLLS):
             driver.execute_script("window.scrollBy(0, 800);")
-            time.sleep(SHORT_DELAY_S)
-            new_height:int = driver.execute_script("return document.body.scrollHeight")
             
-            if new_height == last_height:
+            try:
+                wait.until(
+                    lambda d: d.execute_script("return document.body.scrollHeight") > last_height
+                )
+                
+                last_height = driver.execute_script("return document.body.scrollHeight")
+                self.logger.debug(f"Page height increased to {last_height}px.")
+
+            except TimeoutException:
+                self.logger.debug("Page height did not change. Reached the bottom!")
                 break
-            
-            last_height = new_height
-            
+                    
         self.logger.debug("Reached the bottom!")
 
     def _generate_xpath_dict(self, hint_config: Dict[str, Dict[str,Any]]) -> Dict[str,List[str]]:
@@ -389,13 +427,12 @@ class FetchManagerSelenium:
             self.logger.warning(f"No xpath rules found for {source_name}")
             return
 
-        def click_xpath(context_driver : Chrome, xpath : str) -> bool:
-            
+        waiter = WebDriverWait(driver, timeout=2)
+        
+        def click_xpath(context_driver : Chrome, xpath : str, waiter: WebDriverWait) -> bool:
             self.logger.debug(f"Trying to click {xpath}")
-            
             try:
-
-                element = WebDriverWait(context_driver, 1).until(
+                element = waiter.until(
                     EC.presence_of_element_located((By.XPATH, xpath))
                 )
                 
@@ -422,8 +459,7 @@ class FetchManagerSelenium:
             driver.switch_to.default_content()
             
             # Successfully clicked a button
-            if click_xpath(driver, button_to_close):
-                time.sleep(SHORT_DELAY_S)
+            if click_xpath(driver, button_to_close, waiter):
                 continue 
 
             # If not found, iterate ALL iframes
@@ -432,8 +468,7 @@ class FetchManagerSelenium:
                 try:
                     driver.switch_to.default_content() 
                     driver.switch_to.frame(iframe) 
-                    if click_xpath(driver, button_to_close):
-                        time.sleep(SHORT_DELAY_S)
+                    if click_xpath(driver, button_to_close, waiter):
                         break 
                 except Exception:
                     # Iframes sometimes unload or deny access, just skip
@@ -496,7 +531,6 @@ class FetchManagerSelenium:
         try:
             self._handle_scroll(driver)
             self._take_and_save_screenshot(driver, article_url)
-            time.sleep(LONG_DELAY_S)
             self._handle_pop_ups(source_name, driver)
             self._take_and_save_screenshot(driver, article_url)
             self._handle_scroll(driver)
@@ -556,16 +590,18 @@ class FetchManagerSelenium:
             driver:Chrome = self._generate_new_driver(driver_config)
             
             driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT_S)
-
+            driver.set_script_timeout(SCRIPT_LOAD_TIMEOUT_S)
+            
             driver.get(article_url)
+            
             self._scroll_and_close_popups(driver, article_url, driver_config.source_name)
+            
             body_element:str = self._extract_html(driver)           
             self.logger.debug(f"[SUCCESS] Successfully fetched {len(body_element)} bytes from {article_url}")
             return body_element
         
         except Exception as e:
-            self.logger.info(f"[ERROR] Could not fetch {article_url}: {e}")
-            # traceback.print_exc()
+            self.logger.error(f"[ERROR] Could not fetch {article_url}: {e}")
             raise e
 
         finally:

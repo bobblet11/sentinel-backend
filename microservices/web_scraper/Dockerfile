@@ -11,5 +11,6 @@ COPY microservices/web_scraper/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY microservices/web_scraper/ /app/microservices/web_scraper
+COPY common/ /app/common/
 
 CMD ["python", "-m", "microservices.web_scraper.main"]

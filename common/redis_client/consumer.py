@@ -46,6 +46,12 @@ class RedisConsumer:
             # '$' means start reading from the end of the stream (only new messages).
             # MKSTREAM will create the stream if it doesn't exist.
             
+            
+            
+            # 0: This special ID signifies that the consumer group should start reading from the very beginning of the stream, consuming every message that has ever been published to it.[1][2]
+            # $: This special ID tells the consumer group to only start consuming new messages that arrive after the group was created. It will not receive any of the messages that are already in the stream.[1]
+            # A specific message ID: You can provide any valid message ID. The consumer group will then start reading messages that come after that specific ID.
+            
             self.client.xgroup_create(
                 self.stream_name, self.group_name, id="0", mkstream=True
             )

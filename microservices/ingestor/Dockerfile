@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y cron dos2unix && \
 
 # Step 5: Copy the rest of your application's source code.
 COPY microservices/ingestor/ /app/microservices/ingestor
+COPY common/ /app/common/
 
 # Step 6: Copy the cronjob file into the container.
 COPY microservices/ingestor/cronjob /tmp/app-cronjob
