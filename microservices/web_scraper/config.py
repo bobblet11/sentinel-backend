@@ -6,15 +6,7 @@ from logging import Logger, getLogger
 load_dotenv()
 config_logger: Logger = getLogger("config")
 
-PRIORITY_MAP = {
-    "user": 1,
-    "admin": 1,  # Same priority as user
-    "background": 2,
-    "logging": 3,
-}
-LOWEST_PRIORITY: float = float("inf")
-
-INPUT_STREAM: str = get_env_var("INPUT_STREAM",str, config_logger)
+INPUT_STREAMS: List[str] = get_env_var("INPUT_STREAMS",str, config_logger).split(", ")
 USER_OUTPUT_STREAM: str = get_env_var("USER_OUTPUT_STREAM",str, config_logger)
 BACKGROUND_OUTPUT_STREAM: str = get_env_var("BACKGROUND_OUTPUT_STREAM",str, config_logger)
 FAILURE_OUTPUT_STREAM: str = get_env_var("FAILURE_OUTPUT_STREAM",str, config_logger)
@@ -30,13 +22,10 @@ MAX_PROXY_VALIDATION_WORKERS: int = get_env_var("MAX_PROXY_VALIDATION_WORKERS",i
 MAX_FETCH_RETRIES: int = get_env_var("MAX_FETCH_RETRIES",int, config_logger)
 INITIAL_FETCH_DELAY_S: float = get_env_var("INITIAL_FETCH_DELAY_S",float, config_logger)
 FETCH_DELAY_GROWTH_RATE: float = get_env_var("FETCH_DELAY_GROWTH_RATE",float, config_logger)
+LOG_MODE:int = get_env_var("LOG_MODE", int, config_logger)
 
-
-env_variables: List[EnvVariable] = [
-    EnvVariable("LOWEST_PRIORITY", LOWEST_PRIORITY), 
-    EnvVariable("PRIORITY_MAP", PRIORITY_MAP), 
-    
-    EnvVariable("INPUT_STREAM", INPUT_STREAM),
+env_variables: List[EnvVariable] = [    
+    EnvVariable("INPUT_STREAMS", INPUT_STREAMS),
     EnvVariable("USER_OUTPUT_STREAM", USER_OUTPUT_STREAM),
     EnvVariable("BACKGROUND_OUTPUT_STREAM", BACKGROUND_OUTPUT_STREAM),
     EnvVariable("FAILURE_OUTPUT_STREAM", FAILURE_OUTPUT_STREAM),
@@ -51,10 +40,11 @@ env_variables: List[EnvVariable] = [
     EnvVariable("MAX_PROXY_VALIDATION_WORKERS", MAX_PROXY_VALIDATION_WORKERS), 
     EnvVariable("MAX_FETCH_RETRIES", MAX_FETCH_RETRIES), 
     EnvVariable("INITIAL_FETCH_DELAY_S", INITIAL_FETCH_DELAY_S), 
-    EnvVariable("FETCH_DELAY_GROWTH_RATE", FETCH_DELAY_GROWTH_RATE), 
+    EnvVariable("FETCH_DELAY_GROWTH_RATE", FETCH_DELAY_GROWTH_RATE),
+    EnvVariable("LOG_MODE", LOG_MODE),
 ]
 
-input_stream:str = INPUT_STREAM
+input_streams:List[str] = INPUT_STREAMS
 output_streams:List[str] = [USER_OUTPUT_STREAM, BACKGROUND_OUTPUT_STREAM, FAILURE_OUTPUT_STREAM]
 
-print_env(Config(env_variables, input_stream, output_streams), config_logger)
+print_env(Config(env_variables, input_streams, output_streams), config_logger)

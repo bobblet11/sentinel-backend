@@ -2,28 +2,33 @@ import datetime
 import hashlib
 import logging
 
-from common.models.api.redis_models import Message, MessageHeader, MessageURLPayload
+from common.models.api.dtos.job import JobStage, JobStatus, JobType
+from common.models.api.redis_models import Article, Message, MessageHeader, MessagePayload, MessageTimestamp, add_timestamp_to_message
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
 from dataclasses import dataclass
 from typing import Iterator, Dict, Set, List, Any
 
-
-@dataclass(frozen=True)
-class Article:
-    link: str
-    source: str = "Unknown Source"
-    
 class BaseIngestor:
     """
     A base class that defines the template for an ingestion workflow.
     Subclasses must implement the `_fetch_articles` generator method.
     """
 
-    def __init__(self):
-        self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY)
-        self.publisher = RedisPublisher(OUTPUT_STREAM)
+    def __init__(self, duplicate_filter = None, publisher = None):
+        # If no duplicate_filter was provided, create the default one NOW.
+        if duplicate_filter is None:
+            self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY)
+        else:
+            self.duplicate_filter = duplicate_filter
+
+        # Do the exact same thing for the publisher.
+        if publisher is None:
+            self.publisher = RedisPublisher(OUTPUT_STREAM)
+        else:
+            self.publisher = publisher
+            
         self.logger: logging.Logger = logging.getLogger("base_ingestor")
 
     def fetch_articles(self) -> Iterator[Article]: 
@@ -67,16 +72,22 @@ class BaseIngestor:
         # Step 4: Publish unseen articles
         messages_to_publish: List[Any] = []
         for article in unseen_articles:
-            payload = MessageURLPayload(url=article.link, source_rss=article.source)
-            
+            payload = MessagePayload(article_url=article.link, news_outlet=article.source, title=article.title, summary=article.summary)
+            job_uid = hashlib.md5(article.link.encode()).hexdigest()[:36]
             message = Message(
                 header=MessageHeader(
-                    message_id=hashlib.md5(article.link.encode()).hexdigest(),
-                    timestamp=datetime.datetime.now().isoformat(),
-                    type="background",
+                    id=None,
+                    uid=job_uid,
+                    created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    status=JobStatus.PENDING.value,
+                    type=JobType.BACKGROUND.value,
                 ),
-                data=payload,
+                payload=payload,
+                stage_timestamps=[]
             )
+            
+            message = add_timestamp_to_message(message=message, stage_name=JobStage.INGESTED)
+            
             message_as_dict = message.model_dump()
             messages_to_publish.append(message_as_dict)
 

@@ -24,3 +24,4 @@ typing_extensions==4.15.0
 psutil==7.1.2
 user-agents
 fake-useragent==2.2.0
+filelock

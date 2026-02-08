@@ -2,18 +2,35 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
-
-# What the user sends to create a job
+from enum import StrEnum
+class JobStatus(StrEnum):
+    PENDING = "pending"
+    COMPLETE = "complete"
+    FAILED = "failed"
+    
+class JobType(StrEnum):
+    BACKGROUND = "background"
+    USER = "user"
+    
+class JobStage(StrEnum):
+    INGESTED = "ingested"
+    FETCHED = "fetched HTML"
+    PARSED = "parsed HTML"
+    NLP_START = "started NLP"
+    NLP_END = "completed NLP"
+    
 class JobCreate(BaseModel):
-    user_id: str
-    input_payload: Dict[str, Any]
+    article_url: str
+    article_html: str | None = None
+    article_text: str | None = None
+    article_title: str | None = None
+    article_summary: str  | None = None
+    
+    news_outlet: str | None = None
+    is_background: bool = False
 
-# What the API returns to the user
 class JobResponse(BaseModel):
-    id: UUID
+    id: int
     status: str
-    result_data: Optional[Dict[str, Any]] = None
+    type: str
     created_at: datetime
-
-    class Config:
-        orm_mode = True # Allows Pydantic to read SQLAlchemy objects
