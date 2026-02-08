@@ -27,11 +27,13 @@ from seleniumwire import undetected_chromedriver as uc
 from logging import Logger, getLogger
 
 from undetected_chromedriver import Chrome, ChromeOptions, Patcher
+from common import requests
 from common.requests.retry_request import exponential_retry
 from microservices.web_scraper.config import (
     FETCH_DELAY_GROWTH_RATE,
     INITIAL_FETCH_DELAY_S,
     MAX_FETCH_RETRIES,
+    MAX_SCREENSHOT_FOLDER_SIZE
 )
 from dataclasses import dataclass
 from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
@@ -583,7 +585,8 @@ class FetchManagerSelenium:
         a SINGLE fetch attempt and for reporting bad proxies.
         """
         driver: Chrome = None
-
+        driver_config:DriverConfig = None
+        
         try:
             self.logger.debug(f"Fetching HTML for {article_url}")
             driver_config:DriverConfig = self._create_driver_config(article_url)
@@ -600,8 +603,15 @@ class FetchManagerSelenium:
             self.logger.debug(f"[SUCCESS] Successfully fetched {len(body_element)} bytes from {article_url}")
             return body_element
         
+        except TimeoutException as e:
+            self.logger.error(f"[ERROR] Potential proxy error on {article_url}: {e}")
+            self.proxy_manager.report_bad_proxy(driver_config.proxy_url)
+        except WebDriverException as e:
+            self.logger.error(f"[ERROR] Potential proxy error on {article_url}: {e}")
+            self.proxy_manager.report_bad_proxy(driver_config.proxy_url)
         except Exception as e:
             self.logger.error(f"[ERROR] Could not fetch {article_url}: {e}")
+            self.proxy_manager.report_bad_proxy(driver_config.proxy_url)
             raise e
 
         finally:
@@ -612,5 +622,5 @@ class FetchManagerSelenium:
 fetch_manager = FetchManagerSelenium(
     proxy_manager=proxy_manager_paid,
     hint_path=HINTS_PATH,
-    screenshot_handler=RotatingScreenshotHandler()
+    screenshot_handler=RotatingScreenshotHandler(max_bytes=MAX_SCREENSHOT_FOLDER_SIZE)
 )
