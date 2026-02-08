@@ -31,6 +31,7 @@ class WebshareIOHttpSource(HttpProxySource):
                 for line in lines
                 if line.strip()
             ]
+            
         line_parser:Callable[[str], List[str]] = parse_line_fun
 
         self.logger.info(f"Fetching proxies from Webshare.io")
@@ -39,7 +40,7 @@ class WebshareIOHttpSource(HttpProxySource):
         self.logger.info(f"Attempting to create country map (default = US)")
         self.update_mappings(https)
             
-        return {"https": https, "socks4": [], "socks5": []}
+        return {"https": https or [], "socks4": [], "socks5": []}
 
     def update_mappings(self, proxies:List[str]) -> None:
         with concurrent.futures.ThreadPoolExecutor(
