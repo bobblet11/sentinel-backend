@@ -64,7 +64,7 @@
       container_name: sentinel-postgres-container
       image: pgvector/pgvector:pg15
       ports:
-        - "${POSTGRES_EXTERNAL_PORT}:5432"
+        - "${POSTGRES_PORT}:5432"
       environment:
         POSTGRES_USER: ${POSTGRES_USER}
         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
