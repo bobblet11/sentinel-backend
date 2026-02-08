@@ -36,29 +36,23 @@ if ! sudo -E docker ps -a --format '{{.Names}}' | grep -q "^${REDIS_CONTAINER_NA
   exit 1
 fi
 
+echo "Triggering BGSAVE..."
+sudo docker exec "$REDIS_CONTAINER_NAME" redis-cli BGSAVE
 
+# WAIT FOR COMPLETION (fixes everything)
+echo "Waiting for BGSAVE completion..."
+until sudo docker exec "$REDIS_CONTAINER_NAME" redis-cli INFO persistence | grep -q 'rdb_bgsave_in_progress:0.*ok'; do
+    echo -n "."
+    sleep 2
+done
+echo "BGSAVE complete!"
 
-# --- BACKUP PROCESS ---
-echo "Starting Redis backup for container '${REDIS_CONTAINER_NAME}'..."
+# Copy
+sudo docker cp "${REDIS_CONTAINER_NAME}:${REDIS_DATA_DIR}/dump.rdb" "$BACKUP_PATH"
 
-# 1. Trigger a background save of the Redis data.
-#    BGSAVE is preferred as it runs in the background without blocking the Redis server. [1, 5]
-echo "Triggering BGSAVE on the Redis container..."
-sudo -E docker exec "$REDIS_CONTAINER_NAME" redis-cli BGSAVE
-echo "BGSAVE command issued. Waiting a few seconds for it to complete..."
-
-# Give it a moment to complete the save operation. For very large databases, you might need to increase this sleep time.
-sleep 10
-
-# 2. Find the Redis data directory within the container.
-#    The default is often /data, but we can query Redis to be sure. [1, 3]
-REDIS_DATA_DIR=$(sudo -E docker exec "$REDIS_CONTAINER_NAME" redis-cli config get dir | tail -n 1)
-
-
-# 3. Copy the backup file from the container to the specified host directory.
-#    The docker cp command is used for this purpose. [2, 7, 14]
-echo "Copying 'dump.rdb' from '${REDIS_CONTAINER_NAME}:${REDIS_DATA_DIR}/dump.rdb' to '${BACKUP_PATH}'..."
-sudo -E docker cp "${REDIS_CONTAINER_NAME}:${REDIS_DATA_DIR}/dump.rdb" "$BACKUP_PATH"
-
-echo "Backup successful!"
-echo "Backup file created at: ${BACKUP_PATH}"
+# VALIDATE
+SIZE=$(stat -c%s "$BACKUP_PATH")
+echo "Backup saved: ${SIZE} bytes"
+if [ "$SIZE" -lt 1000000 ]; then
+    echo "WARNING: Very small backup!"
+fi
