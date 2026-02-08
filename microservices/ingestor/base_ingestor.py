@@ -6,10 +6,11 @@ from common.models.api.dtos.job import JobStage, JobStatus, JobType
 from common.models.api.redis_models import Article, Message, MessageHeader, MessagePayload, MessageTimestamp, add_timestamp_to_message
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
+from common.io.json_updater import JsonHandler
 from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
 from dataclasses import dataclass
 from typing import Iterator, Dict, Set, List, Any
-
+from datetime import datetime, timezone
 class BaseIngestor:
     """
     A base class that defines the template for an ingestion workflow.
@@ -30,7 +31,29 @@ class BaseIngestor:
             self.publisher = publisher
             
         self.logger: logging.Logger = logging.getLogger("base_ingestor")
+        self.stats_json_handler = JsonHandler(filename="stats.json")
 
+    def _log_stats(self, new:int, seen:int, total:int) -> None:
+        file_data = self.stats_json_handler.read_json()
+        
+        current_date = datetime.now().date()
+        entry = {
+            "new": new,
+            "seen": seen,
+            "total_processed": total
+        }
+        
+        existing_entry:Dict[str,Any] = file_data.get(current_date, None)
+        if existing_entry:
+            entry["new"] += existing_entry.get("new", 0)
+            entry["seen"] += existing_entry.get("seen", 0)
+            entry["total_processed"] += existing_entry.get("total_processed", 0)
+
+        file_data[current_date] = entry
+        
+        self.stats_json_handler.write_json(file_data)
+        
+    
     def fetch_articles(self) -> Iterator[Article]: 
         """
         Generator that fetches URLs from some source.
@@ -43,7 +66,6 @@ class BaseIngestor:
         """
 
         raise NotImplementedError("Please Implement this method")
-
 
     def run(self) -> None:
         """
@@ -78,7 +100,7 @@ class BaseIngestor:
                 header=MessageHeader(
                     id=None,
                     uid=job_uid,
-                    created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    created_at=datetime.now().isoformat(),
                     status=JobStatus.PENDING.value,
                     type=JobType.BACKGROUND.value,
                 ),
@@ -106,6 +128,8 @@ class BaseIngestor:
 
         # Step 5: Add urls to cache for future cycles
         self.duplicate_filter.add_many(unseen_article_urls)
+        
+        self._log_stats(len(unseen_articles), len(raw_articles) - len(unseen_articles), len(raw_articles))
         
         self.logger.info("--- Ingestion cycle finished ---")
         self.logger.info(f"\tNew: {len(unseen_articles)}")
