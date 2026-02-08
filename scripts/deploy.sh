@@ -119,8 +119,15 @@ sudo mkdir -p "$HOST_LOG_ROOT/api"
 sudo mkdir -p "$HOST_LOG_ROOT/nlp_prioritiser"
 sudo mkdir -p "$HOST_LOG_ROOT/nlp"
 
+sudo mkdir -p "$HOST_ROOT/data/redis_data"
+sudo mkdir -p "$HOST_ROO/data/postgres_data"
+
 log_warn "Setting permissions of log folder"
 sudo chmod -R 777 "$HOST_LOG_ROOT"
+sudo chown -R 999:999 "$HOST_LOG_ROOT"
+
+sudo chown -R 999:999 "$HOST_ROOT/data"
+sudo chmod -R 644 "$HOST_ROOT/data"
 echo "        Completed log directory setup"
 
 log_warn "Forcefully removing ':latest' images, protecting the dev container's image..."
