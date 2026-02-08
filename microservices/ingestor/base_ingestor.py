@@ -10,7 +10,7 @@ from common.io.json_updater import JsonHandler
 from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
 from dataclasses import dataclass
 from typing import Iterator, Dict, Set, List, Any
-from datetime import datetime
+from datetime import datetime, timezone
 class BaseIngestor:
     """
     A base class that defines the template for an ingestion workflow.
@@ -100,7 +100,7 @@ class BaseIngestor:
                 header=MessageHeader(
                     id=None,
                     uid=job_uid,
-                    created_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    created_at=datetime.now().isoformat(),
                     status=JobStatus.PENDING.value,
                     type=JobType.BACKGROUND.value,
                 ),
