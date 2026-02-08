@@ -52,6 +52,12 @@ class ProxyManagerPaid:
                 "WebshareIoHttp", timeout=(20.0, 22.0)
             )
             
+            self._init_proxies()
+            
+            self._initialized = True
+            self.logger.info(f"Initialisation complete!")
+
+    def _init_proxies(self):
             self.proxies["https"].update(self.webshareio_http_source.get_proxies()["https"])
             self.ip_country_mapping: Dict[str, str] = (
                 self.webshareio_http_source.ip_country_mapping
@@ -59,14 +65,12 @@ class ProxyManagerPaid:
             self.country_ip_mapping: Dict[str, str] = (
                 self.webshareio_http_source.country_ip_mapping
             )
-            
-            self._initialized = True
-            self.logger.info(f"Initialisation complete!")
-
+    
     def reset(self):
         """Testing aid: clear caches and force next call to rebuild."""
         with self._refresh_lock:
             self.proxies = {"https": set(), "socks4": set(), "socks5": set()}
+            self._init_proxies()
 
     def get_random_proxy(self) -> ProxyRequestDict:
         """
@@ -101,6 +105,8 @@ class ProxyManagerPaid:
 
     def report_bad_proxy(self, proxy_url: str) -> None:
         """Does not need to do anything for paid proxies"""
+        self.logger.warning(f"proxy {proxy_url} failed, refreshing proxies...")
+        self.reset()
         return
 
     def _get_all_usable_proxies(self) -> Set[str]:
