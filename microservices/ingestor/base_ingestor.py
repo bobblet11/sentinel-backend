@@ -20,7 +20,7 @@ class BaseIngestor:
     def __init__(self, duplicate_filter = None, publisher = None):
         # If no duplicate_filter was provided, create the default one NOW.
         if duplicate_filter is None:
-            self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY)
+            self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY, ttl_s=None)
         else:
             self.duplicate_filter = duplicate_filter
 
@@ -132,7 +132,7 @@ class BaseIngestor:
         self._log_stats(len(unseen_articles), len(raw_articles) - len(unseen_articles), len(raw_articles))
         
         self.logger.info("--- Ingestion cycle finished ---")
-        self.logger.info(f"\tNew: {len(unseen_articles)}")
-        self.logger.info(f"\tSeen: {len(raw_articles) - len(unseen_articles)}")
-        self.logger.info(f"\tTotal: {len(raw_articles)}")
+        self.logger.info(f"\tNew this cycle: {len(unseen_articles)}")
+        self.logger.info(f"\tSeen this cycle: {len(raw_articles) - len(unseen_articles)}")
+        self.logger.info(f"\tTotal this cycle: {len(raw_articles)}")
         self.logger.info("-" * 10)

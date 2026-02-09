@@ -23,7 +23,7 @@ class RssIngestor(BaseIngestor):
 
         # If no duplicate_filter was provided, create the default one NOW.
         if duplicate_filter is None:
-            self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY)
+            self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY, ttl_s=0)
         else:
             self.duplicate_filter = duplicate_filter
 
