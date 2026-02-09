@@ -36,7 +36,7 @@ class BaseIngestor:
     def _log_stats(self, new:int, seen:int, total:int) -> None:
         file_data = self.stats_json_handler.read_json()
         
-        current_date = datetime.now().date()
+        current_date = str(datetime.now().date())
         entry = {
             "new": new,
             "seen": seen,
