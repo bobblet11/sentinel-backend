@@ -39,6 +39,7 @@ class ServiceConfig():
         is_concurrent: bool = False
         max_workers:int = 1
         batch_size:int = 10
+        is_cut_and_paste_mode: bool = True
 
         
 
@@ -67,6 +68,7 @@ class ServiceTemplate(ABC):
 			routing_key=config.routing_key, routing_map=routing_map
 		)
 		self.fail_publisher = RedisPublisher(config.failure_output_stream)
+		self.is_cut_and_paste_mode = config.is_cut_and_paste_mode
 		self.logger.info(f"config of service: {config}")
 
 	def shutdown(self, *args) -> None:
@@ -86,7 +88,12 @@ class ServiceTemplate(ABC):
 		payload = message.data.model_dump() if is_stream_message else message.get("data", {})
   		# Acknowledge the original message before publishing to failure queue
 		self.fail_publisher.publish_one(payload)	
-		self.message_consumer.acknowledge_and_delete(stream_name=stream_name, redis_message_id=redis_id)
+
+		if self.is_cut_and_paste_mode:
+			self.message_consumer.acknowledge_and_delete(stream_name=stream_name, redis_message_id=redis_id)
+		else:
+			self.message_consumer.acknowledge(stream_name=stream_name, redis_message_id=redis_id)
+   
 		self.logger.info(f"Message {redis_id} acknowledged and moved to failure stream.")
   
 	def _handle_failure_batch(self, messages: List[StreamMessage | Dict[str, Any]], error: Exception):
@@ -137,8 +144,12 @@ class ServiceTemplate(ABC):
    
 			if not new_redis_id:
 				raise ProcessingError("Publisher returned an empty ID.")
-			
-			self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
+
+			if self.is_cut_and_paste_mode:
+				self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
+			else:
+				self.message_consumer.acknowledge(message.stream, message.redis_id)
+				
 			return message.redis_id, new_redis_id
 
 		except Exception as e:
@@ -185,7 +196,11 @@ class ServiceTemplate(ABC):
 				failure_count += 1
 			else:
 				# This message was successfully published. Acknowledge it.
-				self.message_consumer.acknowledge_and_delete(message.stream, original_message.redis_id)
+				if self.is_cut_and_paste_mode:
+					self.message_consumer.acknowledge_and_delete(message.stream, original_message.redis_id)
+				else:
+					self.message_consumer.acknowledge(message.stream, original_message.redis_id)
+
 				ack_count += 1
 		
 		if ack_count > 0:
