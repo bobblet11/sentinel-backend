@@ -38,7 +38,9 @@ if __name__ == "__main__":
         consumer_name=CONSUMER_NAME, 
         failure_output_stream=FAILURE_OUTPUT_STREAM, 
         is_concurrent=True, 
-        batch_size=BATCH_SIZE)
+        batch_size=BATCH_SIZE,
+        is_cut_and_paste_mode=False
+        )
     
     
     
