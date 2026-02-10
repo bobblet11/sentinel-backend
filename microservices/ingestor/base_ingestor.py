@@ -8,9 +8,10 @@ from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 from common.io.json_updater import JsonHandler
 from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
-from dataclasses import dataclass
 from typing import Iterator, Dict, Set, List, Any
-from datetime import datetime, timezone
+from datetime import datetime
+
+
 class BaseIngestor:
     """
     A base class that defines the template for an ingestion workflow.
