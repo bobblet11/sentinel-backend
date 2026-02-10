@@ -128,6 +128,8 @@
         - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
         - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sentinelpass}
         - OUTPUT_STREAM=${API_OUTPUT_STREAM:-user:to.be.scraped}
+        - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
+        - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
 
       deploy:
         resources:
@@ -163,6 +165,8 @@
       environment:
         - REDIS_DUPLICATE_FILTER_KEY=${INGESTOR_REDIS_DUPLICATE_FILTER_KEY:-ingestor:seen.articles}
         - OUTPUT_STREAM=${INGESTOR_OUTPUT_STREAM:-background:to.be.scraped}
+        - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
+        - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
         # performance tuning 
         - MAX_INGESTOR_WORKERS=${INGESTOR_MAX_WORKERS:-10}
 
@@ -210,7 +214,8 @@
         - CONSUMER_NAME=${WEB_SCRAPER_CONSUMER_NAME:-web-scraper-1}
         - LOG_MODE=${WEB_SCRAPER_LOG_MODE:-10}
         - MAX_SCREENSHOT_FOLDER_SIZE=${WEB_SCRAPER_MAX_SCREENSHOT_FOLDER_SIZE:-10000000}
-
+        - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
+        - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
         # performance tuning
         - BATCH_SIZE=${WEB_SCRAPER_BATCH_SIZE:-10}
         - SCRAPER_MAX_WORKERS=${WEB_SCRAPER_MAX_WORKERS:-2}
@@ -258,7 +263,8 @@
         - FAILURE_OUTPUT_STREAM=${NLP_FAILURE_OUTPUT_STREAM:-failure:to.be.nlp}
         - GROUP_NAME=${NLP_GROUP_NAME:-default}
         - CONSUMER_NAME=${NLP_CONSUMER_NAME:-nlp-1}
-
+        - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
+        - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
         # performance tuning
         - BATCH_SIZE=${NLP_BATCH_SIZE:-10}
         - NLP_MAX_WORKERS=${NLP_MAX_WORKERS:-2}
