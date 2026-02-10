@@ -20,7 +20,7 @@ class BaseIngestor:
     def __init__(self, duplicate_filter = None, publisher = None):
         # If no duplicate_filter was provided, create the default one NOW.
         if duplicate_filter is None:
-            self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY, ttl_s=None)
+            self.duplicate_filter = RedisDuplicateFilter(REDIS_DUPLICATE_FILTER_KEY, ttl_s=0)
         else:
             self.duplicate_filter = duplicate_filter
 
@@ -128,9 +128,6 @@ class BaseIngestor:
             return
 
         published_ids:List[str] = self.publisher.publish_many(messages_to_publish)
-        if not published_ids == 0:
-            self.logger.info("--- Ingestion cycle finished. Could not publish to queue. ---\n\n")
-            return
 
         # Step 5: Add urls to cache for future cycles
         self.duplicate_filter.add_many(unseen_urls)
