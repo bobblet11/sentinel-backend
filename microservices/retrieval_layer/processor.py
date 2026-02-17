@@ -1,4 +1,4 @@
-from microservices.retrieval_layer.crud import get_or_create_article, create_claim_and_link_entities
+from microservices.retrieval_layer.storage.crud import get_or_create_article, create_claim_and_link_entities
 from microservices.retrieval_layer.db.session import get_db_session
 from typing import Dict, Any
 

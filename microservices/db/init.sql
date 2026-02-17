@@ -70,6 +70,77 @@ COMMENT ON COLUMN job_timestamp.stage_name IS 'The name of the pipeline stage, e
 
 CREATE INDEX IF NOT EXISTS idx_job_timestamp_job_id ON job_timestamp(job_id);
 
+CREATE TABLE IF NOT EXISTS author (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS sentiment_analysis (
+    id SERIAL PRIMARY KEY,
+    bias_category VARCHAR(50),
+    bias_score FLOAT,
+    bias_analysis_confidence FLOAT,
+    sentiment_category VARCHAR(50),
+    sentiment_analysis_confidence FLOAT
+);
+
+ALTER TABLE article
+ADD COLUMN IF NOT EXISTS title VARCHAR(1024),
+ADD COLUMN IF NOT EXISTS publishedat TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS sentiment_id INTEGER,
+ADD COLUMN IF NOT EXISTS outlet_id INTEGER;
+
+ALTER TABLE article
+ADD CONSTRAINT fk_article_outlet
+FOREIGN KEY (outlet_id) REFERENCES news_outlet(id)
+ON DELETE SET NULL;
+
+ALTER TABLE article
+ADD CONSTRAINT fk_article_sentiment
+FOREIGN KEY (sentiment_id) REFERENCES sentiment_analysis(id)
+ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS entity (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_name ON entity(name);
+
+CREATE TABLE IF NOT EXISTS claim (
+    id SERIAL PRIMARY KEY,
+    original_sentence TEXT NOT NULL,
+    decontextualised_claim TEXT,
+    decontextualised_embedding JSON,
+    centrality_score FLOAT,
+    article_id INTEGER NOT NULL,
+
+    CONSTRAINT fk_claim_article
+        FOREIGN KEY(article_id)
+        REFERENCES article(id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS claim_to_entity (
+    claim_id INTEGER NOT NULL,
+    entity_id INTEGER NOT NULL,
+
+    PRIMARY KEY (claim_id, entity_id),
+
+    CONSTRAINT fk_cte_claim
+        FOREIGN KEY (claim_id)
+        REFERENCES claim(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_cte_entity
+        FOREIGN KEY (entity_id)
+        REFERENCES entity(id)
+        ON DELETE CASCADE
+);
+
 
 
 COMMIT;
