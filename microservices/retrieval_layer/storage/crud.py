@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from microservices.retrieval_layer.models import (
+from microservices.retrieval_layer.db.models import (
     Article, Claim, Entity, NewsOutlet, Author, SentimentAnalysis, claim_to_entity_table
 )
 from datetime import datetime

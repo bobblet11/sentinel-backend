@@ -315,6 +315,7 @@ services:
 
   retrieval-layer-service:
     container_name: sentinel-retrieval-layer-service-container
+    shm_size: '${RETRIEVAL_LAYER_SHM_SIZE:-2gb}'
     image: sentinel/retrieval-layer-service:latest
     build:
       context: ../../
@@ -327,7 +328,7 @@ services:
     profiles:
       - retrieval
 
-    restart: unless-stopped
+    restart: always
     networks:
       - sentinel-net
 
@@ -345,10 +346,10 @@ services:
       resources:
         limits:
           cpus: '${RETRIEVAL_CPU_LIMIT:-0.5}'
-          memory: '${RETRIEVAL_MEMORY_LIMIT:-512M}'
+          memory: '${RETRIEVAL_MEMORY_LIMIT:-2G}'
         reservations:
           cpus: '${RETRIEVAL_CPU_RESERVATION:-0.25}'
-          memory: '${RETRIEVAL_MEMORY_RESERVATION:-256M}'
+          memory: '${RETRIEVAL_MEMORY_RESERVATION:-1G}'
 
 volumes:
   redis_data: {}

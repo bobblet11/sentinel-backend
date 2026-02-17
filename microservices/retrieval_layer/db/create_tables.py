@@ -1,4 +1,4 @@
-from microservices.retrieval_layer.models import Base
+from microservices.retrieval_layer.db.models import Base
 from microservices.retrieval_layer.db.session import engine
 
 def main():
