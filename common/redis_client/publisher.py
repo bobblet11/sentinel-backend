@@ -21,7 +21,7 @@ class RedisPublisher:
         self.logger: Logger = getLogger(f"{stream_name}.redis_publisher")
         self.logger.info("--- Initializing RedisPublisher ---")
         self.stream_name:str = stream_name
-        self.max_len:int = 100000
+        self.max_len:int = 100_000
         self.client:redis.Redis = redis_connection.get_client()
         self.logger.info(f"--- Initialized RedisPublisher to {stream_name} ---")
 

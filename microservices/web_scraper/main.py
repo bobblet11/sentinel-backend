@@ -16,14 +16,15 @@ from microservices.web_scraper.config import (
     GROUP_NAME,
     INPUT_STREAMS,
     SCRAPER_MAX_WORKERS,
-    USER_OUTPUT_STREAM
+    USER_OUTPUT_STREAM,
+    LOG_MODE
 )
 from microservices.web_scraper.scraper_service_benchmark import ScraperServiceBenchmark
 SERVICE_NAME="scraper"
 CONTAINER_NAME="web_scraper"
 
 if __name__ == "__main__":
-    setup_logging(level=DEBUG,container_name=CONTAINER_NAME)
+    setup_logging(level=LOG_MODE,container_name=CONTAINER_NAME)
 
     config = ServiceConfig(
         routing_key=["header","type"],
@@ -37,7 +38,11 @@ if __name__ == "__main__":
         consumer_name=CONSUMER_NAME, 
         failure_output_stream=FAILURE_OUTPUT_STREAM, 
         is_concurrent=True, 
-        batch_size=BATCH_SIZE)
+        batch_size=BATCH_SIZE,
+        is_cut_and_paste_mode=False
+        )
+    
+    
     
     scraper_service = ScraperService(config)
     signal.signal(signal.SIGINT, scraper_service.shutdown)

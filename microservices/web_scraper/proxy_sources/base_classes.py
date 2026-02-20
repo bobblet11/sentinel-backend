@@ -179,10 +179,13 @@ class HttpProxySource(ProxySource):
         
         except exceptions.Timeout:
             self.logger.warning(f"Timeout connecting to {url}")
+            raise
         except exceptions.RequestException as e:
             self.logger.error(f"HTTP Error fetching {url}: {e}")
+            raise
         except Exception as e:
             self.logger.error(f"Unexpected error parsing {url}: {e}")
+            raise
 
     @abstractmethod
     def get_proxies(self, bootstrap_proxies: ProxyRequestDict = None) -> ProxyDict:

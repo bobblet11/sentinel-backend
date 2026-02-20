@@ -1,6 +1,6 @@
 import redis
 
-from typing import List
+from typing import List, Optional
 from common.redis_client.connection import redis_connection
 from logging import Logger, getLogger
 
@@ -10,13 +10,12 @@ class RedisDuplicateFilter:
     Uses a "rolling" TTL on the entire set to manage memory over time.
     """
 
-    def __init__(self, key_name: str, ttl_s: int = 604800):
+    def __init__(self, key_name: str, ttl_s: int = 0):
         """
         key_name (str): The name of the Redis set to upload and check.
         ttl_s (str): The time in seconds a value can live in redis set. Default is 1 week
         """
 
-        
         if not isinstance(key_name, str) or not key_name:
             raise ValueError("key_name must be a non-empty string.")
         
@@ -25,7 +24,7 @@ class RedisDuplicateFilter:
         
 
         self.key_name:str = key_name
-        self.ttl_s:str = ttl_s
+        self.ttl_s:int = ttl_s
         self.client: redis.Redis = redis_connection.get_client()
 
         self.logger.info(f"--- Initialized RedisDuplicateFilter at {key_name} ---")
@@ -62,6 +61,7 @@ class RedisDuplicateFilter:
             unseen_items: List[str] = [
                 item for item, exists in zip(items, exists_results) if not exists
             ]
+            
             return unseen_items
         except Exception as e:
             self.logger.error(
@@ -80,8 +80,14 @@ class RedisDuplicateFilter:
 
             pipe = self.client.pipeline()
             pipe.sadd(self.key_name, item)
-            pipe.expire(self.key_name, self.ttl_s)
-            pipe.execute()
+            
+            if self.ttl_s > 0:
+                pipe.expire(self.key_name, self.ttl_s)
+                
+            results = pipe.execute()
+            
+            if not results[-1]:  # Check expire result
+                self.logger.warning(f"Failed to set TTL on {self.key_name}")
             
         except Exception as e:
             self.logger.error(f"Failed to add item {item} to set {self.key_name}! {e}")
@@ -98,11 +104,24 @@ class RedisDuplicateFilter:
 
             pipe = self.client.pipeline()
             pipe.sadd(self.key_name, *items)
-            pipe.expire(self.key_name, self.ttl_s)
-            pipe.execute()
             
+            if self.ttl_s > 0:
+                pipe.expire(self.key_name, self.ttl_s)
+                
+            results = pipe.execute()
+            
+            if not results[-1]:  # Check expire result
+                self.logger.warning(f"Failed to set TTL on {self.key_name}")
         except Exception as e:
             self.logger.error(
                 f"Failed to add {len(items)} items to set {self.key_name}! {e}"
             )
+            raise e
+
+    def scard(self) -> int:
+        try:
+            result: int = self.client.scard(self.key_name)
+            return result
+        except Exception as e:
+            self.logger.error(f"Failed to count elements in duplicate filter! {e}")
             raise e
