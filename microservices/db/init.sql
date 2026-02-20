@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS claim (
     id SERIAL PRIMARY KEY,
     original_sentence TEXT NOT NULL,
     decontextualised_claim TEXT,
-    decontextualised_embedding JSON,
+    decontextualised_embedding VECTOR(768),
     centrality_score FLOAT,
     article_id INTEGER NOT NULL,
 
@@ -123,6 +123,11 @@ CREATE TABLE IF NOT EXISTS claim (
         REFERENCES article(id)
         ON DELETE CASCADE
 );
+
+CREATE INDEX IF NOT EXISTS idx_claim_embedding_ivfflat
+ON claim
+USING ivfflat (decontextualised_embedding vector_cosine_ops)
+WITH (lists = 100);
 
 CREATE TABLE IF NOT EXISTS claim_to_entity (
     claim_id INTEGER NOT NULL,

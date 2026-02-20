@@ -19,7 +19,9 @@ LABEL_MAP = {
 }
 
 def classify_claim_relation(user_claim: str, candidate_claim: str):
-    result = _nli(
+    nli = get_nli()
+    # print("DEBUG NLI INPUT:", {"text": candidate_claim, "text_pair": user_claim})
+    result = nli(
         {
             "text": candidate_claim,
             "text_pair": user_claim

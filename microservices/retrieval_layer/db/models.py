@@ -2,7 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, Text, DateTime, ForeignKey, Float, Table, func, JSON
 )
 from sqlalchemy.orm import relationship, declarative_base
-
+from pgvector.sqlalchemy import Vector
 Base = declarative_base()
 
 claim_to_entity_table = Table(
@@ -27,7 +27,7 @@ class Claim(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     original_sentence = Column(Text, nullable=False)
     decontextualised_claim = Column(Text, nullable=True)
-    decontextualised_embedding = Column(JSON, nullable=True)  # store array/JSON from NLP
+    decontextualised_embedding = Column(Vector(768), nullable=True)
     centrality_score = Column(Float, nullable=True)
     article_id = Column(Integer, ForeignKey("article.id"), nullable=False)
 
