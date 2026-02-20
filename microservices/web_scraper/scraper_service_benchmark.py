@@ -51,7 +51,7 @@ class ScraperServiceBenchmark(ScraperService):
         #Ack but dont publish
         try:
             self._process_message(message)
-            self.message_consumer.acknowledge(message.stream, message.redis_id)
+            self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
             return "0","0"
 
         except Exception as e:

@@ -117,8 +117,5 @@ class BenchmarkTemplate(ABC):
 
 	def run(self) -> BenchmarkResults:
 		self.setup()
-		start_time = time.perf_counter()
 		self.execute()
-		end_time = time.perf_counter()
-		BenchmarkResults(total_time_elapsed=end_time - start_time)
 		

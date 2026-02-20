@@ -61,7 +61,7 @@ class Group():
 
         for job in self.jobs:
             timestamps = job.get("stage_timestamps", [])
-            if len(timestamps) < 8:
+            if len(timestamps) < 7:
                 continue
             valid_jobs.append(job)
             
@@ -69,8 +69,8 @@ class Group():
             wait_1 = timestamps[1]["offset_s"] - timestamps[0]["offset_s"]
             wait_2 = timestamps[2]["offset_s"] - timestamps[1]["offset_s"]
             durations["wait_total"].append(wait_1 + wait_2)
-            durations["fetch_time"].append(timestamps[4]["offset_s"] - timestamps[3]["offset_s"])
-            durations["parse_time"].append(timestamps[6]["offset_s"] - timestamps[5]["offset_s"])
+            durations["fetch_time"].append(timestamps[3]["offset_s"] - timestamps[2]["offset_s"])
+            durations["parse_time"].append(timestamps[5]["offset_s"] - timestamps[4]["offset_s"])
 
         if not valid_jobs:
             return StatisticForGroup()
@@ -95,6 +95,7 @@ class Group():
 
 
 def read_and_segment_groups(result_path: Path) -> Tuple[Group, Group, Group]:
+    print(result_path)
     with open(result_path, "r") as file:
         file_data = json.load(file)
     user_jobs, background_jobs = [], []
