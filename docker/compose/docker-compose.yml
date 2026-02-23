@@ -509,6 +509,9 @@ services:
     profiles:
       - retrieval
 
+    volumes:
+      - ${HOST_LOG_ROOT}/retrieval/logs:/app/logs
+
     restart: unless-stopped
     networks:
       - sentinel-net

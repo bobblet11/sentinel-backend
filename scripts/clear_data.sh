@@ -131,4 +131,15 @@ run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" down
 echo "==> Forcefully removing old service images to prevent tag conflicts..."
 run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" down --rmi local -v --remove-orphans || true
 
+echo "==> Removing host-mounted data directories..."
+if [ -d "$PROJECT_ROOT/data/postgres_data" ]; then
+    log_warn "Deleting Postgres data at $PROJECT_ROOT/data/postgres_data"
+    run_and_log sudo rm -rf "$PROJECT_ROOT/data/postgres_data"
+fi
+
+if [ -d "$PROJECT_ROOT/data/redis_data" ]; then
+    log_warn "Deleting Redis data at $PROJECT_ROOT/data/redis_data"
+    run_and_log sudo rm -rf "$PROJECT_ROOT/data/redis_data"
+fi
+
 echo "==> Clean complete."

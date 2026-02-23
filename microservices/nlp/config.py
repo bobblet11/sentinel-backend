@@ -17,6 +17,13 @@ CONSUMER_NAME: str = get_env_var("CONSUMER_NAME",str, config_logger)
 NLP_MAX_WORKERS: int  = get_env_var("NLP_MAX_WORKERS",str, config_logger)
 BATCH_SIZE: int = get_env_var("BATCH_SIZE", int, config_logger)
 
+DUMMY_NLP_MODE: bool = get_env_var(
+    "DUMMY_NLP_MODE",
+    lambda x: str(x).lower() in {"1", "true", "yes", "y"},
+    config_logger,
+    default=False,
+)
+
 EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, "all-MiniLM-L6-v2") 
 NER_MODEL = get_env_var("NLP_NER_MODEL", str, config_logger, "dslim/bert-base-NER") 
 BIAS_MODEL = get_env_var("NLP_BIAS_MODEL", str, config_logger, "facebook/bart-large-mnli") 
@@ -37,7 +44,8 @@ env_variables: List[EnvVariable] = [
     EnvVariable("EMBEDDING_MODEL", EMBEDDING_MODEL), 
     EnvVariable("NER_MODEL", NER_MODEL), 
     EnvVariable("BIAS_MODEL", BIAS_MODEL), 
-    EnvVariable("DEVICE", DEVICE)
+    EnvVariable("DEVICE", DEVICE),
+    EnvVariable("DUMMY_NLP_MODE", DUMMY_NLP_MODE),
 ]
 
 print_env(Config(env_variables, input_streams, output_streams), config_logger)

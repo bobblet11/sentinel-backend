@@ -11,7 +11,7 @@ def get_or_create_outlet(db: Session, name: str, leaning: Optional[str] = None) 
     row = db.execute(select(NewsOutlet).where(NewsOutlet.name == name)).scalar_one_or_none()
     if row:
         return row
-    n = NewsOutlet(name=name, leaning=leaning)
+    n = NewsOutlet(name=name)
     db.add(n)
     db.flush()
     return n

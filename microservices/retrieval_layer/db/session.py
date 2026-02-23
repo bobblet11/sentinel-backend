@@ -4,13 +4,13 @@ from microservices.retrieval_layer.config import (
     POSTGRES_USER,
     POSTGRES_PASSWORD,
     POSTGRES_HOST,
-    POSTGRES_EXTERNAL_PORT,
+    POSTGRES_PORT,
     POSTGRES_DB,
 )
 
 DATABASE_URL = (
     f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
-    f"@{POSTGRES_HOST}:{POSTGRES_EXTERNAL_PORT}/{POSTGRES_DB}"
+    f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 )
 
 engine = create_engine(

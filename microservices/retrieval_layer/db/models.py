@@ -38,9 +38,7 @@ class Claim(Base):
 class NewsOutlet(Base):
     __tablename__ = "news_outlet"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    leaning = Column(String(50), nullable=True)
     name = Column(String(255), nullable=False, unique=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     articles = relationship("Article", back_populates="outlet")
 
@@ -59,7 +57,7 @@ class Article(Base):
     title = Column(String(1024), nullable=True)
     text = Column(Text, nullable=True)
     html = Column(Text, nullable=True)
-    publishedAt = Column(DateTime(timezone=True), nullable=True)
+    publishedAt = Column("publishedat", DateTime(timezone=True), nullable=True)
     sentiment_id = Column(Integer, ForeignKey("sentiment_analysis.id"), nullable=True)
     outlet_id = Column(Integer, ForeignKey("news_outlet.id"), nullable=True)
 
