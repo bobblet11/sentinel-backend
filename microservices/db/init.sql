@@ -13,6 +13,23 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- Enable trigram similarity for fuzzy text search
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
+-- ============================================================================
+-- Create sentinel_user role with proper credentials and permissions
+-- ============================================================================
+DO $$ 
+BEGIN
+  -- Create role if it doesn't exist, or alter password if it does
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'sentinel_user') THEN
+    CREATE ROLE sentinel_user WITH LOGIN PASSWORD 'Sentinel12345' SUPERUSER CREATEDB CREATEROLE;
+  ELSE
+    ALTER ROLE sentinel_user WITH PASSWORD 'Sentinel12345';
+  END IF;
+END 
+$$;
+
+-- Grant all privileges on the sentinel_db database
+GRANT ALL PRIVILEGES ON DATABASE "sentinel_db" TO sentinel_user;
+
 BEGIN;
 
 
