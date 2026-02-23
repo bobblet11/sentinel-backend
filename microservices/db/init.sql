@@ -50,8 +50,6 @@ CREATE TABLE IF NOT EXISTS news_outlet (
 );
 COMMENT ON TABLE news_outlet IS 'Records each news outlet. everytime a new outlet is submitted through an article, new outlet is added here';
 
-
-
 CREATE TABLE IF NOT EXISTS job (
 	id SERIAL PRIMARY KEY,
 	uid CHAR(36) NOT NULL UNIQUE,
