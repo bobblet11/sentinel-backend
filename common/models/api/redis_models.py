@@ -123,19 +123,6 @@ class SentenceScore:
     entities: List[Entity] = field(default_factory=list)
 
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
-
-
-@dataclass
-class SentenceScore:
-    """
-    Represents a sentence and its analysis scores across the pipeline.
-    """
-    index: int
-    text: str
-    score: float = 0.0  # Centrality or relevance score
-    embedding: Optional[List[float]] = None  # Vector representation
-    label: Optional[str] = None  # e.g., "CLAIM", "BIASED", "NEUTRAL"
 
     
 @dataclass
