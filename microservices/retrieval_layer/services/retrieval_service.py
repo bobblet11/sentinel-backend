@@ -26,6 +26,18 @@ EMBEDDING_DIM = 768
 _DUMMY_CORPUS_SEEDED = False
 _DUMMY_BASE_EMBEDDING = [0.05] * EMBEDDING_DIM
 
+# Define 3 distinct dummy article embeddings
+_DUMMY_EMBEDDINGS = {
+    "article_1": [0.1] * EMBEDDING_DIM,  # Government/Taxes
+    "article_2": [0.3] * EMBEDDING_DIM,  # Climate
+    "article_3": [0.5] * EMBEDDING_DIM,  # Healthcare
+}
+
+
+def _create_similar_embedding(base_pattern: float, noise_level: float = 0.05) -> List[float]:
+    """Create an embedding similar to a base pattern with slight variation."""
+    return [base_pattern + (noise_level if i % 2 == 0 else -noise_level) for i in range(EMBEDDING_DIM)]
+
 
 def _extract_sentiment(payload: Any) -> Optional[Dict[str, Any]]:
     bias_profile = getattr(payload, "bias_profile", None)
@@ -115,38 +127,78 @@ def _seed_dummy_corpus() -> None:
 
     db = get_db_session()
     try:
-        seed_specs = [
-            ("https://dummy.local/article/seed-1", "Government raised taxes"),
-            ("https://dummy.local/article/seed-2", "Tax increases were approved"),
-            ("https://dummy.local/article/seed-3", "New tax hike announced"),
+        # Define 3 dummy articles with different topics and embeddings
+        articles_data = [
+            {
+                "url": "https://dummy.local/article/seed-1",
+                "title": "Dummy Article 1: Government Policy",
+                "text": "Article about government taxation policies and economic impact.",
+                "outlet_name": "Dummy Outlet 1",
+                "embedding": _DUMMY_EMBEDDINGS["article_1"],
+                "claims": [
+                    ("Government raised taxes", "Government raised taxes", 0.0),
+                    ("Tax increases impact citizens", "Tax increases impact citizens", 0.01),
+                    ("Revenue from taxes increased", "Revenue from taxes increased", 0.02),
+                ]
+            },
+            {
+                "url": "https://dummy.local/article/seed-2",
+                "title": "Dummy Article 2: Climate Change",
+                "text": "Article about climate change impacts and environmental policies.",
+                "outlet_name": "Dummy Outlet 2",
+                "embedding": _DUMMY_EMBEDDINGS["article_2"],
+                "claims": [
+                    ("Climate is changing rapidly", "Climate is changing rapidly due to human activity", 0.0),
+                    ("Carbon emissions are rising", "Carbon emissions continue to rise globally", 0.01),
+                    ("Green energy is critical", "Renewable energy solutions are critical for sustainability", 0.02),
+                ]
+            },
+            {
+                "url": "https://dummy.local/article/seed-3",
+                "title": "Dummy Article 3: Healthcare Reform",
+                "text": "Article about healthcare system improvements and medical innovations.",
+                "outlet_name": "Dummy Outlet 3",
+                "embedding": _DUMMY_EMBEDDINGS["article_3"],
+                "claims": [
+                    ("Healthcare costs are rising", "Healthcare costs continue to rise across the nation", 0.0),
+                    ("Medications are unaffordable", "Prescription medications are becoming increasingly unaffordable", 0.01),
+                    ("Medical technology advancing", "New medical technology is advancing patient care significantly", 0.02),
+                ]
+            },
         ]
 
-        for url, claim_text in seed_specs:
+        for article_data in articles_data:
             article = get_or_create_article(
                 db,
                 {
-                    "url": url,
-                    "title": "Dummy Seed Article",
-                    "text": "Dummy content about taxes and policy.",
-                    "html": "<p>Dummy content about taxes and policy.</p>",
+                    "url": article_data["url"],
+                    "title": article_data["title"],
+                    "text": article_data["text"],
+                    "html": f"<p>{article_data['text']}</p>",
                     "publishedAt": "2026-02-23T00:00:00",
-                    "outlet_name": "Dummy Outlet",
+                    "outlet_name": article_data["outlet_name"],
                 },
             )
-            create_claim_and_link_entities(
-                db,
-                {
-                    "original_sentence": claim_text,
-                    "decontextualised_claim": claim_text,
-                    "decontextualised_embedding": _DUMMY_BASE_EMBEDDING,
-                    "centrality_score": 0.9,
-                    "entities": [
-                        {"name": "Government", "type": "ORG"},
-                        {"name": "taxes", "type": "TOPIC"},
-                    ],
-                },
-                article_obj=article,
-            )
+            
+            # Create 3 claims for each article with slightly different embeddings
+            base_value = article_data["embedding"][0]
+            for original_sentence, decontextualised_claim, noise_offset in article_data["claims"]:
+                # Create unique embedding for each claim by adding a small offset
+                claim_embedding = [base_value + noise_offset] * EMBEDDING_DIM
+                
+                create_claim_and_link_entities(
+                    db,
+                    {
+                        "original_sentence": original_sentence,
+                        "decontextualised_claim": decontextualised_claim,
+                        "decontextualised_embedding": claim_embedding,
+                        "centrality_score": 0.9,
+                        "entities": [
+                            {"name": "General", "type": "TOPIC"},
+                        ],
+                    },
+                    article_obj=article,
+                )
 
         db.commit()
         _DUMMY_CORPUS_SEEDED = True
@@ -155,6 +207,37 @@ def _seed_dummy_corpus() -> None:
         raise
     finally:
         db.close()
+
+def _create_synthetic_user_claims() -> List[Dict[str, Any]]:
+    """
+    Create 3 synthetic claims for user articles, each with embedding directly matching a dummy article.
+    This ensures retrieval matches against each of the 3 dummy article topics.
+    """
+    claims = [
+        {
+            "original_sentence": "Government policy affects citizens",
+            "decontextualised_claim": "Government policy affects citizens",
+            "decontextualised_embedding": _DUMMY_EMBEDDINGS["article_1"],  # Direct match to Article 1
+            "centrality_score": 0.85,
+            "entities": [{"name": "Government", "type": "ORG"}],
+        },
+        {
+            "original_sentence": "Environmental changes are occurring",
+            "decontextualised_claim": "Environmental changes are occurring",
+            "decontextualised_embedding": _DUMMY_EMBEDDINGS["article_2"],  # Direct match to Article 2
+            "centrality_score": 0.87,
+            "entities": [{"name": "Environment", "type": "TOPIC"}],
+        },
+        {
+            "original_sentence": "Healthcare systems are evolving",
+            "decontextualised_claim": "Healthcare systems are evolving",
+            "decontextualised_embedding": _DUMMY_EMBEDDINGS["article_3"],  # Direct match to Article 3
+            "centrality_score": 0.86,
+            "entities": [{"name": "Healthcare", "type": "TOPIC"}],
+        },
+    ]
+    return claims
+
 
 logger = getLogger(__name__)
 
@@ -250,6 +333,14 @@ class RetrievalService(ServiceTemplate):
                 "claims": claims,
             }
 
+        # For user articles, generate 3 synthetic claims matching dummy articles (for demo/testing)
+        if message.data.header.type == "user":
+            message_dict["claims"] = _create_synthetic_user_claims()
+            logger.info(
+                "Generated 3 synthetic claims for user article uid=%s",
+                message.data.header.uid,
+            )
+
         logger.info(
             "Retrieval received message uid=%s type=%s url=%s claims=%s",
             message.data.header.uid,
@@ -269,49 +360,54 @@ class RetrievalService(ServiceTemplate):
 
         has_claims = bool(message_dict.get("claims"))
         if message.data.header.type == "user" and has_claims:
-            # choose main claim
-            main_claim = max(
-                message_dict["claims"],
-                key=lambda c: c.get("centrality_score", 0),
-            )
-
+            # Run retrieval on all claims for user articles
             db = get_db_session()
             try:
                 top_k = 3 if DUMMY_NLP_MODE else 5
-                retrieval_results = retrieve_candidate_claims(
-                    db=db,
-                    claim_text=main_claim["decontextualised_claim"],
-                    claim_embedding=main_claim["decontextualised_embedding"],
-                    entities=[e["name"] for e in main_claim.get("entities", [])],
-                    top_k=top_k,
-                    run_nli=not DUMMY_NLP_MODE,
-                )
-
-                # Handle both cases: with NLI (4 values) and without NLI (2 values)
-                if DUMMY_NLP_MODE:
-                    # When run_nli=False, only (claim, score) is returned
-                    retrieval_output = [
-                        {
-                            "claim_id": claim["id"],
-                            "claim_text": claim["decontextualised_claim"],
-                            "similarity": float(score),
-                            "relation": "unknown",
-                            "confidence": 0.0,
-                        }
-                        for claim, score in retrieval_results
-                    ]
-                else:
-                    # When run_nli=True, (claim, score, label, confidence) is returned
-                    retrieval_output = [
-                        {
-                            "claim_id": claim["id"],
-                            "claim_text": claim["decontextualised_claim"],
-                            "similarity": float(score),
-                            "relation": label,
-                            "confidence": confidence,
-                        }
-                        for claim, score, label, confidence in retrieval_results
-                    ]
+                all_retrieval_results = []
+                
+                for claim in message_dict["claims"]:
+                    retrieval_results = retrieve_candidate_claims(
+                        db=db,
+                        claim_text=claim["decontextualised_claim"],
+                        claim_embedding=claim["decontextualised_embedding"],
+                        entities=[e["name"] for e in claim.get("entities", [])],
+                        top_k=top_k,
+                        run_nli=not DUMMY_NLP_MODE,
+                    )
+                    
+                    # Store results with claim text for reference
+                    if DUMMY_NLP_MODE:
+                        # When run_nli=False, only (claim, score) is returned
+                        claim_results = [
+                            {
+                                "claim_id": c["id"],
+                                "claim_text": c["decontextualised_claim"],
+                                "similarity": float(score),
+                                "relation": "unknown",
+                                "confidence": 0.0,
+                                "query_claim": claim["decontextualised_claim"],
+                            }
+                            for c, score in retrieval_results
+                        ]
+                    else:
+                        # When run_nli=True, (claim, score, label, confidence) is returned
+                        claim_results = [
+                            {
+                                "claim_id": c["id"],
+                                "claim_text": c["decontextualised_claim"],
+                                "similarity": float(score),
+                                "relation": label,
+                                "confidence": confidence,
+                                "query_claim": claim["decontextualised_claim"],
+                            }
+                            for c, score, label, confidence in retrieval_results
+                        ]
+                    
+                    all_retrieval_results.extend(claim_results)
+                
+                retrieval_output = all_retrieval_results
+                
                 if DUMMY_NLP_MODE and result.get("created_article_id"):
                     retrieval_output = [
                         item for item in retrieval_output
