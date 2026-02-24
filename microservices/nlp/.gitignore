@@ -1,3 +1,4 @@
-tests/article.json
+tests/article[0-9]*.json
 tests/test_output.json
 tests/test_output_readable.json
+tests/notebook_output.json

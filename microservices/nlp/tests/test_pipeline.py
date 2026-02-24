@@ -18,9 +18,9 @@ from microservices.nlp.components.bias import BiasDetector
 from microservices.nlp.components.ner import EntityRecognizer
 from microservices.nlp.components.checkworthy import CheckWorthinessFilter
 
-def run_local_pipeline_test():
+def run_local_pipeline_test(filename="article.json"):
     # 1. Arrange: Load data from JSON
-    json_path = os.path.join(os.path.dirname(__file__), 'article.json')
+    json_path = os.path.join(os.path.dirname(__file__), filename)
     if not os.path.exists(json_path):
         print(f"Error: {json_path} not found.")
         return
@@ -28,11 +28,13 @@ def run_local_pipeline_test():
     with open(json_path, 'r') as f:
         data = json.load(f)
 
-    # Article(text=..., title=..., link=...) - based on nlp_service.py usage
+    # Article(text=..., title=..., link=...) - mapping updated JSON structure to internal model
     article = Article(
-        title=data.get('title', 'Unknown Title'),
-        text=data.get('text', ''),
-        link=data.get('url', data.get('link', 'http://example.com'))
+        title=data.get('article_title', 'Unknown Title'),
+        text=data.get('article_text', ''),
+        # Map 'article_url' from JSON to the Article's 'link' field
+        link=data.get('article_url', 'http://example.com'),
+        summary=data.get('article_summary', '')
     )
     result = NLPResult()
     options = NLPOptions()
@@ -82,13 +84,16 @@ def run_local_pipeline_test():
         print(f"Total Sentences: {len(result.sentences)}")
         for i, s in enumerate(result.sentences): 
              # Print details for every sentence to debug classification
-             print(f"Sent {i}: [{s.claim_type or 'N/A'}] ({s.confidence:.2f}) - Checkworthy: {s.is_checkworthy}")
-             print(f"    Text: {s.text[:100]}...")
+             print(f"Sent {i}: [{s.claim_type or 'N/A'}] (Conf: {s.confidence:.2f} | Centrality: {s.score:.4f}) - Checkworthy: {s.is_checkworthy}")
+             print(f"    Text: {s.text}...")
 
     print(f"\nTotal Claims Extracted: {len(result.claims_in_article)}")
 
     # Output as JSON
-    output_file = Path(os.path.join(os.path.dirname(__file__), 'test_output.json'))
+    # If the input was article5.json, output is test_output_article5.json
+    base_name = os.path.splitext(filename)[0]
+    output_filename = f"test_output_{base_name}.json" if filename != 'article.json' else 'test_output.json'
+    output_file = Path(os.path.join(os.path.dirname(__file__), output_filename))
     
     with open(output_file, 'w') as out_f:
         json.dump(dataclasses.asdict(result), out_f, indent=2, default=str)
@@ -97,4 +102,10 @@ def run_local_pipeline_test():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    run_local_pipeline_test()
+    
+    target_file = 'article.json'
+    if len(sys.argv) > 1:
+        # User provides just the number, e.g. "5" -> "article5.json"
+        target_file = f"article{sys.argv[1]}.json"
+
+    run_local_pipeline_test(target_file)
