@@ -32,6 +32,7 @@ class JobCreate(BaseModel):
 
 class JobResponse(BaseModel):
     id: int
+    uid: UUID
     status: str
     type: str
     created_at: datetime
