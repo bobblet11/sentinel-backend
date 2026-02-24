@@ -332,14 +332,51 @@ class RetrievalService(ServiceTemplate):
                 },
                 "claims": claims,
             }
+            
+            # Log original NLP claims before synthetic replacement
+            if message.data.header.type == "user" and claims:
+                logger.info(
+                    "=== ORIGINAL NLP RESULTS FOR USER ARTICLE ===\n"
+                    "uid=%s, title=%s\n"
+                    "Number of claims: %d",
+                    message.data.header.uid,
+                    payload.title,
+                    len(claims),
+                )
+                for i, claim in enumerate(claims, 1):
+                    embedding_sample = claim.get("decontextualised_embedding", [])
+                    embedding_sample = embedding_sample[:3] if embedding_sample else []
+                    logger.info(
+                        "  Claim %d: %s\n"
+                        "    Embedding sample (first 3 values): %s\n"
+                        "    Centrality score: %.2f",
+                        i,
+                        claim.get("decontextualised_claim"),
+                        embedding_sample,
+                        claim.get("centrality_score", 0),
+                    )
 
         # For user articles, generate 3 synthetic claims matching dummy articles (for demo/testing)
         if message.data.header.type == "user":
+            original_claims_count = len(message_dict.get("claims", []))
             message_dict["claims"] = _create_synthetic_user_claims()
             logger.info(
-                "Generated 3 synthetic claims for user article uid=%s",
+                "=== REPLACING WITH 3 SYNTHETIC CLAIMS ===\n"
+                "uid=%s\n"
+                "Original NLP claims: %d → Synthetic claims: 3",
                 message.data.header.uid,
+                original_claims_count,
             )
+            for i, claim in enumerate(message_dict["claims"], 1):
+                embedding_sample = claim.get("decontextualised_embedding", [])
+                embedding_sample = embedding_sample[:3] if embedding_sample else []
+                logger.info(
+                    "  Synthetic Claim %d: %s\n"
+                    "    Embedding sample (first 3 values): %s",
+                    i,
+                    claim["decontextualised_claim"],
+                    embedding_sample,
+                )
 
         logger.info(
             "Retrieval received message uid=%s type=%s url=%s claims=%s",
