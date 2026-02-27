@@ -13,6 +13,23 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- Enable trigram similarity for fuzzy text search
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
+-- ============================================================================
+-- Create sentinel_user role with proper credentials and permissions
+-- ============================================================================
+DO $$ 
+BEGIN
+  -- Create role if it doesn't exist, or alter password if it does
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'sentinel_user') THEN
+    CREATE ROLE sentinel_user WITH LOGIN PASSWORD 'Sentinel12345' SUPERUSER CREATEDB CREATEROLE;
+  ELSE
+    ALTER ROLE sentinel_user WITH PASSWORD 'Sentinel12345';
+  END IF;
+END 
+$$;
+
+-- Grant all privileges on the sentinel_db database
+GRANT ALL PRIVILEGES ON DATABASE "sentinel_db" TO sentinel_user;
+
 BEGIN;
 
 
@@ -32,8 +49,6 @@ CREATE TABLE IF NOT EXISTS news_outlet (
 	UNIQUE (name)
 );
 COMMENT ON TABLE news_outlet IS 'Records each news outlet. everytime a new outlet is submitted through an article, new outlet is added here';
-
-
 
 CREATE TABLE IF NOT EXISTS job (
 	id SERIAL PRIMARY KEY,
@@ -69,6 +84,82 @@ COMMENT ON TABLE job_timestamp IS 'Records timestamps for various pipeline stage
 COMMENT ON COLUMN job_timestamp.stage_name IS 'The name of the pipeline stage, e.g., ''ingested'', ''scraped''.';
 
 CREATE INDEX IF NOT EXISTS idx_job_timestamp_job_id ON job_timestamp(job_id);
+
+CREATE TABLE IF NOT EXISTS author (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS sentiment_analysis (
+    id SERIAL PRIMARY KEY,
+    bias_category VARCHAR(50),
+    bias_score FLOAT,
+    bias_analysis_confidence FLOAT,
+    sentiment_category VARCHAR(50),
+    sentiment_analysis_confidence FLOAT
+);
+
+ALTER TABLE article
+ADD COLUMN IF NOT EXISTS title VARCHAR(1024),
+ADD COLUMN IF NOT EXISTS publishedat TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS sentiment_id INTEGER,
+ADD COLUMN IF NOT EXISTS outlet_id INTEGER;
+
+ALTER TABLE article
+ADD CONSTRAINT fk_article_outlet
+FOREIGN KEY (outlet_id) REFERENCES news_outlet(id)
+ON DELETE SET NULL;
+
+ALTER TABLE article
+ADD CONSTRAINT fk_article_sentiment
+FOREIGN KEY (sentiment_id) REFERENCES sentiment_analysis(id)
+ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS entity (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_name ON entity(name);
+
+CREATE TABLE IF NOT EXISTS claim (
+    id SERIAL PRIMARY KEY,
+    original_sentence TEXT NOT NULL,
+    decontextualised_claim TEXT,
+    decontextualised_embedding VECTOR(768),
+    centrality_score FLOAT,
+    article_id INTEGER NOT NULL,
+
+    CONSTRAINT fk_claim_article
+        FOREIGN KEY(article_id)
+        REFERENCES article(id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_claim_embedding_ivfflat
+ON claim
+USING ivfflat (decontextualised_embedding vector_cosine_ops)
+WITH (lists = 100);
+
+CREATE TABLE IF NOT EXISTS claim_to_entity (
+    claim_id INTEGER NOT NULL,
+    entity_id INTEGER NOT NULL,
+
+    PRIMARY KEY (claim_id, entity_id),
+
+    CONSTRAINT fk_cte_claim
+        FOREIGN KEY (claim_id)
+        REFERENCES claim(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_cte_entity
+        FOREIGN KEY (entity_id)
+        REFERENCES entity(id)
+        ON DELETE CASCADE
+);
 
 
 

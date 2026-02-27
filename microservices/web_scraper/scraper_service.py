@@ -152,6 +152,18 @@ class ScraperService(ServiceTemplate):
                 message.add_timestamp(JobStage.PARSED_OUT)
                 parse_end = time.perf_counter()
                 parse_time = parse_end - parse_start
+
+            if message.text:
+                text_preview = (message.text[:200] + "...") if len(message.text) > 200 else message.text
+                self.logger.info(
+                    "Scraper result url=%s title=%s publish_date=%s text_len=%s html_len=%s text_preview=%s",
+                    message.link,
+                    message.title,
+                    message.data.payload.publish_date,
+                    len(message.text or ""),
+                    len(message.html or ""),
+                    text_preview,
+                )
             
             message.add_timestamp(JobStage.OUT)
             self._log_stats(fetch_time, parse_time)
