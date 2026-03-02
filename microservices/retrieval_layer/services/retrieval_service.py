@@ -288,6 +288,73 @@ def _create_synthetic_user_claims() -> List[Dict[str, Any]]:
 logger = getLogger(__name__)
 
 
+def _calculate_verdict_and_confidence(matches: list[dict]) -> tuple[str, int]:
+    """
+    Calculate verdict and confidence for a claim based on its retrieval matches.
+    
+    Verdict: "true" | "mostly-true" | "mixed" | "mostly-false" | "false" | "unverified"
+    Confidence: 0-100 integer
+    """
+    if not matches:
+        return "unverified", 0
+    
+    # Count relations
+    support_count = sum(1 for m in matches if m["relation"] == "support")
+    contradict_count = sum(1 for m in matches if m["relation"] == "contradict")
+    irrelevant_count = sum(1 for m in matches if m["relation"] == "irrelevant")
+    unknown_count = sum(1 for m in matches if m["relation"] == "unknown")
+    
+    total = len(matches)
+    
+    # Calculate verdict based on support/contradict ratio
+    if irrelevant_count == total or (support_count == 0 and contradict_count == 0):
+        verdict = "unverified"
+    elif contradict_count == 0:
+        if support_count == total:
+            verdict = "true"
+        else:
+            verdict = "mostly-true"
+    elif support_count == 0:
+        if contradict_count == total:
+            verdict = "false"
+        else:
+            verdict = "mostly-false"
+    else:
+        # Both support and contradict present
+        support_ratio = support_count / total
+        if support_ratio > 0.66:
+            verdict = "mostly-true"
+        elif support_ratio < 0.33:
+            verdict = "mostly-false"
+        else:
+            verdict = "mixed"
+    
+    # Calculate confidence (0-100) based on:
+    # 1. Number of high-quality matches (similarity > 0.5 and relation != 'irrelevant')
+    # 2. Consistency of results (90+ confidence in NLI predictions)
+    high_quality_matches = [
+        m for m in matches 
+        if m["similarity"] > 0.5 and m["relation"] != "irrelevant"
+    ]
+    high_confidence_matches = [
+        m for m in high_quality_matches 
+        if m["confidence"] >= 0.9
+    ]
+    
+    if not high_quality_matches:
+        confidence = 20  # Low confidence when no high-quality matches
+    else:
+        # Base confidence on number and quality of matches
+        match_count_score = min(len(high_quality_matches) * 20, 60)  # Max 60 from match count
+        avg_similarity = sum(m["similarity"] for m in high_quality_matches) / len(high_quality_matches)
+        similarity_score = int(avg_similarity * 30)  # Max 30 from similarity
+        high_conf_bonus = len(high_confidence_matches) * 10  # Max 10 from high-confidence matches
+        
+        confidence = min(match_count_score + similarity_score + high_conf_bonus, 100)
+    
+    return verdict, confidence
+
+
 class RetrievalService(ServiceTemplate):
     def __init__(self, config):
         super().__init__(config)
@@ -489,13 +556,24 @@ class RetrievalService(ServiceTemplate):
                     
                     all_retrieval_results.extend(claim_results)
                 
-                retrieval_output = all_retrieval_results
+                # Group results by query_claim and calculate verdict + confidence
+                from collections import defaultdict
+                grouped_results = defaultdict(list)
+                for item in all_retrieval_results:
+                    grouped_results[item["query_claim"]].append(item)
                 
-                if DUMMY_NLP_MODE and result.get("created_article_id"):
-                    retrieval_output = [
-                        item for item in retrieval_output
-                        if item["claim_id"] not in (result.get("created_claim_ids") or [])
-                    ][:top_k]
+                # Build retrieval_output with verdict and confidence for each claim
+                retrieval_output = []
+                for query_claim, matches in grouped_results.items():
+                    verdict, confidence_score = _calculate_verdict_and_confidence(matches)
+                    
+                    retrieval_output.append({
+                        "query_claim": query_claim,
+                        "verdict": verdict,
+                        "confidence": confidence_score,
+                        "matches": matches,
+                        "match_count": len(matches),
+                    })
             finally:
                 db.close()
 
