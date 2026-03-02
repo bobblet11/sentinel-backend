@@ -15,12 +15,15 @@ from microservices.retrieval_layer.config import (
 )
 from microservices.retrieval_layer.retrieval.pipeline import retrieve_candidate_claims
 from microservices.retrieval_layer.db.session import get_db_session
+from microservices.retrieval_layer.db.models import Article, Claim, SentimentAnalysis, NewsOutlet
 from microservices.retrieval_layer.storage.crud import (
     get_or_create_article,
     create_claim_and_link_entities,
 )
 from logging import error, getLogger
 from pydantic import ValidationError
+from sqlalchemy.orm import joinedload
+from sqlalchemy import select, distinct
 
 EMBEDDING_DIM = 768
 _DUMMY_CORPUS_SEEDED = False
@@ -39,10 +42,21 @@ def _create_similar_embedding(base_pattern: float, noise_level: float = 0.05) ->
     return [base_pattern + (noise_level if i % 2 == 0 else -noise_level) for i in range(EMBEDDING_DIM)]
 
 
-def _extract_sentiment(payload: Any) -> Optional[Dict[str, Any]]:
+def _extract_sentiment(payload: Any) -> Dict[str, Any]:
+    import random
+    
     bias_profile = getattr(payload, "bias_profile", None)
     if not bias_profile:
-        return None
+        # Return random dummy sentiment if no bias profile is provided
+        bias_categories = ["left", "center", "right", "neutral"]
+        sentiment_categories = ["positive", "negative", "neutral", "critical", "optimistic", "concerned"]
+        return {
+            "bias_category": random.choice(bias_categories),
+            "bias_score": round(random.uniform(0.3, 0.9), 2),
+            "bias_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
+            "sentiment_category": random.choice(sentiment_categories),
+            "sentiment_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
+        }
 
     scores = getattr(bias_profile, "scores", None)
     bias_score = None
@@ -96,6 +110,12 @@ def _normalize_claims(claims: List[Any]) -> List[Dict[str, Any]]:
 
 
 def _build_dummy_message(article_url: str, claim_text: str) -> Dict[str, Any]:
+    import random
+    
+    # Generate random dummy sentiment for user-submitted articles
+    bias_categories = ["left", "center", "right", "neutral"]
+    sentiment_categories = ["positive", "negative", "neutral", "critical", "optimistic", "concerned"]
+    
     return {
         "article": {
             "url": article_url,
@@ -104,6 +124,13 @@ def _build_dummy_message(article_url: str, claim_text: str) -> Dict[str, Any]:
             "html": "<p>Dummy article about taxes and policy.</p>",
             "publishedAt": "2026-02-23T00:00:00",
             "outlet_name": "Dummy Outlet",
+            "sentiment": {
+                "bias_category": random.choice(bias_categories),
+                "bias_score": round(random.uniform(0.3, 0.9), 2),
+                "bias_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
+                "sentiment_category": random.choice(sentiment_categories),
+                "sentiment_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
+            },
         },
         "claims": [
             {
@@ -135,6 +162,13 @@ def _seed_dummy_corpus() -> None:
                 "text": "Article about government taxation policies and economic impact.",
                 "outlet_name": "Dummy Outlet 1",
                 "embedding": _DUMMY_EMBEDDINGS["article_1"],
+                "sentiment": {
+                    "bias_category": "left",
+                    "bias_score": 0.65,
+                    "bias_analysis_confidence": 0.80,
+                    "sentiment_category": "critical",
+                    "sentiment_analysis_confidence": 0.75,
+                },
                 "claims": [
                     ("Government raised taxes", "Government raised taxes", 0.0),
                     ("Tax increases impact citizens", "Tax increases impact citizens", 0.01),
@@ -147,6 +181,13 @@ def _seed_dummy_corpus() -> None:
                 "text": "Article about climate change impacts and environmental policies.",
                 "outlet_name": "Dummy Outlet 2",
                 "embedding": _DUMMY_EMBEDDINGS["article_2"],
+                "sentiment": {
+                    "bias_category": "neutral",
+                    "bias_score": 0.50,
+                    "bias_analysis_confidence": 0.85,
+                    "sentiment_category": "concerned",
+                    "sentiment_analysis_confidence": 0.82,
+                },
                 "claims": [
                     ("Climate is changing rapidly", "Climate is changing rapidly due to human activity", 0.0),
                     ("Carbon emissions are rising", "Carbon emissions continue to rise globally", 0.01),
@@ -159,6 +200,13 @@ def _seed_dummy_corpus() -> None:
                 "text": "Article about healthcare system improvements and medical innovations.",
                 "outlet_name": "Dummy Outlet 3",
                 "embedding": _DUMMY_EMBEDDINGS["article_3"],
+                "sentiment": {
+                    "bias_category": "right",
+                    "bias_score": 0.60,
+                    "bias_analysis_confidence": 0.78,
+                    "sentiment_category": "optimistic",
+                    "sentiment_analysis_confidence": 0.80,
+                },
                 "claims": [
                     ("Healthcare costs are rising", "Healthcare costs continue to rise across the nation", 0.0),
                     ("Medications are unaffordable", "Prescription medications are becoming increasingly unaffordable", 0.01),
@@ -177,6 +225,7 @@ def _seed_dummy_corpus() -> None:
                     "html": f"<p>{article_data['text']}</p>",
                     "publishedAt": "2026-02-23T00:00:00",
                     "outlet_name": article_data["outlet_name"],
+                    "sentiment": article_data["sentiment"],
                 },
             )
             
@@ -240,6 +289,146 @@ def _create_synthetic_user_claims() -> List[Dict[str, Any]]:
 
 
 logger = getLogger(__name__)
+
+
+def _calculate_verdict_and_confidence(matches: list[dict]) -> tuple[str, int]:
+    """
+    Calculate verdict and confidence for a claim based on its retrieval matches.
+    
+    Verdict: "true" | "mostly-true" | "mixed" | "mostly-false" | "false" | "unverified"
+    Confidence: 0-100 integer
+    """
+    if not matches:
+        return "unverified", 0
+    
+    # Count relations
+    support_count = sum(1 for m in matches if m["relation"] == "support")
+    contradict_count = sum(1 for m in matches if m["relation"] == "contradict")
+    irrelevant_count = sum(1 for m in matches if m["relation"] == "irrelevant")
+    unknown_count = sum(1 for m in matches if m["relation"] == "unknown")
+    
+    total = len(matches)
+    
+    # Calculate verdict based on support/contradict ratio
+    if irrelevant_count == total or (support_count == 0 and contradict_count == 0):
+        verdict = "unverified"
+    elif contradict_count == 0:
+        if support_count == total:
+            verdict = "true"
+        else:
+            verdict = "mostly-true"
+    elif support_count == 0:
+        if contradict_count == total:
+            verdict = "false"
+        else:
+            verdict = "mostly-false"
+    else:
+        # Both support and contradict present
+        support_ratio = support_count / total
+        if support_ratio > 0.66:
+            verdict = "mostly-true"
+        elif support_ratio < 0.33:
+            verdict = "mostly-false"
+        else:
+            verdict = "mixed"
+    
+    # Calculate confidence (0-100) based on:
+    # 1. Number of high-quality matches (similarity > 0.5 and relation != 'irrelevant')
+    # 2. Consistency of results (90+ confidence in NLI predictions)
+    high_quality_matches = [
+        m for m in matches 
+        if m["similarity"] > 0.5 and m["relation"] != "irrelevant"
+    ]
+    high_confidence_matches = [
+        m for m in high_quality_matches 
+        if m["confidence"] >= 0.9
+    ]
+    
+    if not high_quality_matches:
+        confidence = 20  # Low confidence when no high-quality matches
+    else:
+        # Base confidence on number and quality of matches
+        match_count_score = min(len(high_quality_matches) * 20, 60)  # Max 60 from match count
+        avg_similarity = sum(m["similarity"] for m in high_quality_matches) / len(high_quality_matches)
+        similarity_score = int(avg_similarity * 30)  # Max 30 from similarity
+        high_conf_bonus = len(high_confidence_matches) * 10  # Max 10 from high-confidence matches
+        
+        confidence = min(match_count_score + similarity_score + high_conf_bonus, 100)
+    
+    return verdict, confidence
+
+
+def _map_bias_category(bias_category: str) -> str:
+    """Map bias category to frontend expected values."""
+    if not bias_category:
+        return "center"
+    
+    category_lower = bias_category.lower()
+    if category_lower in ["left", "center-left", "center", "center-right", "right"]:
+        return category_lower
+    
+    # Map common variations
+    mapping = {
+        "liberal": "left",
+        "progressive": "left",
+        "conservative": "right",
+        "neutral": "center",
+        "moderate": "center",
+    }
+    return mapping.get(category_lower, "center")
+
+
+def _fetch_related_articles(db, claim_ids: List[int], current_article_id: int) -> List[Dict[str, Any]]:
+    """
+    Fetch related articles based on matched claim IDs.
+    Returns articles that contain the matched claims, excluding the current article.
+    """
+    if not claim_ids:
+        return []
+    
+    # Get unique article IDs from the matched claims
+    article_ids = db.execute(
+        select(distinct(Claim.article_id))
+        .where(Claim.id.in_(claim_ids))
+        .where(Claim.article_id != current_article_id)
+    ).scalars().all()
+    
+    if not article_ids:
+        return []
+    
+    # Fetch articles with their relationships
+    articles = db.execute(
+        select(Article)
+        .options(joinedload(Article.outlet))
+        .where(Article.id.in_(article_ids))
+        .limit(5)  # Limit to top 5 related articles
+    ).scalars().unique().all()
+    
+    related = []
+    for article in articles:
+        # Fetch sentiment if available
+        sentiment = None
+        if article.sentiment_id:
+            sentiment = db.execute(
+                select(SentimentAnalysis).where(SentimentAnalysis.id == article.sentiment_id)
+            ).scalar_one_or_none()
+        
+        # Create excerpt from article text
+        excerpt = article.text[:300] if article.text else ""
+        if len(article.text or "") > 300:
+            excerpt += "..."
+        
+        related.append({
+            "id": str(article.id),
+            "title": article.title or "Untitled",
+            "source": article.outlet.name if article.outlet else "Unknown",
+            "url": article.url,
+            "bias": _map_bias_category(sentiment.bias_category if sentiment and sentiment.bias_category else "center"),
+            "publishedAt": article.publishedAt.isoformat() if article.publishedAt else "",
+            "excerpt": excerpt,
+        })
+    
+    return related
 
 
 class RetrievalService(ServiceTemplate):
@@ -394,6 +583,7 @@ class RetrievalService(ServiceTemplate):
         )
 
         retrieval_output = None
+        related_articles = []
 
         has_claims = bool(message_dict.get("claims"))
         if message.data.header.type == "user" and has_claims:
@@ -443,13 +633,33 @@ class RetrievalService(ServiceTemplate):
                     
                     all_retrieval_results.extend(claim_results)
                 
-                retrieval_output = all_retrieval_results
+                # Group results by query_claim and calculate verdict + confidence
+                from collections import defaultdict
+                grouped_results = defaultdict(list)
+                for item in all_retrieval_results:
+                    grouped_results[item["query_claim"]].append(item)
                 
-                if DUMMY_NLP_MODE and result.get("created_article_id"):
-                    retrieval_output = [
-                        item for item in retrieval_output
-                        if item["claim_id"] not in (result.get("created_claim_ids") or [])
-                    ][:top_k]
+                # Build retrieval_output with verdict and confidence for each claim
+                retrieval_output = []
+                for query_claim, matches in grouped_results.items():
+                    verdict, confidence_score = _calculate_verdict_and_confidence(matches)
+                    
+                    retrieval_output.append({
+                        "query_claim": query_claim,
+                        "verdict": verdict,
+                        "confidence": confidence_score,
+                        "matches": matches,
+                        "match_count": len(matches),
+                    })
+                
+                # Fetch related articles based on matched claims
+                matched_claim_ids = [item["claim_id"] for item in all_retrieval_results]
+                current_article_id = result.get("created_article_id") or 0
+                related_articles = _fetch_related_articles(
+                    db=db,
+                    claim_ids=matched_claim_ids,
+                    current_article_id=current_article_id
+                )
             finally:
                 db.close()
 
@@ -467,6 +677,7 @@ class RetrievalService(ServiceTemplate):
         "retrieval_result": {
             **result,
             "matches": retrieval_output,
+            "related_articles": related_articles,
             }
         })
 
