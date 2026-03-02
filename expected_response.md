@@ -33,7 +33,7 @@
       excerpt: string;         // Relevant excerpt/quote
     }>;
   }>;
-<!--   
+  
   relatedArticles: Array<{
     id: string;
     title: string;
@@ -42,5 +42,5 @@
     bias: "left" | "center-left" | "center" | "center-right" | "right";
     publishedAt: string;       // ISO 8601 date string
     excerpt: string;           // Article summary/preview
-  }>; -->
+  }>;
 }

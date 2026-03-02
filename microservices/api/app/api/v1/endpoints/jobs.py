@@ -101,11 +101,15 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
         },
     }
     
+    # Extract related articles from retrieval result
+    related_articles = retrieval_result.get("related_articles", [])
+    
     return {
         "article": article_section,
         "trustScore": trust_score,
         "biasAnalysis": bias_analysis,
         "keyClaims": key_claims,
+        "relatedArticles": related_articles,
     }
 
 
