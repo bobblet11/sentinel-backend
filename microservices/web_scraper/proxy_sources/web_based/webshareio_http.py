@@ -36,7 +36,7 @@ class WebshareIOHttpSource(HttpProxySource):
 
         self.logger.info(f"Fetching proxies from Webshare.io")
         https:List[str] = self._fetch_from_url(f"{self.URL}", bootstrap_proxies, line_parser)
-
+        self.logger.info(f"Found https {https}")
         self.logger.info(f"Attempting to create country map (default = US)")
         self.update_mappings(https)
             
