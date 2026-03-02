@@ -39,10 +39,21 @@ def _create_similar_embedding(base_pattern: float, noise_level: float = 0.05) ->
     return [base_pattern + (noise_level if i % 2 == 0 else -noise_level) for i in range(EMBEDDING_DIM)]
 
 
-def _extract_sentiment(payload: Any) -> Optional[Dict[str, Any]]:
+def _extract_sentiment(payload: Any) -> Dict[str, Any]:
+    import random
+    
     bias_profile = getattr(payload, "bias_profile", None)
     if not bias_profile:
-        return None
+        # Return random dummy sentiment if no bias profile is provided
+        bias_categories = ["left", "center", "right", "neutral"]
+        sentiment_categories = ["positive", "negative", "neutral", "critical", "optimistic", "concerned"]
+        return {
+            "bias_category": random.choice(bias_categories),
+            "bias_score": round(random.uniform(0.3, 0.9), 2),
+            "bias_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
+            "sentiment_category": random.choice(sentiment_categories),
+            "sentiment_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
+        }
 
     scores = getattr(bias_profile, "scores", None)
     bias_score = None
@@ -96,6 +107,12 @@ def _normalize_claims(claims: List[Any]) -> List[Dict[str, Any]]:
 
 
 def _build_dummy_message(article_url: str, claim_text: str) -> Dict[str, Any]:
+    import random
+    
+    # Generate random dummy sentiment for user-submitted articles
+    bias_categories = ["left", "center", "right", "neutral"]
+    sentiment_categories = ["positive", "negative", "neutral", "critical", "optimistic", "concerned"]
+    
     return {
         "article": {
             "url": article_url,
@@ -104,6 +121,13 @@ def _build_dummy_message(article_url: str, claim_text: str) -> Dict[str, Any]:
             "html": "<p>Dummy article about taxes and policy.</p>",
             "publishedAt": "2026-02-23T00:00:00",
             "outlet_name": "Dummy Outlet",
+            "sentiment": {
+                "bias_category": random.choice(bias_categories),
+                "bias_score": round(random.uniform(0.3, 0.9), 2),
+                "bias_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
+                "sentiment_category": random.choice(sentiment_categories),
+                "sentiment_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
+            },
         },
         "claims": [
             {
@@ -135,6 +159,13 @@ def _seed_dummy_corpus() -> None:
                 "text": "Article about government taxation policies and economic impact.",
                 "outlet_name": "Dummy Outlet 1",
                 "embedding": _DUMMY_EMBEDDINGS["article_1"],
+                "sentiment": {
+                    "bias_category": "left",
+                    "bias_score": 0.65,
+                    "bias_analysis_confidence": 0.80,
+                    "sentiment_category": "critical",
+                    "sentiment_analysis_confidence": 0.75,
+                },
                 "claims": [
                     ("Government raised taxes", "Government raised taxes", 0.0),
                     ("Tax increases impact citizens", "Tax increases impact citizens", 0.01),
@@ -147,6 +178,13 @@ def _seed_dummy_corpus() -> None:
                 "text": "Article about climate change impacts and environmental policies.",
                 "outlet_name": "Dummy Outlet 2",
                 "embedding": _DUMMY_EMBEDDINGS["article_2"],
+                "sentiment": {
+                    "bias_category": "neutral",
+                    "bias_score": 0.50,
+                    "bias_analysis_confidence": 0.85,
+                    "sentiment_category": "concerned",
+                    "sentiment_analysis_confidence": 0.82,
+                },
                 "claims": [
                     ("Climate is changing rapidly", "Climate is changing rapidly due to human activity", 0.0),
                     ("Carbon emissions are rising", "Carbon emissions continue to rise globally", 0.01),
@@ -159,6 +197,13 @@ def _seed_dummy_corpus() -> None:
                 "text": "Article about healthcare system improvements and medical innovations.",
                 "outlet_name": "Dummy Outlet 3",
                 "embedding": _DUMMY_EMBEDDINGS["article_3"],
+                "sentiment": {
+                    "bias_category": "right",
+                    "bias_score": 0.60,
+                    "bias_analysis_confidence": 0.78,
+                    "sentiment_category": "optimistic",
+                    "sentiment_analysis_confidence": 0.80,
+                },
                 "claims": [
                     ("Healthcare costs are rising", "Healthcare costs continue to rise across the nation", 0.0),
                     ("Medications are unaffordable", "Prescription medications are becoming increasingly unaffordable", 0.01),
@@ -177,6 +222,7 @@ def _seed_dummy_corpus() -> None:
                     "html": f"<p>{article_data['text']}</p>",
                     "publishedAt": "2026-02-23T00:00:00",
                     "outlet_name": article_data["outlet_name"],
+                    "sentiment": article_data["sentiment"],
                 },
             )
             
