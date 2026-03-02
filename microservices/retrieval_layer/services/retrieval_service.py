@@ -15,12 +15,15 @@ from microservices.retrieval_layer.config import (
 )
 from microservices.retrieval_layer.retrieval.pipeline import retrieve_candidate_claims
 from microservices.retrieval_layer.db.session import get_db_session
+from microservices.retrieval_layer.db.models import Article, Claim, SentimentAnalysis, NewsOutlet
 from microservices.retrieval_layer.storage.crud import (
     get_or_create_article,
     create_claim_and_link_entities,
 )
 from logging import error, getLogger
 from pydantic import ValidationError
+from sqlalchemy.orm import joinedload
+from sqlalchemy import select, distinct
 
 EMBEDDING_DIM = 768
 _DUMMY_CORPUS_SEEDED = False
@@ -355,6 +358,79 @@ def _calculate_verdict_and_confidence(matches: list[dict]) -> tuple[str, int]:
     return verdict, confidence
 
 
+def _map_bias_category(bias_category: str) -> str:
+    """Map bias category to frontend expected values."""
+    if not bias_category:
+        return "center"
+    
+    category_lower = bias_category.lower()
+    if category_lower in ["left", "center-left", "center", "center-right", "right"]:
+        return category_lower
+    
+    # Map common variations
+    mapping = {
+        "liberal": "left",
+        "progressive": "left",
+        "conservative": "right",
+        "neutral": "center",
+        "moderate": "center",
+    }
+    return mapping.get(category_lower, "center")
+
+
+def _fetch_related_articles(db, claim_ids: List[int], current_article_id: int) -> List[Dict[str, Any]]:
+    """
+    Fetch related articles based on matched claim IDs.
+    Returns articles that contain the matched claims, excluding the current article.
+    """
+    if not claim_ids:
+        return []
+    
+    # Get unique article IDs from the matched claims
+    article_ids = db.execute(
+        select(distinct(Claim.article_id))
+        .where(Claim.id.in_(claim_ids))
+        .where(Claim.article_id != current_article_id)
+    ).scalars().all()
+    
+    if not article_ids:
+        return []
+    
+    # Fetch articles with their relationships
+    articles = db.execute(
+        select(Article)
+        .options(joinedload(Article.outlet))
+        .where(Article.id.in_(article_ids))
+        .limit(5)  # Limit to top 5 related articles
+    ).scalars().unique().all()
+    
+    related = []
+    for article in articles:
+        # Fetch sentiment if available
+        sentiment = None
+        if article.sentiment_id:
+            sentiment = db.execute(
+                select(SentimentAnalysis).where(SentimentAnalysis.id == article.sentiment_id)
+            ).scalar_one_or_none()
+        
+        # Create excerpt from article text
+        excerpt = article.text[:300] if article.text else ""
+        if len(article.text or "") > 300:
+            excerpt += "..."
+        
+        related.append({
+            "id": str(article.id),
+            "title": article.title or "Untitled",
+            "source": article.outlet.name if article.outlet else "Unknown",
+            "url": article.url,
+            "bias": _map_bias_category(sentiment.bias_category if sentiment and sentiment.bias_category else "center"),
+            "publishedAt": article.publishedAt.isoformat() if article.publishedAt else "",
+            "excerpt": excerpt,
+        })
+    
+    return related
+
+
 class RetrievalService(ServiceTemplate):
     def __init__(self, config):
         super().__init__(config)
@@ -507,6 +583,7 @@ class RetrievalService(ServiceTemplate):
         )
 
         retrieval_output = None
+        related_articles = []
 
         has_claims = bool(message_dict.get("claims"))
         if message.data.header.type == "user" and has_claims:
@@ -574,6 +651,15 @@ class RetrievalService(ServiceTemplate):
                         "matches": matches,
                         "match_count": len(matches),
                     })
+                
+                # Fetch related articles based on matched claims
+                matched_claim_ids = [item["claim_id"] for item in all_retrieval_results]
+                current_article_id = result.get("created_article_id") or 0
+                related_articles = _fetch_related_articles(
+                    db=db,
+                    claim_ids=matched_claim_ids,
+                    current_article_id=current_article_id
+                )
             finally:
                 db.close()
 
@@ -591,6 +677,7 @@ class RetrievalService(ServiceTemplate):
         "retrieval_result": {
             **result,
             "matches": retrieval_output,
+            "related_articles": related_articles,
             }
         })
 
