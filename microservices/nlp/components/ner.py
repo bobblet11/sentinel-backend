@@ -1,90 +1,112 @@
 import logging
-from typing import Any, List
-from transformers import pipeline
+import torch
+from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
+from typing import List, Dict, Any
 
 # Local imports
 from microservices.nlp.models.base import NLPComponent
-from common.models.api.redis_models import Article, Entity, NLPOptions, NLPResult
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, Entity, SentenceScore
+from microservices.nlp.config import NER_MODEL, NER_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 
 class EntityRecognizer(NLPComponent):
     """
-    Identifies named entities (PER, ORG, LOC, MISC) in the text.
-    Uses 'dslim/bert-base-NER-uncased' to handle noisy/lowercase text robustly.
-    """
-    def __init__(self, ner_model: Any = None):
-        """
-        Args:
-            ner_model: The loaded HuggingFace NER pipeline. 
-        """
-        if ner_model:
-            self.ner_model = ner_model
-        else:
-            logger.info("EntityRecognizer: Loading default model 'dslim/bert-base-NER-uncased'...")
-            try:
-                # We default to CPU (-1) for safety, but main.py/nlp_service should pass a GPU-loaded model
-                self.ner_model = pipeline(
-                    "token-classification", 
-                    model="dslim/bert-base-NER-uncased", 
-                    aggregation_strategy="simple",
-                    device=-1 
-                )
-            except Exception as e:
-                logger.error(f"EntityRecognizer: Failed to load model: {e}")
-                raise
+    Named Entity Recognition using the model specified in config.NER_MODEL.
 
-    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
+    Processes the sentences list and writes deduplicated entities
+    into result.entities_in_article.
+    """
+
+    def __init__(self):
+        self.model_name = NER_MODEL
+        self.device = 0 if torch.cuda.is_available() else -1
+        use_fp16 = torch.cuda.is_available()
+
+        logger.info(f"EntityRecognizer: Loading '{self.model_name}' "
+                    f"on {'CUDA' if self.device == 0 else 'CPU'} "
+                    f"(fp16={use_fp16})...")
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+            self.model = AutoModelForTokenClassification.from_pretrained(
+                self.model_name,
+                torch_dtype=torch.float16 if use_fp16 else torch.float32,
+            )
+            self.nlp_pipeline = pipeline(
+                "ner",
+                model=self.model,
+                tokenizer=self.tokenizer,
+                aggregation_strategy="simple",
+                device=self.device,
+                batch_size=NER_BATCH_SIZE,
+            )
+        except Exception as e:
+            logger.error(f"EntityRecognizer: Failed to load model: {e}")
+            raise
+
+    def run(self, article: Article, result: NLPResult, options: NLPOptions,
+            sentences: List[SentenceScore]) -> None:
         """
-        Extracts entities from the text and updates result.entities.
+        Runs NER over all sentences provided by the Preprocessor.
+        Updates result.entities_in_article with unique entities found.
         """
-        # We perform NER on the *Full Text* of the article for better context,
-        # rather than sentence-by-sentence which is slow and loses context.
-        text = getattr(article, 'text', "")
-        
-        if not text:
+        if not sentences:
+            logger.warning("EntityRecognizer: No sentences provided to process.")
             return
 
-        # NER models have a token limit (usually 512). 
-        # For a robust solution, we truncate or chunk. 
-        # For this sprint, we truncate to first ~10 paragraphs (approx 5000 chars) to prevent errors.
-        safe_text = text[:5000]
+        # Filter out empty/whitespace-only texts to prevent pipeline errors
+        texts: List[str] = [s.text for s in sentences if s.text and s.text.strip()]
+        if not texts:
+            logger.warning("EntityRecognizer: All sentence texts are empty, skipping.")
+            return
+
+        logger.info(f"EntityRecognizer: Running NER on {len(texts)} sentences.")
+
+        # Dictionary to track unique entities by (text, label) to avoid duplicates
+        unique_entities: Dict[tuple, Dict[str, Any]] = {}
 
         try:
-            # Run Inference
-            raw_entities = self.ner_model(safe_text)
-            
+            # Batch inference via Hugging Face pipeline
+            for sent_results in self.nlp_pipeline(texts):
+                for item in sent_results:
+                    text = item["word"].strip()
+                    label = item["entity_group"]
+                    score = float(item["score"])
+
+                    # Ignore noise or very short fragments
+                    if len(text) < 3:
+                        continue
+
+                    key = (text.lower(), label)
+                    # Keep the entity occurrence with the highest confidence score
+                    if key not in unique_entities or score > unique_entities[key]["score"]:
+                        e_obj = Entity(
+                            entity_text=text,
+                            type_of_entity=label,
+                            start_char=item.get("start", 0),
+                            end_char=item.get("end", 0),
+                        )
+                        unique_entities[key] = {"entity_obj": e_obj, "score": score}
+
+            # Map results to the NLPResult object
+            result.entities_in_article = [v["entity_obj"] for v in unique_entities.values()]
+            logger.info(f"EntityRecognizer: Found {len(result.entities_in_article)} unique entities.")
+
         except Exception as e:
-            logger.error(f"NER inference failed: {e}")
-            return
+            logger.error(f"EntityRecognizer failed during execution: {e}")
+            raise
 
-        # Map to Schema
-        entities_list: List[Entity] = []
-        unique_hashes = set() # To avoid duplicates
-        
-        for item in raw_entities:
-            # item: {'entity_group': 'ORG', 'score': 0.98, 'word': 'apple', 'start': 0, 'end': 5}
-            
-            # Confidence Threshold
-            if item['score'] < options.min_confidence:
-                continue
+if 'RUN_DEBUG_STEPS' in globals() and RUN_DEBUG_STEPS:
+    print("\n--- Running Entity Recognizer Test ---")
+    try:
+        ner = EntityRecognizer()
+        ner.run(article, result, options, sentences)
 
-            # Create Entity Object
-            entity = Entity(
-                entity_text=item['word'],
-                type_of_entity=item['entity_group'], # "PER", "ORG", "LOC", "MISC"
-                start_char=item['start'],
-                end_char=item['end']
-            )
-            
-            # Deduplicate (e.g., don't list "Trump" 50 times)
-            # We create a simple unique signature: "Trump|PER"
-            entity_hash = f"{entity.entity_text.lower()}|{entity.type_of_entity}"
-            
-            if entity_hash not in unique_hashes:
-                entities_list.append(entity)
-                unique_hashes.add(entity_hash)
+        print(f"Entities Extracted: {len(result.entities_in_article)}")
+        for e in result.entities_in_article[:5]: # Show first 5
+            print(f"  - {e.entity_text} [{e.type_of_entity}]")
 
-        # Update Result
-        result.entities_in_article = entities_list
-        logger.info(f"EntityRecognizer: Found {len(entities_list)} unique entities.")
+    except Exception as e:
+        import traceback
+        print(f"Error during NER test: {e}")
+        traceback.print_exc()

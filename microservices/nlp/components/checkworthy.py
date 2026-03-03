@@ -1,112 +1,115 @@
 import logging
-import torch
-from typing import Any, List
+import spacy
+from typing import List, Tuple
 
 # Local imports
 from microservices.nlp.models.base import NLPComponent
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, Claim
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
+from microservices.nlp.config import CW_THRESHOLD, CW_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 
-class CheckWorthinessFilter(NLPComponent):
+
+class CheckWorthiness(NLPComponent):
     """
-    Filters sentences to identify factual claims worth checking.
-    Uses Zero-Shot Classification (BART-MNLI) to categorize sentences.
-    
-    Model: facebook/bart-large-mnli
-    Candidates: ["factual claim", "opinion", "spam", "question"]
+    MODULAR CHECK-WORTHINESS LAYER
+
+    Scores each sentence on its factual claim-worthiness using a lightweight
+    rule-based feature model powered by spaCy's POS tagger and NER.
+
+    Strategies Applied:
+    1.  Entity Density Scoring: Sentences containing named entities (PERSON, ORG,
+        GPE, EVENT, FAC, NORP) receive a +0.3 base score, with an additional +0.1
+        for each extra entity beyond the first (max contribution from this rule: +0.4).
+    2.  Numeric Content Bonus: Presence of numeric/quantitative entities (MONEY,
+        PERCENT, CARDINAL, DATE, QUANTITY) contributes +0.4, as numerical claims are
+        among the most check-worthy sentence types.
+    3.  Reporting Verb Signal: Presence of reporting verbs (say, claim, state, report,
+        announce, confirm, warn, accuse) contributes +0.1 — indicates attributed quotes.
+    4.  Action Verb Signal: Presence of any non-reporting verb adds +0.1 — broad signal
+        for event sentences.
+    5.  Speculative Penalty: Any speculative modal or keyword (could, might, may, would,
+        predict, expect, likely, possibly, perhaps, if, future, etc.) subtracts -0.5 to
+        suppress forward-looking or opinion-based sentences.
+    6.  Threshold: A sentence is marked is_checkworthy=True if its final clamped
+        score >= 0.60.
+    7.  Batching: Uses spaCy's nlp.pipe() for efficient batched processing
+        (batch_size=32), avoiding per-sentence model reloads.
+
+    Accepts and returns a local sentences list; does NOT write to result.
     """
-    def __init__(self, classifier: Any = None):
-        """
-        Args:
-            classifier: Loaded pipeline("zero-shot-classification")
-        """
-        self.classifier = classifier
-        self.candidate_labels = ["fact", "opinion"]
-        # Threshold: Lowered to capture descriptive news reporting
-        self.threshold = 0.50
 
-        # Load model if not provided
-        if not self.classifier:
-            logger.info("CheckWorthinessFilter: No classifier provided. Loading 'facebook/bart-large-mnli'...")
-            try:
-                from transformers import pipeline
-                # Detect GPU
-                device = 0 if torch.cuda.is_available() else -1
-                
-                self.classifier = pipeline(
-                    "zero-shot-classification",
-                    model="facebook/bart-large-mnli",
-                    device=device
-                )
-                logger.info(f"CheckWorthinessFilter: Loaded on {'GPU' if device==0 else 'CPU'}.")
-            except Exception as e:
-                logger.error(f"CheckWorthinessFilter: Failed to load model: {e}")
-                raise
-
-    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
-        """
-        Classifies each sentence in result.sentences.
-        Adds 'is_checkworthy', 'claim_type', and 'confidence' attributes to the sentence objects.
-        """
-        if not result.sentences:
-            return
-
-        logger.info(f"CheckWorthiness: Analyzing {len(result.sentences)} sentences...")
-
-        # Optimize by batching: The pipeline accepts a list of strings
-        texts = [s.text for s in result.sentences]
-
+    def __init__(self):
+        logger.info("CheckWorthiness: Loading spaCy 'en_core_web_sm' model...")
         try:
-            # Run Inference (Batch)
-            predictions = self.classifier(
-                texts, 
-                self.candidate_labels, 
-                multi_label=False
-                # Removed hypothesis_template to use the default "This example is {}." which is often more robust for simple labels.
-            )
+            self.nlp = spacy.load("en_core_web_sm", disable=["lemmatizer"])
+        except OSError:
+            logger.error("CheckWorthiness: Run: python -m spacy download en_core_web_sm")
+            raise
 
-            count = 0
-            claims_discovered = []
-            
-            for i, pred in enumerate(predictions):
-                # pred format: 
-                # {'sequence': '...', 'labels': ['fact', 'opinion'], 'scores': [0.85, 0.15]}
-                
-                top_label = pred['labels'][0]
-                top_score = pred['scores'][0]
+        self.reporting_verbs = {
+            "say", "claim", "state", "report", "announce",
+            "confirm", "warn", "accuse",
+        }
+        self.speculative_keywords = {
+            "could", "might", "may", "would", "predict", "expect", "poised",
+            "likely", "potential", "possibly", "perhaps", "if", "future",
+        }
 
-                # Determine checkworthiness
-                is_worthy = (top_label == "fact" and top_score >= self.threshold)
+    def _score_doc(self, doc) -> Tuple[float, bool]:
+        entities = [
+            e for e in doc.ents
+            if e.label_ in ("PERSON", "ORG", "GPE", "EVENT", "FAC", "NORP")
+        ]
+        numbers = [
+            e for e in doc.ents
+            if e.label_ in ("MONEY", "PERCENT", "CARDINAL", "DATE", "QUANTITY")
+        ]
 
-                # Assign attributes to the Sentence object
-                # NOTE: Ensure schemas.py is updated to support these fields (Task B.2)
-                result.sentences[i].is_checkworthy = is_worthy
-                result.sentences[i].claim_type = top_label
-                result.sentences[i].confidence = top_score
+        verbs = [t for t in doc if t.pos_ == "VERB"]
+        has_reporting  = any(v.lemma_.lower() in self.reporting_verbs  for v in verbs)
+        has_action     = any(v.lemma_.lower() not in self.reporting_verbs for v in verbs)
+        is_speculative = any(t.text.lower() in self.speculative_keywords for t in doc)
 
-                if is_worthy:
-                    count += 1
-                    
-                    # Construct and store the Claim object
-                    claim_obj = Claim(
-                        confidence=top_score,
-                        source_sentence_indices=[i],
-                        contextualised_claim_text=result.sentences[i].text,
-                        decontextualised_claim_text=result.sentences[i].text, # Assuming text is already processed/clean
-                        decontextualised_claim_embedding=result.sentences[i].embedding,
-                        NER_entities=result.sentences[i].entities
-                    )
-                    claims_discovered.append(claim_obj)
-                    
-                    # logger.debug(f"Claim: {texts[i][:50]}... ({top_score:.2f})")
+        score = 0.0
+        if len(entities) >= 1: score += 0.3
+        if len(entities) >= 2: score += 0.1
+        if len(numbers)  >= 1: score += 0.4
+        if has_reporting:       score += 0.1
+        if has_action:          score += 0.1
+        if is_speculative:      score -= 0.5
 
-            # Update the result object
-            result.claims_in_article = claims_discovered
-            logger.info(f"CheckWorthiness: Identified {count} factual claims out of {len(texts)} sentences.")
+        score = max(0.0, min(1.0, score))
+        return score, score >= CW_THRESHOLD
 
-        except Exception as e:
-            logger.error(f"CheckWorthiness analysis failed: {e}")
-            # Fail gracefully: assume nothing is checkworthy so we don't crash
-            for s in result.sentences:
-                s.is_checkworthy = False
+    def run(
+        self,
+        article: Article,
+        result: NLPResult,
+        options: NLPOptions,
+        sentences: List[SentenceScore],
+    ) -> List[SentenceScore]:
+        """
+        Scores each sentence for check-worthiness using rule-based NLP features.
+        Populates confidence and is_checkworthy on each SentenceScore in-place.
+        Returns the same list (modified in-place); does NOT write to result.
+        """
+        if not sentences:
+            return []
+
+        logger.info(
+            f"CheckWorthiness: Evaluating {len(sentences)} sentences "
+            f"(batch_size={CW_BATCH_SIZE}, threshold={CW_THRESHOLD})..."
+        )
+
+        texts = [s.text for s in sentences]
+        for s_obj, doc in zip(sentences, self.nlp.pipe(texts, batch_size=CW_BATCH_SIZE)):
+            score, is_checkworthy = self._score_doc(doc)
+            s_obj.confidence     = float(score)
+            s_obj.is_checkworthy = is_checkworthy
+
+        worthy_count = sum(1 for s in sentences if s.is_checkworthy)
+        logger.info(
+            f"CheckWorthiness: {worthy_count}/{len(sentences)} sentences marked as check-worthy."
+        )
+        return sentences
