@@ -14,3 +14,6 @@ logs
 **.log
 data/postgres_data
 data/redis_data
+
+# HuggingFace model cache
+**/.cache/
