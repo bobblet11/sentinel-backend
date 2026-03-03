@@ -1,19 +1,46 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Union
-from common.models.api.redis_models import Article, NLPOptions, NLPResult
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
 
 
-class NLPComponent(ABC): 
+# Keep the old name as an alias so existing imports don't break during migration.
+NLPComponent = "NLPComponent"  # replaced below
+
+
+class ArticleProcessor(ABC):
     """
-    Abstract base class for all NLP pipeline stages.
-    Each component (NER, Bias, etc.) must implement 'run'.
+    Protocol for components that write directly to NLPResult.
+    They do not consume or return a sentence list.
+    Implementations: EntityRecognizer, BiasDetector.
     """
     @abstractmethod
     def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
-        """
-        Executes the component logic and updates the shared AnalysisResult in-place.
-        """
+        """Executes component logic and writes into result in-place."""
         pass
+
+
+class SentenceProcessor(ABC):
+    """
+    Protocol for components that transform the local sentence list.
+    They may read from result but must not write to it.
+    They receive and return List[SentenceScore].
+    Implementations: Preprocessor, SentenceExtraction, Decontextualizer,
+                     CheckWorthiness, Embedder.
+    """
+    @abstractmethod
+    def run(
+        self,
+        article: Article,
+        result: NLPResult,
+        options: NLPOptions,
+        sentences: List[SentenceScore],
+    ) -> List[SentenceScore]:
+        """Transforms the sentence list and returns the (possibly filtered) result."""
+        pass
+
+
+# NLPComponent is kept as the union type for ClaimExtraction's type annotations.
+NLPComponent = Union[ArticleProcessor, SentenceProcessor]  # type: ignore[misc,assignment]
 
 class SentenceEmbedder(ABC):
     """

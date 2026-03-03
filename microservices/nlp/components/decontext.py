@@ -1,12 +1,13 @@
 import logging
 import re
+import spacy
 import torch
 from typing import List, Optional
 from rank_bm25 import BM25Okapi
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 
 # Local imports
-from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.models.base import SentenceProcessor
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
 from microservices.nlp.config import (
     QG_MODEL, QA_MODEL, GEN_MODEL,
@@ -18,7 +19,7 @@ from microservices.nlp.config import (
 logger = logging.getLogger(__name__)
 
 
-class Decontextualizer(NLPComponent):
+class Decontextualizer(SentenceProcessor):
     """
     MODULAR DECONTEXTUALIZER LAYER
 
@@ -60,19 +61,22 @@ class Decontextualizer(NLPComponent):
         flags=re.IGNORECASE,
     )
 
-    def __init__(self, use_gpu: bool = True):
-        import spacy
+    def __init__(self, use_gpu: bool = True, nlp=None):
         self.device    = "cuda" if use_gpu and torch.cuda.is_available() else "cpu"
         self.device_id = 0 if self.device == "cuda" else -1
         use_fp16       = self.device == "cuda"
 
         logger.info(f"Decontextualizer: Initializing on {self.device} (fp16={use_fp16})...")
 
-        try:
-            self.nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            logger.error("Decontextualizer: Run: python -m spacy download en_core_web_sm")
-            raise
+        if nlp is not None:
+            logger.info("Decontextualizer: Using shared spaCy model.")
+            self.nlp = nlp
+        else:
+            try:
+                self.nlp = spacy.load("en_core_web_sm")
+            except OSError:
+                logger.error("Decontextualizer: Run: python -m spacy download en_core_web_sm")
+                raise
 
         # Question Generation model
         self.qg_tokenizer = AutoTokenizer.from_pretrained(QG_MODEL)

@@ -2,6 +2,7 @@
 from typing import List
 from logging import getLogger
 import random
+import torch
 
 from common.models.api.redis_models import (
     Article,
@@ -14,7 +15,7 @@ from common.models.api.redis_models import (
 )
 from common.service.service_template import ProcessingError, ServiceConfig, ServiceTemplate
 
-from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.models.base import ArticleProcessor
 from microservices.nlp.components.claimextract import ClaimExtraction
 from microservices.nlp.config import DUMMY_NLP_MODE
 
@@ -73,12 +74,12 @@ class NLPService(ServiceTemplate):
         # Only load models if NOT in dummy mode
         if DUMMY_NLP_MODE:
             logger.info("DUMMY_NLP_MODE enabled - skipping model loading")
-            self.pipeline: List[NLPComponent] = []
+            self.pipeline: List[ArticleProcessor] = []
         else:
             # ClaimExtraction is the full pipeline orchestrator — it owns all
             # stages internally (Preprocessor → NER → Extraction → Decontext →
             # CheckWorthiness → EntityMapping → Embedder → BiasDetector).
-            self.pipeline: List[NLPComponent] = [
+            self.pipeline: List[ArticleProcessor] = [
                 ClaimExtraction(use_gpu=True),
             ]
     
@@ -92,11 +93,18 @@ class NLPService(ServiceTemplate):
 
         for component in self.pipeline:
             try:
-                component.run(article, analysis_result, self.options)                
-            except Exception as e:
-                print(f"Pipeline error in {component.__class__.__name__}: {str(e)}")
+                component.run(article, analysis_result, self.options)
+            except torch.cuda.OutOfMemoryError as oom:
+                logger.error(
+                    f"CUDA OOM in {component.__class__.__name__}: {oom}. "
+                    f"Flushing cache and aborting article."
+                )
+                torch.cuda.empty_cache()
                 raise
-            
+            except Exception as e:
+                logger.error(f"Pipeline error in {component.__class__.__name__}: {e}")
+                raise
+
         message.set_nlp_result(analysis_result)
         return message
 
@@ -111,9 +119,14 @@ class NLPService(ServiceTemplate):
                 message.set_nlp_result(dummy_result)
                 return message
 
-            analyzed_message:StreamMessage = self._analyze_html_and_update(message)
+            analyzed_message: StreamMessage = self._analyze_html_and_update(message)
             return analyzed_message
         except Exception as e:
             raise ProcessingError(f"Failed to analyze {message.link}: {e}")
+        finally:
+            # Always flush the GPU cache after a message to prevent OOM accumulation
+            # across articles on long-running stream consumers.
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
         
  

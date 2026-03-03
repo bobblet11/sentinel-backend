@@ -4,13 +4,13 @@ from transformers import AutoTokenizer, AutoModelForTokenClassification, pipelin
 from typing import List, Dict, Any
 
 # Local imports
-from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.models.base import ArticleProcessor
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, Entity, SentenceScore
 from microservices.nlp.config import NER_MODEL, NER_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 
-class EntityRecognizer(NLPComponent):
+class EntityRecognizer(ArticleProcessor):
     """
     Named Entity Recognition using the model specified in config.NER_MODEL.
 
@@ -49,25 +49,37 @@ class EntityRecognizer(NLPComponent):
         """
         Runs NER over all sentences provided by the Preprocessor.
         Updates result.entities_in_article with unique entities found.
+        Character offsets stored in Entity are article-relative.
         """
         if not sentences:
             logger.warning("EntityRecognizer: No sentences provided to process.")
             return
 
-        # Filter out empty/whitespace-only texts to prevent pipeline errors
-        texts: List[str] = [s.text for s in sentences if s.text and s.text.strip()]
-        if not texts:
+        # Filter out empty/whitespace-only texts, preserving sentence-level offsets.
+        valid_sentences: List[SentenceScore] = [
+            s for s in sentences if s.text and s.text.strip()
+        ]
+        if not valid_sentences:
             logger.warning("EntityRecognizer: All sentence texts are empty, skipping.")
             return
 
+        texts: List[str] = [s.text for s in valid_sentences]
         logger.info(f"EntityRecognizer: Running NER on {len(texts)} sentences.")
+
+        # Build cumulative char offsets so entity positions become article-relative.
+        char_offsets: List[int] = []
+        offset = 0
+        for t in texts:
+            char_offsets.append(offset)
+            offset += len(t) + 1  # +1 for the sentence separator
 
         # Dictionary to track unique entities by (text, label) to avoid duplicates
         unique_entities: Dict[tuple, Dict[str, Any]] = {}
 
         try:
             # Batch inference via Hugging Face pipeline
-            for sent_results in self.nlp_pipeline(texts):
+            for sent_idx, sent_results in enumerate(self.nlp_pipeline(texts)):
+                sent_offset = char_offsets[sent_idx]
                 for item in sent_results:
                     text = item["word"].strip()
                     label = item["entity_group"]
@@ -83,8 +95,8 @@ class EntityRecognizer(NLPComponent):
                         e_obj = Entity(
                             entity_text=text,
                             type_of_entity=label,
-                            start_char=item.get("start", 0),
-                            end_char=item.get("end", 0),
+                            start_char=sent_offset + item.get("start", 0),
+                            end_char=sent_offset + item.get("end", 0),
                         )
                         unique_entities[key] = {"entity_obj": e_obj, "score": score}
 
@@ -95,18 +107,3 @@ class EntityRecognizer(NLPComponent):
         except Exception as e:
             logger.error(f"EntityRecognizer failed during execution: {e}")
             raise
-
-if 'RUN_DEBUG_STEPS' in globals() and RUN_DEBUG_STEPS:
-    print("\n--- Running Entity Recognizer Test ---")
-    try:
-        ner = EntityRecognizer()
-        ner.run(article, result, options, sentences)
-
-        print(f"Entities Extracted: {len(result.entities_in_article)}")
-        for e in result.entities_in_article[:5]: # Show first 5
-            print(f"  - {e.entity_text} [{e.type_of_entity}]")
-
-    except Exception as e:
-        import traceback
-        print(f"Error during NER test: {e}")
-        traceback.print_exc()

@@ -4,7 +4,7 @@ from typing import Dict, Optional
 from transformers import pipeline
 
 # Local imports
-from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.models.base import ArticleProcessor
 from common.models.api.redis_models import Article, BiasProfile, NLPOptions, NLPResult
 from microservices.nlp.config import (
     BIAS_POLITICAL_MODEL, BIAS_SENTIMENT_MODEL,
@@ -14,7 +14,7 @@ from microservices.nlp.config import (
 logger = logging.getLogger(__name__)
 
 
-class BiasDetector(NLPComponent):
+class BiasDetector(ArticleProcessor):
     """
     MODULAR BIAS DETECTION LAYER
 

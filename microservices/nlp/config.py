@@ -27,10 +27,12 @@ BIAS_POLITICAL_MODEL  = "typeform/distilbert-base-uncased-mnli"
 BIAS_SENTIMENT_MODEL  = "cardiffnlp/twitter-roberta-base-sentiment-latest"
 
 # ── Thresholds ────────────────────────────────────────────────────────────────
-# Minimum check-worthiness score for a sentence to be promoted to a Claim.
-# Used as the Stage 7 fallback when NLPOptions.min_confidence is not set.
-CLAIM_MIN_CONFIDENCE     = 0.60
-# Sentence is marked is_checkworthy=True when its score reaches this value.
+# Minimum confidence for a check-worthy sentence to be promoted to a Claim.
+# Must equal NLPOptions.min_confidence (default 0.75) — keep in sync.
+CLAIM_MIN_CONFIDENCE     = 0.75
+# Minimum check-worthiness score for a sentence to be flagged is_checkworthy.
+# Intentionally lower than CLAIM_MIN_CONFIDENCE: CW is a broad net,
+# CLAIM_MIN_CONFIDENCE is the final promotion gate in Stage 7.
 CW_THRESHOLD             = 0.60
 # NLI entailment probability above which a candidate sentence is considered
 # redundant with an already-selected one (Stage 3 deduplication).

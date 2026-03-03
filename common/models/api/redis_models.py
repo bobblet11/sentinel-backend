@@ -35,7 +35,6 @@ class NLPOptions:
     """Toggles and thresholds to control the pipeline's execution."""
     enable_bias_detection: bool = True
     enable_ner: bool = True
-    enable_centrality: bool = True
     enable_claim_extraction: bool = True
     max_claims: int = 10
     min_confidence: float = 0.75 # Updated default to match CheckWorthinessFilter

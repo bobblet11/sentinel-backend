@@ -4,13 +4,13 @@ import re
 from typing import List
 
 # Local imports
-from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.models.base import SentenceProcessor
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
 from microservices.nlp.config import PREPROCESS_MIN_TOKENS, PHOTO_CREDIT_MAX_LEN
 
 logger = logging.getLogger(__name__)
 
-class Preprocessor(NLPComponent):
+class Preprocessor(SentenceProcessor):
     """
     "Universal Janitor" Preprocessor.
     
@@ -22,14 +22,18 @@ class Preprocessor(NLPComponent):
 
     Returns sentences via a local list; does NOT write to result.sentences.
     """
-    def __init__(self):
-        logger.info("Preprocessor: Loading Spacy 'en_core_web_sm' model...")
-        try:
-            # We disable NER and Lemmatizer as they are handled by specialized downstream components
-            self.nlp = spacy.load("en_core_web_sm", disable=["ner", "lemmatizer"])
-        except OSError:
-            logger.error("Spacy model not found. Run: python -m spacy download en_core_web_sm")
-            raise
+    def __init__(self, nlp=None):
+        if nlp is not None:
+            logger.info("Preprocessor: Using shared spaCy model.")
+            self.nlp = nlp
+        else:
+            logger.info("Preprocessor: Loading Spacy 'en_core_web_sm' model...")
+            try:
+                # We disable NER and Lemmatizer as they are handled by specialized downstream components
+                self.nlp = spacy.load("en_core_web_sm", disable=["ner", "lemmatizer"])
+            except OSError:
+                logger.error("Spacy model not found. Run: python -m spacy download en_core_web_sm")
+                raise
 
         # Compiled once at init; used by both line-level and sentence-level filters.
         self._photo_credit_re = re.compile(

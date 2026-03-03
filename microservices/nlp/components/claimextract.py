@@ -1,9 +1,10 @@
 import logging
+import spacy
 import time
 from typing import List
 
 # Local imports
-from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.models.base import ArticleProcessor, SentenceProcessor
 from common.models.api.redis_models import Article, Claim, NLPOptions, NLPResult, SentenceScore
 
 # Pipeline stage imports
@@ -14,12 +15,11 @@ from microservices.nlp.components.decontext import Decontextualizer
 from microservices.nlp.components.checkworthy import CheckWorthiness
 from microservices.nlp.components.embedder import Embedder
 from microservices.nlp.components.bias import BiasDetector
-from microservices.nlp.config import CLAIM_MIN_CONFIDENCE
 
 logger = logging.getLogger(__name__)
 
 
-class ClaimExtraction(NLPComponent):
+class ClaimExtraction(ArticleProcessor):
     """
     THE PIPELINE ORCHESTRATOR
 
@@ -69,11 +69,19 @@ class ClaimExtraction(NLPComponent):
         logger.info("ClaimExtraction: Initializing all pipeline stages...")
         t_start = time.time()
 
-        self.preprocessor        = Preprocessor()
+        # Load spaCy once and share across the three components that need it.
+        # This avoids loading the same ~100 MB model three separate times.
+        try:
+            nlp_sm = spacy.load("en_core_web_sm", disable=["ner", "lemmatizer"])
+        except OSError:
+            logger.error("spaCy model not found. Run: python -m spacy download en_core_web_sm")
+            raise
+
+        self.preprocessor        = Preprocessor(nlp=nlp_sm)
         self.entity_recognizer   = EntityRecognizer()
         self.sentence_extractor  = SentenceExtraction(use_fp16=use_gpu)
-        self.decontextualizer    = Decontextualizer(use_gpu=use_gpu)
-        self.checkworthiness     = CheckWorthiness()
+        self.decontextualizer    = Decontextualizer(use_gpu=use_gpu, nlp=nlp_sm)
+        self.checkworthiness     = CheckWorthiness(nlp=nlp_sm)
         self.embedder            = Embedder()
         self.bias_detector       = BiasDetector()
 
@@ -182,12 +190,9 @@ class ClaimExtraction(NLPComponent):
         # ── Stage 7 — Sentence → Claim Conversion ────────────────────────────────
         # Anti-Regression: Claim stores source_sentence_indices (int ref) and the
         # decontextualised text, but NO raw/original text duplication.
-        # Filter: only sentences that passed the check-worthiness threshold are
-        # promoted to Claims. This respects options.min_confidence as an override.
+        # Filter: only sentences that passed the check-worthiness threshold AND
+        # meet options.min_confidence (default 0.75) are promoted to Claims.
         t = time.time()
-        # Use options.min_confidence if set; fall back to the CW threshold (0.60)
-        # so that unscored sentences never slip through on a bad default.
-        min_conf = getattr(options, "min_confidence", CLAIM_MIN_CONFIDENCE)
         result.claims_in_article = [
             Claim(
                 confidence=s.confidence,
@@ -197,7 +202,7 @@ class ClaimExtraction(NLPComponent):
                 NER_entities=s.entities,
             )
             for s in sentences
-            if s.is_checkworthy and s.confidence >= min_conf
+            if s.is_checkworthy and s.confidence >= options.min_confidence
         ]
         logger.info(
             f"[Stage 7 | Sentence→Claim] {len(result.claims_in_article)} claims "
@@ -205,14 +210,16 @@ class ClaimExtraction(NLPComponent):
         )
 
         # ── Stage 8 — Bias Detection (optional) ──────────────────────────────────
-        if getattr(options, "enable_bias_detection", True):
+        if options.enable_bias_detection:
             t = time.time()
             try:
                 self.bias_detector.run(article, result, options)
+                logger.info(f"[Stage 8 | BiasDetector] complete in {time.time() - t:.2f}s")
             except Exception as e:
-                logger.error(f"ClaimExtraction [Stage 8 BiasDetector] failed: {e}")
+                logger.error(
+                    f"[Stage 8 | BiasDetector] failed after {time.time() - t:.2f}s: {e}"
+                )
                 # Non-critical — do not re-raise; claims are already committed
-            logger.info(f"[Stage 8 | BiasDetector] complete in {time.time() - t:.2f}s")
 
         logger.info(
             f"--- ClaimExtraction Pipeline complete in "

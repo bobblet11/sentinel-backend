@@ -7,7 +7,7 @@ from transformers import AutoTokenizer, AutoModel, AutoModelForSequenceClassific
 from torch.amp import autocast
 
 # Local imports
-from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.models.base import SentenceProcessor
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
 from microservices.nlp.config import (
     BERT_SCORING_MODEL, NLI_MODEL,
@@ -18,7 +18,7 @@ from microservices.nlp.config import (
 
 logger = logging.getLogger(__name__)
 
-class SentenceExtraction(NLPComponent):
+class SentenceExtraction(SentenceProcessor):
     """
     MODULAR SENTENCE EXTRACTION LAYER
     Combines extractive importance (BertSum-style CLS scoring) with

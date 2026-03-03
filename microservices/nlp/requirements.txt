@@ -7,7 +7,6 @@ requests>=2.31.0
 
 # NLP & Machine Learning (Pinned for CUDA 12.1 Compatibility, Updated for Py3.13)
 numpy>=1.26.4
-pandas>=2.2.0
 torch>=2.5.1
 transformers>=4.43.4
 sentence-transformers>=3.0.0
@@ -16,6 +15,15 @@ scikit-learn>=1.4.0
 # HuggingFace Ecosystem
 datasets>=2.20.0          # Arrow-backed batching for HF pipelines (Embedder, Decontextualizer)
 accelerate>=0.33.0        # Required by transformers for fp16 / torch_dtype pipeline args
+huggingface-hub>=1.4.1    # Model/dataset downloads from HF Hub
+safetensors>=0.7.0        # Fast, safe model weight serialisation format
+sentencepiece>=0.2.1      # Required by T5 tokenizers (Decontextualizer QG/rewrite models)
+
+# Serialisation & Data Formats
+protobuf>=5.0.0           # Protocol Buffers — required by some HF model configs and tokenizers
+pyarrow>=15.0.0           # Columnar memory format; core dependency of datasets (Arrow tables)
+xxhash>=3.4.0             # Fast hashing used by datasets for cache fingerprinting
+dill>=0.3.8               # Extended pickling used by datasets/multiprocess for serialising lambdas
 
 # Text Processing
 spacy>=3.7.2
@@ -23,6 +31,9 @@ spacy>=3.7.2
 
 # Retrieval
 rank-bm25>=0.2.2          # BM25Okapi sparse retrieval (Decontextualizer evidence lookup)
+
+# Scientific Computing
+scipy>=1.17.0             # Used by scikit-learn and sentence-transformers internals
 
 # Utilities
 tqdm>=4.66.0

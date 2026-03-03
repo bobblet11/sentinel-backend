@@ -2,18 +2,17 @@ import logging
 import torch
 import numpy as np
 from typing import List
-from datasets import Dataset
 from sentence_transformers import SentenceTransformer
 
 # Local imports
-from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.models.base import SentenceProcessor
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
 from microservices.nlp.config import EMBEDDING_MODEL, EMBEDDER_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 
 
-class Embedder(NLPComponent):
+class Embedder(SentenceProcessor):
     """
     MODULAR EMBEDDER LAYER
 
@@ -74,16 +73,16 @@ class Embedder(NLPComponent):
             return []
 
         texts = [s.text for s in sentences]
-        ds    = Dataset.from_dict({"text": texts})
 
         try:
-            embeddings: np.ndarray = self.model.encode(
-                ds["text"],
-                batch_size=EMBEDDER_BATCH_SIZE,
-                show_progress_bar=len(texts) > EMBEDDER_BATCH_SIZE,
-                convert_to_numpy=True,
-                normalize_embeddings=False,
-            )
+            with torch.inference_mode():
+                embeddings: np.ndarray = self.model.encode(
+                    texts,
+                    batch_size=EMBEDDER_BATCH_SIZE,
+                    show_progress_bar=len(texts) > EMBEDDER_BATCH_SIZE,
+                    convert_to_numpy=True,
+                    normalize_embeddings=False,
+                )
 
             for i, sent in enumerate(sentences):
                 sent.embedding = embeddings[i].tolist()

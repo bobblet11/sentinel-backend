@@ -56,7 +56,7 @@ def run_local_pipeline_test(filename: str = "article.json") -> None:
         summary=data.get('article_summary', ''),
     )
     result  = NLPResult()
-    options = NLPOptions(enable_centrality=True, min_confidence=0.8, max_claims=10)
+    options = NLPOptions(min_confidence=0.8, max_claims=10)
 
     print(f"\n{'='*70}")
     print(f"PIPELINE TEST: {article.title}")

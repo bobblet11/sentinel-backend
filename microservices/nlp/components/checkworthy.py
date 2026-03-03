@@ -3,14 +3,14 @@ import spacy
 from typing import List, Tuple
 
 # Local imports
-from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.models.base import SentenceProcessor
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
 from microservices.nlp.config import CW_THRESHOLD, CW_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 
 
-class CheckWorthiness(NLPComponent):
+class CheckWorthiness(SentenceProcessor):
     """
     MODULAR CHECK-WORTHINESS LAYER
 
@@ -39,13 +39,17 @@ class CheckWorthiness(NLPComponent):
     Accepts and returns a local sentences list; does NOT write to result.
     """
 
-    def __init__(self):
-        logger.info("CheckWorthiness: Loading spaCy 'en_core_web_sm' model...")
-        try:
-            self.nlp = spacy.load("en_core_web_sm", disable=["lemmatizer"])
-        except OSError:
-            logger.error("CheckWorthiness: Run: python -m spacy download en_core_web_sm")
-            raise
+    def __init__(self, nlp=None):
+        if nlp is not None:
+            logger.info("CheckWorthiness: Using shared spaCy model.")
+            self.nlp = nlp
+        else:
+            logger.info("CheckWorthiness: Loading spaCy 'en_core_web_sm' model...")
+            try:
+                self.nlp = spacy.load("en_core_web_sm", disable=["lemmatizer"])
+            except OSError:
+                logger.error("CheckWorthiness: Run: python -m spacy download en_core_web_sm")
+                raise
 
         self.reporting_verbs = {
             "say", "claim", "state", "report", "announce",
