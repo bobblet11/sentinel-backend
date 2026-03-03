@@ -15,18 +15,11 @@ from common.models.api.redis_models import (
 from common.service.service_template import ProcessingError, ServiceConfig, ServiceTemplate
 
 from microservices.nlp.models.base import NLPComponent
-
-# We will implement these empty skeletons in the next step
-from microservices.nlp.components.preprocess import Preprocessor
-from microservices.nlp.components.centrality import CentralityScorer
-from microservices.nlp.components.embedder import Embedder
-from microservices.nlp.components.bias import BiasDetector
-from microservices.nlp.components.ner import EntityRecognizer
-from microservices.nlp.components.checkworthy import CheckWorthinessFilter
+from microservices.nlp.components.claimextract import ClaimExtraction
 from microservices.nlp.config import DUMMY_NLP_MODE
 
 logger = getLogger("NLP")
-EMBEDDING_DIM = 768
+EMBEDDING_DIM = 768  # dimensionality of all-mpnet-base-v2 output vectors
 
 
 def _dummy_embedding(dim: int = EMBEDDING_DIM) -> List[float]:
@@ -82,14 +75,11 @@ class NLPService(ServiceTemplate):
             logger.info("DUMMY_NLP_MODE enabled - skipping model loading")
             self.pipeline: List[NLPComponent] = []
         else:
-            # Define the execution order of the pipeline
+            # ClaimExtraction is the full pipeline orchestrator — it owns all
+            # stages internally (Preprocessor → NER → Extraction → Decontext →
+            # CheckWorthiness → EntityMapping → Embedder → BiasDetector).
             self.pipeline: List[NLPComponent] = [
-                Preprocessor(),
-                Embedder(),
-                CentralityScorer(),
-                BiasDetector(),
-                EntityRecognizer(),
-                CheckWorthinessFilter()
+                ClaimExtraction(use_gpu=True),
             ]
     
     

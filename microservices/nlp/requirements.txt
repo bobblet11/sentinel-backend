@@ -13,9 +13,16 @@ transformers>=4.43.4
 sentence-transformers>=3.0.0
 scikit-learn>=1.4.0
 
+# HuggingFace Ecosystem
+datasets>=2.20.0          # Arrow-backed batching for HF pipelines (Embedder, Decontextualizer)
+accelerate>=0.33.0        # Required by transformers for fp16 / torch_dtype pipeline args
+
 # Text Processing
 spacy>=3.7.2
 # Note: You must also run: python -m spacy download en_core_web_sm
+
+# Retrieval
+rank-bm25>=0.2.2          # BM25Okapi sparse retrieval (Decontextualizer evidence lookup)
 
 # Utilities
 tqdm>=4.66.0

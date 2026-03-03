@@ -42,5 +42,5 @@ def strip_embeddings(input_path, output_path=None):
 if __name__ == "__main__":
     # You can point this to your 'test_output.json'
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    target_file = os.path.join(current_dir, 'test_output.json')
+    target_file = os.path.join(current_dir, 'final_claims_output.json')
     strip_embeddings(target_file)
