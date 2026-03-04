@@ -26,6 +26,7 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
         {
             "created_article_id": ...,
             "created_claim_ids": [...],
+            "claims": [{"original_sentence": ..., "decontextualised_claim": ..., "entities": [...]}],
             "matches": [
                 {
                     "query_claim": str,
@@ -57,35 +58,56 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
         "publishedAt": article.publishedAt.isoformat() if article.publishedAt else "",
     }
     
-    # Transform matches into keyClaims
+    # Get all claims and matches
+    all_claims = retrieval_result.get("claims", []) or []
     matches_list = retrieval_result.get("matches", []) or []
+    
+    # Create a lookup map: query_claim -> match_group for easy access
+    matches_by_claim = {
+        match_group.get("query_claim", ""): match_group
+        for match_group in matches_list
+    }
+    
+    # Build keyClaims from ALL claims (not just those with matches)
     key_claims = []
     
-    for idx, match_group in enumerate(matches_list, 1):
-        claim_matches = match_group.get("matches", [])
+    for idx, claim in enumerate(all_claims, 1):
+        claim_text = claim.get("decontextualised_claim") or claim.get("original_sentence", "")
         
-        # Transform individual match items into evidence
-        evidence = [
-            {
-                "source": f"Claim #{m['claim_id']}",
-                "url": article.url,  # Use article URL as placeholder
-                "excerpt": m.get("claim_text", "")[:500],  # Limit excerpt to 500 chars
-            }
-            for m in claim_matches[:3]  # Limit to top 3 evidence items
-        ]
+        # Check if this claim has retrieval matches
+        match_group = matches_by_claim.get(claim_text)
+        
+        if match_group:
+            # Claim has matches - include evidence
+            claim_matches = match_group.get("matches", [])
+            evidence = [
+                {
+                    "source": f"Claim #{m['claim_id']}",
+                    "url": article.url,  # Use article URL as placeholder
+                    "excerpt": m.get("claim_text", "")[:500],  # Limit excerpt to 500 chars
+                }
+                for m in claim_matches[:3]  # Limit to top 3 evidence items
+            ]
+            verdict = match_group.get("verdict", "unverified")
+            confidence = match_group.get("confidence", 0)
+        else:
+            # Claim has no matches - mark as unverified
+            evidence = []
+            verdict = "unverified"
+            confidence = 0
         
         key_claim = {
             "id": str(idx),
-            "claim": match_group.get("query_claim", ""),
-            "verdict": match_group.get("verdict", "unverified"),
-            "confidence": match_group.get("confidence", 0),
+            "claim": claim_text,
+            "verdict": verdict,
+            "confidence": confidence,
             "evidence": evidence,
         }
         key_claims.append(key_claim)
     
-    # Calculate overall trustScore from average confidence
-    confidences = [m.get("confidence", 0) for m in matches_list]
-    trust_score = int(sum(confidences) / len(confidences)) if confidences else 0
+    # Calculate overall trustScore from average confidence of matched claims
+    matched_confidences = [m.get("confidence", 0) for m in matches_list]
+    trust_score = int(sum(matched_confidences) / len(matched_confidences)) if matched_confidences else 0
     
     # Build biasAnalysis from article sentiment if available
     # For now, provide placeholder values (in production, would fetch from sentiment_analysis table)

@@ -591,19 +591,13 @@ class RetrievalService(ServiceTemplate):
             len(message_dict.get("claims", []) or []),
         )
 
-        result = process_nlp_message(message_dict)
-        logger.info(
-            "DB write result article_id=%s claim_ids=%s",
-            result.get("created_article_id"),
-            result.get("created_claim_ids"),
-        )
-
+        # STEP 1: Run retrieval BEFORE saving to DB to avoid self-referencing
         retrieval_output = None
         related_articles = []
 
         has_claims = bool(message_dict.get("claims"))
         if message.data.header.type == "user" and has_claims:
-            # Run retrieval on all claims for user articles
+            # Run retrieval on all claims for user articles BEFORE saving
             db = get_db_session()
             try:
                 top_k = 3 if DUMMY_NLP_MODE else 5
@@ -668,13 +662,12 @@ class RetrievalService(ServiceTemplate):
                         "match_count": len(matches),
                     })
                 
-                # Fetch related articles based on matched claims
+                # Fetch related articles based on matched claims (current article not yet saved)
                 matched_claim_ids = [item["claim_id"] for item in all_retrieval_results]
-                current_article_id = result.get("created_article_id") or 0
                 related_articles = _fetch_related_articles(
                     db=db,
                     claim_ids=matched_claim_ids,
-                    current_article_id=current_article_id
+                    current_article_id=0  # Not saved yet, so no self-reference possible
                 )
             finally:
                 db.close()
@@ -685,13 +678,22 @@ class RetrievalService(ServiceTemplate):
                 0 if retrieval_output is None else len(retrieval_output),
             )
         
+        # STEP 2: NOW save article and claims to DB (after retrieval)
+        result = process_nlp_message(message_dict)
+        logger.info(
+            "DB write result article_id=%s claim_ids=%s",
+            result.get("created_article_id"),
+            result.get("created_claim_ids"),
+        )
         
-        # publish success
+        
+        # publish success - include the claims data for frontend
         self.user_publisher.publish_one({
         "job_uid": message.data.header.uid,
         "status": "completed",
         "retrieval_result": {
             **result,
+            "claims": message_dict.get("claims", []),  # Include actual claim data
             "matches": retrieval_output,
             "related_articles": related_articles,
             }
