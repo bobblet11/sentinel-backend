@@ -37,7 +37,7 @@ class NLPOptions:
     enable_ner: bool = True
     enable_claim_extraction: bool = True
     max_claims: int = 10
-    min_confidence: float = 0.75 # Updated default to match CheckWorthinessFilter
+    min_confidence: float = 0.50  # Recalibrated: hybrid CW ensemble tops out ~0.65; 0.50 gates low-signal sentences
     # If True, include high-dimensional embeddings in the final response
     return_embeddings: bool = True 
     
@@ -247,11 +247,7 @@ class StreamMessage:
             self.data.payload.publish_date = parsed_result.published_at
             
     def set_nlp_result(self, nlp_result: NLPResult) -> None:
-        """Unpacks a ParseResult object and updates the message payload."""
-        # Use dot notation on the ParseResult object for clarity and safety
-        if not self.data.payload.sentences and nlp_result.sentences:
-            self.data.payload.sentences = nlp_result.sentences
-
+        """Unpacks an NLPResult object and updates the message payload."""
         if not self.data.payload.claims_in_article and nlp_result.claims_in_article:
             self.data.payload.claims_in_article = nlp_result.claims_in_article
             
