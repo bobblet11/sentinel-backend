@@ -10,8 +10,6 @@ load_dotenv()
 config_logger: Logger = getLogger("config")
 
 # Service Configuration
-# API_SERVICE_PORT: int = get_env_var("API_SERVICE_PORT",int, config_logger)
-
 # Postgres Connection Configuration
 POSTGRES_HOST: str = get_env_var("POSTGRES_HOST", str, config_logger)
 POSTGRES_PORT: int = get_env_var("POSTGRES_PORT", int, config_logger)
@@ -26,22 +24,18 @@ INPUT_STREAMS: List[str] = get_env_var(
     config_logger
 )
 
-USER_OUTPUT_STREAM: str = get_env_var(
-    "USER_OUTPUT_STREAM",
-    str,
-    config_logger
-)
-
 FAILURE_OUTPUT_STREAM: str = get_env_var(
     "FAILURE_OUTPUT_STREAM",
     str,
     config_logger
 )
+
 GROUP_NAME: str = get_env_var(
     "GROUP_NAME",
     str,
     config_logger
 )
+
 CONSUMER_NAME: str = get_env_var(
     "CONSUMER_NAME",
     str,
@@ -70,26 +64,26 @@ DUMMY_SEED_MODE: bool = get_env_var(
 )
 
 env_variables: List[EnvVariable] = [
-    # EnvVariable("API_SERVICE_PORT", API_SERVICE_PORT), 
-    
     EnvVariable("POSTGRES_HOST", POSTGRES_HOST),
     EnvVariable("POSTGRES_PORT", POSTGRES_PORT),
     EnvVariable("POSTGRES_DB", POSTGRES_DB),
     EnvVariable("POSTGRES_USER", POSTGRES_USER),
     EnvVariable("POSTGRES_PASSWORD", POSTGRES_PASSWORD),
     
-        EnvVariable("INPUT_STREAMS", INPUT_STREAMS),
-    EnvVariable("USER_OUTPUT_STREAM", USER_OUTPUT_STREAM),
+    EnvVariable("INPUT_STREAMS", INPUT_STREAMS),
     EnvVariable("FAILURE_OUTPUT_STREAM", FAILURE_OUTPUT_STREAM),
     EnvVariable("GROUP_NAME", GROUP_NAME),
     EnvVariable("CONSUMER_NAME", CONSUMER_NAME),
+    
     EnvVariable("BATCH_SIZE", BATCH_SIZE),
+    
     EnvVariable("DUMMY_NLP_MODE", DUMMY_NLP_MODE),
     EnvVariable("DUMMY_SEED_MODE", DUMMY_SEED_MODE),
 ]
 
-output_streams = [USER_OUTPUT_STREAM, FAILURE_OUTPUT_STREAM]
+input_streams = INPUT_STREAMS
+output_streams = [FAILURE_OUTPUT_STREAM]
 
-print_env(Config(env_variables, None, output_streams), config_logger)
+print_env(Config(env_variables, input_streams, output_streams), config_logger)
 
 
