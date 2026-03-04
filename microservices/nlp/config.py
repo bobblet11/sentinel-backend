@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from common.env.log_env import print_env, Config, EnvVariable
 from common.env.get_env_var import get_env_var
 from logging import Logger, getLogger
-import torch
 
 load_dotenv()
 config_logger: Logger = getLogger("config")
@@ -26,15 +25,23 @@ QA_MODEL              = "deepset/roberta-base-squad2"
 GEN_MODEL             = "google/flan-t5-base"
 BIAS_POLITICAL_MODEL  = "typeform/distilbert-base-uncased-mnli"
 BIAS_SENTIMENT_MODEL  = "cardiffnlp/twitter-roberta-base-sentiment-latest"
+CW_NLI_MODEL          = "typeform/distilbert-base-uncased-mnli"  # Zero-shot claim classifier (shared with BiasDetector)
 
 # ── Thresholds ────────────────────────────────────────────────────────────────
 # Minimum confidence for a check-worthy sentence to be promoted to a Claim.
-# Must equal NLPOptions.min_confidence (default 0.75) — keep in sync.
-CLAIM_MIN_CONFIDENCE     = 0.75
+# Lowered from 0.75: the hybrid CW ensemble (NLI + heuristic) tops out ~0.65
+# on strong factual sentences; 0.50 preserves discrimination without blocking all claims.
+CLAIM_MIN_CONFIDENCE     = 0.50
 # Minimum check-worthiness score for a sentence to be flagged is_checkworthy.
 # Intentionally lower than CLAIM_MIN_CONFIDENCE: CW is a broad net,
 # CLAIM_MIN_CONFIDENCE is the final promotion gate in Stage 7.
-CW_THRESHOLD             = 0.60
+CW_THRESHOLD             = 0.45   # Lowered: the NLI zero-shot model pulls ensemble scores down
+# Ensemble weights for hybrid CW scorer (NLI transformer vs. spaCy heuristic)
+# NOTE: typeform/distilbert-base-uncased-mnli zero-shot gives 0.30–0.50 for
+# "verifiable factual claim" even on strong sentences — it is not calibrated
+# for this label. The heuristic is the better-calibrated primary signal.
+CW_NLI_WEIGHT            = 0.40   # NLI provides soft signal, not primary driver
+CW_HEURISTIC_WEIGHT      = 0.60   # spaCy heuristic is primary (SVO + NER + hedging)
 # NLI entailment probability above which a candidate sentence is considered
 # redundant with an already-selected one (Stage 3 deduplication).
 NLI_ENTAILMENT_THRESHOLD = 0.70
@@ -47,12 +54,14 @@ CW_BATCH_SIZE            = 32   # CheckWorthiness spaCy pipe batch size
 EMBEDDER_BATCH_SIZE      = 32   # Sentence embedding batch size
 SENTENCE_SCORING_BATCH   = 16   # BertSum CLS scoring batch size
 NLI_MAX_PAIRS            = 32   # Max NLI pairs checked per deduplication pass
-DECONTEXT_GEN_BATCH_SIZE = 8    # QG / QA2D generation batch size
+DECONTEXT_QG_BATCH_SIZE  = 16   # QG (t5-base, short prompts) — increase freely on GPU
+DECONTEXT_QA_BATCH_SIZE  = 16   # QA (roberta-base-squad2) — contexts can be long, 16 is safe
+DECONTEXT_GEN_BATCH_SIZE = 16   # QA2D / final rewrite (flan-t5-base) — longer prompts, keep at 16
 BM25_TOP_K               = 3    # Evidence sentences retrieved per BM25 query
 BERT_MAX_LENGTH          = 512  # Tokenizer truncation for BERT-class models
 DECONTEXT_MAX_GEN_LENGTH = 128  # Max output tokens for decontextualisation rewrites
-DECONTEXT_MAX_UNITS      = 3    # Max ambiguous units resolved per sentence (reduced from 6 for speed)
-DECONTEXT_REWRITE_RATIO  = 2.5  # Reject rewrites longer than N× the original
+DECONTEXT_MAX_UNITS      = 6    # Max ambiguous units resolved per sentence
+DECONTEXT_REWRITE_RATIO  = 4  # Reject rewrites longer than N× the original
 BIAS_MAX_CHARS           = 2000 # Article characters fed to bias classifier
 BIAS_SENTIMENT_MAX_LEN   = 128  # Sentiment pipeline token truncation
 
@@ -90,18 +99,7 @@ try:
     NER_MODEL       = get_env_var("NLP_NER_MODEL",       str, config_logger, NER_MODEL)
     EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, EMBEDDING_MODEL)
     BIAS_POLITICAL_MODEL = get_env_var("NLP_BIAS_MODEL", str, config_logger, BIAS_POLITICAL_MODEL)
-    
-    # Device detection: MPS (Apple Silicon) > CUDA (NVIDIA) > CPU
-    use_gpu_env = get_env_var("USE_GPU", str, config_logger, "false").lower()
-    if use_gpu_env == "true":
-        if torch.backends.mps.is_available():
-            DEVICE = "mps"
-        elif torch.cuda.is_available():
-            DEVICE = "cuda"
-        else:
-            DEVICE = "cpu"
-    else:
-        DEVICE = "cpu"
+    DEVICE = "cuda" if get_env_var("USE_GPU", str, config_logger, "false").lower() == "true" else "cpu"
 
     input_streams: List[str] = INPUT_STREAMS
     output_streams: List[str] = [USER_OUTPUT_STREAM, BACKGROUND_OUTPUT_STREAM, FAILURE_OUTPUT_STREAM]
@@ -129,10 +127,4 @@ except SystemExit:
     # Service env vars not available — running in component/test context.
     # Pipeline constants above are still fully usable.
     DUMMY_NLP_MODE = False
-    # Fallback device detection for non-service context
-    if torch.backends.mps.is_available():
-        DEVICE = "mps"
-    elif torch.cuda.is_available():
-        DEVICE = "cuda"
-    else:
-        DEVICE = "cpu"
+    DEVICE = "cpu"
