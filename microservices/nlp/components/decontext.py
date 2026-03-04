@@ -233,7 +233,9 @@ class Decontextualizer(SentenceProcessor):
             if len(s.strip()) > 10
         ]
 
-        for sent_obj in sentences:
+        total = len(sentences)
+        for sent_idx, sent_obj in enumerate(sentences, start=1):
+            logger.info(f"Decontextualizer: Processing sentence {sent_idx}/{total}...")
             cleaned_text = self._sanitize(sent_obj.text)
             if not cleaned_text:
                 sent_obj.text = ""
