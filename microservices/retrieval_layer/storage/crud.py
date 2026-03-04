@@ -41,7 +41,10 @@ def get_or_create_entity(db: Session, name: str, type_: Optional[str] = None) ->
 
 
 def get_or_create_sentiment(db: Session, sent: Dict[str, Any]) -> SentimentAnalysis:
+    from logging import getLogger
+    logger = getLogger("retrieval-layer")
     
+    logger.info(f"Creating SentimentAnalysis with data: {sent}")
     s = SentimentAnalysis(
         bias_category=sent.get("bias_category"),
         bias_score=sent.get("bias_score"),
@@ -51,10 +54,14 @@ def get_or_create_sentiment(db: Session, sent: Dict[str, Any]) -> SentimentAnaly
     )
     db.add(s)
     db.flush()
+    logger.info(f"SentimentAnalysis created with id={s.id}")
     return s
 
 
 def get_or_create_article(db: Session, article_d: Dict[str, Any]) -> Article:
+    from logging import getLogger
+    logger = getLogger("retrieval-layer")
+    
     url = article_d.get("url")
     if not url:
         raise ValueError("article must include url")
@@ -70,7 +77,10 @@ def get_or_create_article(db: Session, article_d: Dict[str, Any]) -> Article:
 
     sentiment = None
     if article_d.get("sentiment"):
+        logger.info(f"Creating sentiment from article_d: {article_d.get('sentiment')}")
         sentiment = get_or_create_sentiment(db, article_d["sentiment"])
+    else:
+        logger.warning("No sentiment data in article_d")
 
     published_at = None
     if article_d.get("publishedAt"):

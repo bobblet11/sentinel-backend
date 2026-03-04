@@ -46,8 +46,10 @@ def _extract_sentiment(payload: Any) -> Dict[str, Any]:
     import random
     
     bias_profile = getattr(payload, "bias_profile", None)
+    logger.info(f"_extract_sentiment: bias_profile={bias_profile}")
     if not bias_profile:
         # Return random dummy sentiment if no bias profile is provided
+        logger.warning("No bias_profile in payload — using random sentiment")
         bias_categories = ["left", "center", "right", "neutral"]
         sentiment_categories = ["positive", "negative", "neutral", "critical", "optimistic", "concerned"]
         return {
@@ -63,13 +65,15 @@ def _extract_sentiment(payload: Any) -> Dict[str, Any]:
     if isinstance(scores, dict) and scores:
         bias_score = max(scores.values())
 
-    return {
+    result = {
         "bias_category": getattr(bias_profile, "political_bias", None),
         "bias_score": bias_score,
         "bias_analysis_confidence": getattr(bias_profile, "confidence", None),
         "sentiment_category": getattr(bias_profile, "emotional_tone", None),
         "sentiment_analysis_confidence": getattr(bias_profile, "confidence", None),
     }
+    logger.info(f"_extract_sentiment result: {result}")
+    return result
 
 
 def _normalize_claims(claims: List[Any]) -> List[Dict[str, Any]]:
@@ -557,6 +561,7 @@ class RetrievalService(ServiceTemplate):
                     [e.get("name") for e in claim.get("entities", [])],
                 )
             
+            logger.info(f"Building message with sentiment: {sentiment}")
             message_dict = {
                 "article": {
                     "url": payload.article_url,
@@ -696,6 +701,7 @@ class RetrievalService(ServiceTemplate):
             "claims": message_dict.get("claims", []),  # Include actual claim data
             "matches": retrieval_output,
             "related_articles": related_articles,
+            "sentiment": message_dict.get("article", {}).get("sentiment", {}),  # Include sentiment for frontend
             }
         })
 

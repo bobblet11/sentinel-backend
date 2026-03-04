@@ -110,7 +110,6 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
     trust_score = int(sum(matched_confidences) / len(matched_confidences)) if matched_confidences else 0
     
     # Build biasAnalysis from article sentiment if available
-    # For now, provide placeholder values (in production, would fetch from sentiment_analysis table)
     bias_analysis = {
         "overallBias": "center",  # Placeholder
         "biasScore": 0,  # Placeholder (-100 to +100)
@@ -122,6 +121,32 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
             "framing": "Balanced presentation",
         },
     }
+    
+    # Try to use real sentiment from retrieval result
+    sentiment_data = retrieval_result.get("sentiment", {})
+    if sentiment_data:
+        bias_map = {
+            "left": "left",
+            "center": "center",
+            "right": "right",
+            "Left": "left",
+            "Center": "center",
+            "Right": "right",
+            "neutral": "center",
+            "Neutral": "center",
+        }
+        bias_category = sentiment_data.get("bias_category", "center")
+        bias_analysis = {
+            "overallBias": bias_map.get(str(bias_category), "center"),
+            "biasScore": int(float(sentiment_data.get("bias_score", 0)) * 100),
+            "confidence": int(float(sentiment_data.get("bias_analysis_confidence", 0.5)) * 100),
+            "sentiment": sentiment_data.get("sentiment_category", "neutral"),
+            "indicators": {
+                "language": f"{sentiment_data.get('sentiment_category', 'neutral')} language detected",
+                "sources": "Multiple sources cited",
+                "framing": f"{bias_category} perspective detected",
+            },
+        }
     
     # Extract related articles from retrieval result
     related_articles = retrieval_result.get("related_articles", [])
