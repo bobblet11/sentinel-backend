@@ -76,10 +76,16 @@ def _normalize_claims(claims: List[Any]) -> List[Dict[str, Any]]:
     normalized: List[Dict[str, Any]] = []
     for c in claims or []:
         if isinstance(c, dict):
+            decontextualised_claim = c.get("decontextualised_claim")
+            original_sentence = (
+                c.get("original_sentence")
+                or c.get("contextualised_claim")
+                or decontextualised_claim
+            )
             normalized.append(
                 {
-                    "original_sentence": c.get("original_sentence") or c.get("contextualised_claim"),
-                    "decontextualised_claim": c.get("decontextualised_claim"),
+                    "original_sentence": original_sentence,
+                    "decontextualised_claim": decontextualised_claim,
                     "decontextualised_embedding": c.get("decontextualised_embedding"),
                     "centrality_score": c.get("centrality_score"),
                     "entities": c.get("entities", []),
@@ -96,10 +102,13 @@ def _normalize_claims(claims: List[Any]) -> List[Dict[str, Any]]:
                 }
             )
 
+        decontextualised_claim_text = getattr(c, "decontextualised_claim_text", None)
+        original_sentence = getattr(c, "contextualised_claim_text", None) or decontextualised_claim_text
+
         normalized.append(
             {
-                "original_sentence": getattr(c, "contextualised_claim_text", None),
-                "decontextualised_claim": getattr(c, "decontextualised_claim_text", None),
+                "original_sentence": original_sentence,
+                "decontextualised_claim": decontextualised_claim_text,
                 "decontextualised_embedding": getattr(c, "decontextualised_claim_embedding", None),
                 "centrality_score": None,
                 "entities": entities,
@@ -501,6 +510,24 @@ class RetrievalService(ServiceTemplate):
     def _process_message(self, message: StreamMessage) -> StreamMessage:
         payload = message.data.payload
 
+        # Log the full incoming NLP payload
+        logger.info(
+            "=== RETRIEVAL RECEIVED NLP INPUT ===\n"
+            "uid=%s, type=%s\n"
+            "Article URL: %s\n"
+            "Article Title: %s\n"
+            "Claims count: %d\n"
+            "Entities count: %d\n"
+            "Has bias_profile: %s",
+            message.data.header.uid,
+            message.data.header.type,
+            payload.article_url,
+            payload.title,
+            len(payload.claims_in_article or []),
+            len(payload.entities_in_article or []),
+            hasattr(payload, 'bias_profile') and payload.bias_profile is not None,
+        )
+
         if DUMMY_NLP_MODE:
             message_dict = _build_dummy_message(
                 article_url=f"https://dummy.local/article/user-{message.data.header.uid}",
@@ -509,6 +536,27 @@ class RetrievalService(ServiceTemplate):
         else:
             sentiment = _extract_sentiment(payload)
             claims = _normalize_claims(payload.claims_in_article)
+            
+            # Log each claim in detail
+            logger.info("=== NLP EXTRACTED CLAIMS ===")
+            for i, claim in enumerate(claims, 1):
+                embedding_sample = claim.get("decontextualised_embedding", [])
+                embedding_preview = embedding_sample[:5] if embedding_sample else "None"
+                logger.info(
+                    "Claim %d:\n"
+                    "  Original: %s\n"
+                    "  Decontextualized: %s\n"
+                    "  Centrality: %.3f\n"
+                    "  Embedding preview: %s\n"
+                    "  Entities: %s",
+                    i,
+                    claim.get("original_sentence", "N/A"),
+                    claim.get("decontextualised_claim", "N/A"),
+                    claim.get("centrality_score", 0.0) or 0.0,
+                    embedding_preview,
+                    [e.get("name") for e in claim.get("entities", [])],
+                )
+            
             message_dict = {
                 "article": {
                     "url": payload.article_url,
@@ -521,54 +569,22 @@ class RetrievalService(ServiceTemplate):
                 },
                 "claims": claims,
             }
-            
-            # Log original NLP claims before synthetic replacement
-            if message.data.header.type == "user" and claims:
-                logger.info(
-                    "=== ORIGINAL NLP RESULTS FOR USER ARTICLE ===\n"
-                    "uid=%s, title=%s\n"
-                    "Number of claims: %d",
-                    message.data.header.uid,
-                    payload.title,
-                    len(claims),
-                )
-                for i, claim in enumerate(claims, 1):
-                    embedding_sample = claim.get("decontextualised_embedding", [])
-                    embedding_sample = embedding_sample[:3] if embedding_sample else []
-                    logger.info(
-                        "  Claim %d: %s\n"
-                        "    Embedding sample (first 3 values): %s\n"
-                        "    Centrality score: %.2f",
-                        i,
-                        claim.get("decontextualised_claim"),
-                        embedding_sample,
-                        claim.get("centrality_score", 0),
-                    )
 
-        # For user articles, generate 3 synthetic claims matching dummy articles (for demo/testing)
-        if message.data.header.type == "user":
-            original_claims_count = len(message_dict.get("claims", []))
-            message_dict["claims"] = _create_synthetic_user_claims()
-            logger.info(
-                "=== REPLACING WITH 3 SYNTHETIC CLAIMS ===\n"
-                "uid=%s\n"
-                "Original NLP claims: %d → Synthetic claims: 3",
-                message.data.header.uid,
-                original_claims_count,
-            )
-            for i, claim in enumerate(message_dict["claims"], 1):
-                embedding_sample = claim.get("decontextualised_embedding", [])
-                embedding_sample = embedding_sample[:3] if embedding_sample else []
-                logger.info(
-                    "  Synthetic Claim %d: %s\n"
-                    "    Embedding sample (first 3 values): %s",
-                    i,
-                    claim["decontextualised_claim"],
-                    embedding_sample,
-                )
+        # DISABLED: Synthetic claim replacement for testing
+        # If you need to test with synthetic claims, uncomment this block
+        # if message.data.header.type == "user":
+        #     original_claims_count = len(message_dict.get("claims", []))
+        #     message_dict["claims"] = _create_synthetic_user_claims()
+        #     logger.info(
+        #         "=== REPLACING WITH 3 SYNTHETIC CLAIMS ===\n"
+        #         "uid=%s\n"
+        #         "Original NLP claims: %d → Synthetic claims: 3",
+        #         message.data.header.uid,
+        #         original_claims_count,
+        #     )
 
         logger.info(
-            "Retrieval received message uid=%s type=%s url=%s claims=%s",
+            "Retrieval processing uid=%s type=%s url=%s claims=%d",
             message.data.header.uid,
             message.data.header.type,
             message_dict.get("article", {}).get("url"),
@@ -689,10 +705,20 @@ class RetrievalService(ServiceTemplate):
     def _handle_failure(self, raw_msg: Dict[str, Any], error: Exception):
         logger.error("Routing message to failure stream")
 
+        if isinstance(raw_msg, StreamMessage):
+            serialized_raw_message = {
+                "stream": raw_msg.stream,
+                "redis_id": raw_msg.redis_id,
+                "priority": raw_msg.priority,
+                "data": raw_msg.data.model_dump(),
+            }
+        else:
+            serialized_raw_message = raw_msg
+
         self.failure_publisher.publish_one(
             {
                 "error": str(error),
-                "raw_message": raw_msg,
+                "raw_message": serialized_raw_message,
                 "failed_at": datetime.utcnow().isoformat(),
             }
         )

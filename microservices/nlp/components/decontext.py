@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 import spacy
 import torch
 from typing import List, Optional
@@ -14,6 +15,9 @@ from microservices.nlp.config import (
     BM25_TOP_K, QA_SCORE_THRESHOLD,
     BERT_MAX_LENGTH, DECONTEXT_MAX_GEN_LENGTH,
     DECONTEXT_MAX_UNITS, DECONTEXT_REWRITE_RATIO,
+    DECONTEXT_QG_BATCH_SIZE,
+    DECONTEXT_QA_BATCH_SIZE,
+    DECONTEXT_GEN_BATCH_SIZE,
 )
 
 logger = logging.getLogger(__name__)
@@ -85,8 +89,8 @@ class Decontextualizer(SentenceProcessor):
             torch_dtype=torch.float16 if use_fp16 else torch.float32,
         ).to(self.device)
 
-        # Extractive QA pipeline — __call__ is (self, **kwargs) only;
-        # no positional args or batch_size accepted at call time.
+        # Extractive QA pipeline — accepts a list of {"question", "context"} dicts
+        # as the first positional arg; batch_size drives internal GPU batching.
         self.qa_pipe = pipeline(
             "question-answering",
             model=QA_MODEL,
@@ -107,19 +111,73 @@ class Decontextualizer(SentenceProcessor):
         """Strips model-prefixed label artifacts (e.g. 'false: ', 'entailment: ')."""
         return self._LABEL_RE.sub("", text).strip()
 
-    def _generate_batch(self, prompts: List[str], tokenizer, model) -> List[str]:
-        """Batched seq2seq generation with beam search."""
+    def _generate_batch(
+        self,
+        prompts: List[str],
+        tokenizer,
+        model,
+        batch_size: int = 8,
+        label: str = "gen",
+    ) -> List[str]:
+        """
+        Chunked batched seq2seq generation with beam search.
+        Processes prompts in chunks of `batch_size` to avoid GPU OOM on large batches.
+        Logs per-chunk progress so callers can see the batch is alive.
+        """
         if not prompts:
             return []
-        inputs = tokenizer(
-            prompts, return_tensors="pt", padding=True, truncation=True, max_length=BERT_MAX_LENGTH,
-        ).to(self.device)
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs, max_length=DECONTEXT_MAX_GEN_LENGTH, num_beams=2,  # Reduced from 4 to 2
-                repetition_penalty=2.5, early_stopping=True,
+        total_prompts = len(prompts)
+        total_chunks  = (total_prompts + batch_size - 1) // batch_size
+        results: List[str] = []
+        for chunk_idx, chunk_start in enumerate(range(0, total_prompts, batch_size), start=1):
+            chunk     = prompts[chunk_start : chunk_start + batch_size]
+            done_so_far = chunk_start + len(chunk)
+            t0 = time.perf_counter()
+            inputs = tokenizer(
+                chunk, return_tensors="pt", padding=True, truncation=True,
+                max_length=BERT_MAX_LENGTH,
+            ).to(self.device)
+            with torch.no_grad():
+                outputs = model.generate(
+                    **inputs, max_length=DECONTEXT_MAX_GEN_LENGTH, num_beams=4,
+                    repetition_penalty=2.5, early_stopping=True,
+                )
+            results.extend(
+                self._sanitize(tokenizer.decode(o, skip_special_tokens=True))
+                for o in outputs
             )
-        return [self._sanitize(tokenizer.decode(o, skip_special_tokens=True)) for o in outputs]
+            elapsed = time.perf_counter() - t0
+            logger.info(
+                f"Decontextualizer [{label}] chunk {chunk_idx}/{total_chunks} "
+                f"— {done_so_far}/{total_prompts} prompts done ({elapsed:.1f}s)"
+            )
+        return results
+
+    def _qa_batch(self, inputs: List[dict], batch_size: int) -> List[dict]:
+        """
+        Chunked extractive QA inference.
+        QuestionAnsweringPipeline.__call__ only accepts keyword args (question=, context=),
+        not a positional list.  This helper iterates in chunks and logs progress.
+        """
+        if not inputs:
+            return []
+        total        = len(inputs)
+        total_chunks = (total + batch_size - 1) // batch_size
+        results: List[dict] = []
+        for chunk_idx, chunk_start in enumerate(range(0, total, batch_size), start=1):
+            chunk     = inputs[chunk_start : chunk_start + batch_size]
+            done_so_far = chunk_start + len(chunk)
+            t0 = time.perf_counter()
+            for inp in chunk:
+                results.append(
+                    self.qa_pipe(question=inp["question"], context=inp["context"])
+                )
+            elapsed = time.perf_counter() - t0
+            logger.info(
+                f"Decontextualizer [QA] chunk {chunk_idx}/{total_chunks} "
+                f"\u2014 {done_so_far}/{total} inputs done ({elapsed:.1f}s)"
+            )
+        return results
 
     def _extract_units(self, doc) -> List[str]:
         """
@@ -158,61 +216,6 @@ class Decontextualizer(SentenceProcessor):
         top_indices = scores.argsort()[-top_k:][::-1]
         return " ".join(doc_sentences[i] for i in sorted(top_indices))
 
-    def _process_sentence(
-        self,
-        sent_text: str,
-        units: List[str],
-        doc_sentences: List[str],
-    ) -> Optional[str]:
-        """
-        Full three-stage processing for a single sentence:
-        QG → BM25 retrieval → QA grounding → QA-to-declarative conversion.
-        Returns a concatenated context string or None if no useful context found.
-        """
-        if not units:
-            return None
-
-        qg_prompts = [f"answer: {u} context: {sent_text}" for u in units]
-        questions  = self._generate_batch(qg_prompts, self.qg_tokenizer, self.qg_model)
-
-        qa_inputs = []
-        for question in questions:
-            evidence = self._bm25_retrieve(question, doc_sentences)
-            qa_inputs.append({"question": question, "context": evidence or sent_text})
-
-        try:
-            # Process QA in mini-batches for better GPU utilization
-            qa_results = []
-            batch_size = 4  # Process 4 QA pairs at a time
-            for i in range(0, len(qa_inputs), batch_size):
-                batch = qa_inputs[i:i + batch_size]
-                # Pipeline can handle list when items have same keys
-                batch_results = [self.qa_pipe(**item) for item in batch]
-                qa_results.extend(batch_results)
-        except Exception as e:
-            logger.warning(f"Decontextualizer: QA batch failed — {e}")
-            return None
-
-        qa2d_prompts = [
-            f"Convert to a declarative sentence: Q: {q} A: {r['answer']}"
-            for q, r in zip(questions, qa_results)
-            if r["score"] > QA_SCORE_THRESHOLD
-        ]
-
-        if not qa2d_prompts:
-            return None
-
-        try:
-            context_sentences = self._generate_batch(qa2d_prompts, self.gen_tokenizer, self.gen_model)
-        except Exception as e:
-            logger.warning(f"Decontextualizer: QA2D batch failed — {e}")
-            return None
-
-        # Drop any output that FLAN-T5 returned as a question instead of a
-        # declarative sentence (QA2D model failure mode).
-        declarative_only = [s for s in context_sentences if s and not s.rstrip().endswith("?")]
-        return " ".join(declarative_only) or None
-
     def run(
         self,
         article: Article,
@@ -221,65 +224,175 @@ class Decontextualizer(SentenceProcessor):
         sentences: List[SentenceScore],
     ) -> List[SentenceScore]:
         """
-        Rewrites each sentence to be self-contained.
+        Rewrites each sentence to be self-contained using fully batched inference.
+
+        All four model passes (QG / QA / QA2D / rewrite) are batched across
+        every sentence in a single forward sweep instead of looping per-sentence.
+        Sentence-boundary bookkeeping uses (start, end) slice tuples so results
+        can be mapped back after each global batch call.
+
         Preserves original_text on the SentenceScore before overwriting text.
         Returns the updated local sentences list; does NOT write to result.
         """
         if not sentences:
             return []
 
-        # Build flat list of article sentences for BM25 context retrieval
+        n = len(sentences)
+
+        # BM25 corpus: all article sentences used as evidence for QA
         doc_sentences = [
             s.strip()
             for s in re.split(r"(?<=[.!?])\s+", article.text or "")
             if len(s.strip()) > 10
         ]
 
-        total = len(sentences)
-        for sent_idx, sent_obj in enumerate(sentences, start=1):
-            logger.info(f"Decontextualizer: Processing sentence {sent_idx}/{total}...")
-            cleaned_text = self._sanitize(sent_obj.text)
-            if not cleaned_text:
-                sent_obj.text = ""
-                continue
+        # ── Phase 1: batch spaCy parse ─────────────────────────────────────
+        logger.info(f"Decontextualizer: Phase 1 — spaCy batch parse ({n} sentences)...")
+        t_phase = time.perf_counter()
+        texts = [self._sanitize(s.text) for s in sentences]
+        docs  = list(self.nlp.pipe(texts))
+        logger.info(f"Decontextualizer: Phase 1 done ({time.perf_counter() - t_phase:.1f}s)")
 
-            doc            = self.nlp(cleaned_text)
-            units          = self._extract_units(doc)
-            filtered_units = [u for u in units if len(u.split()) < 6][:DECONTEXT_MAX_UNITS]
-            full_context   = self._process_sentence(cleaned_text, filtered_units, doc_sentences)
+        # ── Phase 2: extract units; build flat QG prompt list ─────────────
+        all_qg_prompts: List[str]  = []
+        sent_qg_slices: List[tuple] = []   # (start, end) into all_qg_prompts
 
-            if full_context:
+        for text, doc in zip(texts, docs):
+            start = len(all_qg_prompts)
+            if text:
+                units = [
+                    u for u in self._extract_units(doc) if len(u.split()) < 6
+                ][:DECONTEXT_MAX_UNITS]
+                all_qg_prompts.extend(f"answer: {u} context: {text}" for u in units)
+            sent_qg_slices.append((start, len(all_qg_prompts)))
+
+        # ── Phase 3: batch Question Generation ────────────────────────────
+        logger.info(
+            f"Decontextualizer: Phase 3 — QG batch ({len(all_qg_prompts)} prompts "
+            f"across {n} sentences, chunk_size={DECONTEXT_QG_BATCH_SIZE})..."
+        )
+        t_phase = time.perf_counter()
+        all_questions = self._generate_batch(
+            all_qg_prompts, self.qg_tokenizer, self.qg_model,
+            batch_size=DECONTEXT_QG_BATCH_SIZE, label="QG",
+        )
+        logger.info(f"Decontextualizer: Phase 3 done ({time.perf_counter() - t_phase:.1f}s)")
+
+        # ── Phase 4: BM25 retrieval → flat QA input list ──────────────────
+        all_qa_inputs: List[dict]   = []
+        sent_qa_slices: List[tuple]  = []   # (start, end) into all_qa_inputs
+
+        for i, (qg_start, qg_end) in enumerate(sent_qg_slices):
+            qa_start = len(all_qa_inputs)
+            for question in all_questions[qg_start:qg_end]:
+                evidence = self._bm25_retrieve(question, doc_sentences)
+                all_qa_inputs.append(
+                    {"question": question, "context": evidence or texts[i]}
+                )
+            sent_qa_slices.append((qa_start, len(all_qa_inputs)))
+
+        # ── Phase 5: batch Extractive QA ──────────────────────────────────
+        logger.info(
+            f"Decontextualizer: Phase 5 — QA batch ({len(all_qa_inputs)} inputs, "
+            f"chunk_size={DECONTEXT_QA_BATCH_SIZE})..."
+        )
+        t_phase = time.perf_counter()
+        if all_qa_inputs:
+            all_qa_results: List[dict] = self._qa_batch(
+                all_qa_inputs, batch_size=DECONTEXT_QA_BATCH_SIZE
+            )
+        else:
+            all_qa_results = []
+        logger.info(f"Decontextualizer: Phase 5 done ({time.perf_counter() - t_phase:.1f}s)")
+
+        # ── Phase 6: build QA2D prompt list ───────────────────────────────
+        all_qa2d_prompts: List[str]   = []
+        sent_qa2d_slices: List[tuple]  = []   # (start, end) into all_qa2d_prompts
+
+        for (qg_start, qg_end), (qa_start, qa_end) in zip(
+            sent_qg_slices, sent_qa_slices
+        ):
+            qa2d_start = len(all_qa2d_prompts)
+            for q, r in zip(
+                all_questions[qg_start:qg_end], all_qa_results[qa_start:qa_end]
+            ):
+                if r["score"] > QA_SCORE_THRESHOLD:
+                    all_qa2d_prompts.append(
+                        f"Convert to a declarative sentence: Q: {q} A: {r['answer']}"
+                    )
+            sent_qa2d_slices.append((qa2d_start, len(all_qa2d_prompts)))
+
+        # ── Phase 7: batch QA-to-Declarative ──────────────────────────────
+        logger.info(
+            f"Decontextualizer: Phase 7 — QA2D batch ({len(all_qa2d_prompts)} prompts, "
+            f"chunk_size={DECONTEXT_GEN_BATCH_SIZE})..."
+        )
+        t_phase = time.perf_counter()
+        all_qa2d_results = self._generate_batch(
+            all_qa2d_prompts, self.gen_tokenizer, self.gen_model,
+            batch_size=DECONTEXT_GEN_BATCH_SIZE, label="QA2D",  # flan-t5-base
+        )
+        logger.info(f"Decontextualizer: Phase 7 done ({time.perf_counter() - t_phase:.1f}s)")
+
+        # ── Phase 8: build final rewrite prompt list ───────────────────────
+        all_rewrite_prompts: List[str]    = []
+        sent_rewrite_idx: List[Optional[int]] = []  # index into all_rewrite_prompts, or None
+
+        for i, (qa2d_start, qa2d_end) in enumerate(sent_qa2d_slices):
+            declarative = [
+                s for s in all_qa2d_results[qa2d_start:qa2d_end]
+                if s and not s.rstrip().endswith("?")
+            ]
+            if declarative and texts[i]:
+                full_context = " ".join(declarative)
                 final_prompt = (
                     f"Rewrite the sentence to be self-contained by incorporating "
                     f"specific details from the context.\n"
                     f"Context: {full_context}\n"
-                    f"Sentence: {cleaned_text}\n"
+                    f"Sentence: {texts[i]}\n"
                     f"Rewrite:"
                 )
-                try:
-                    rewrites = self._generate_batch(
-                        [final_prompt], self.gen_tokenizer, self.gen_model
-                    )
-                    rewritten = rewrites[0] if rewrites else ""
-
-                    # Quality gate: reject the rewrite if it
-                    #   (a) is empty or unchanged,
-                    #   (b) contains a question mark (leaked QG output), or
-                    #   (c) is more than 2.5× the original length (hallucination)
-                    max_len = int(len(cleaned_text) * DECONTEXT_REWRITE_RATIO)
-                    if (rewritten
-                            and rewritten.lower() != cleaned_text.lower()
-                            and "?" not in rewritten
-                            and len(rewritten) <= max_len):
-                        sent_obj.original_text = cleaned_text
-                        sent_obj.text = rewritten
-                    else:
-                        sent_obj.text = cleaned_text
-                except Exception as e:
-                    logger.warning(f"Decontextualizer: Final rewrite failed — {e}")
-                    sent_obj.text = cleaned_text
+                sent_rewrite_idx.append(len(all_rewrite_prompts))
+                all_rewrite_prompts.append(final_prompt)
             else:
-                sent_obj.text = cleaned_text
+                sent_rewrite_idx.append(None)
+
+        # ── Phase 9: batch final rewrite ──────────────────────────────────
+        logger.info(
+            f"Decontextualizer: Phase 9 — Rewrite batch ({len(all_rewrite_prompts)} prompts, "
+            f"chunk_size={DECONTEXT_GEN_BATCH_SIZE})..."
+        )
+        t_phase = time.perf_counter()
+        all_rewrites = self._generate_batch(
+            all_rewrite_prompts, self.gen_tokenizer, self.gen_model,
+            batch_size=DECONTEXT_GEN_BATCH_SIZE, label="Rewrite",  # flan-t5-base
+        )
+        logger.info(f"Decontextualizer: Phase 9 done ({time.perf_counter() - t_phase:.1f}s)")
+
+        # ── Phase 10: apply results back to SentenceScore objects ──────────
+        for i, sent_obj in enumerate(sentences):
+            text = texts[i]
+            if not text:
+                sent_obj.text = ""
+                continue
+
+            rw_idx = sent_rewrite_idx[i]
+            if rw_idx is not None:
+                rewritten = all_rewrites[rw_idx]
+                max_len   = int(len(text) * DECONTEXT_REWRITE_RATIO)
+                # Quality gate: reject if empty, unchanged, contains "?", or too long
+                if (
+                    rewritten
+                    and rewritten.lower() != text.lower()
+                    and "?" not in rewritten
+                    and len(rewritten) <= max_len
+                ):
+                    sent_obj.original_text = text
+                    sent_obj.text          = rewritten
+                else:
+                    sent_obj.text = text
+            else:
+                sent_obj.text = text
 
         logger.info("Decontextualizer: Complete.")
         return sentences

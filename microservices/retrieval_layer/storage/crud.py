@@ -107,8 +107,10 @@ def create_claim_and_link_entities(
       - centrality_score (float)
       - entities: list of {'name','type'}
     """
+    original_sentence = claim_d.get("original_sentence") or claim_d.get("decontextualised_claim")
+
     claim = Claim(
-        original_sentence=claim_d.get("original_sentence"),
+        original_sentence=original_sentence,
         decontextualised_claim=claim_d.get("decontextualised_claim"),
         decontextualised_embedding=claim_d.get("decontextualised_embedding"),
         centrality_score=claim_d.get("centrality_score"),

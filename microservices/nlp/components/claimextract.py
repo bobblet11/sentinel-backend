@@ -69,10 +69,10 @@ class ClaimExtraction(ArticleProcessor):
         logger.info("ClaimExtraction: Initializing all pipeline stages...")
         t_start = time.time()
 
-        # Load spaCy once and share across the three components that need it.
-        # This avoids loading the same ~100 MB model three separate times.
+        # Load spaCy once and share across components that need it.
+        # Keep NER enabled because CheckWorthiness relies on doc.ents.
         try:
-            nlp_sm = spacy.load("en_core_web_sm", disable=["ner", "lemmatizer"])
+            nlp_sm = spacy.load("en_core_web_sm", disable=["lemmatizer"])
         except OSError:
             logger.error("spaCy model not found. Run: python -m spacy download en_core_web_sm")
             raise
@@ -196,6 +196,24 @@ class ClaimExtraction(ArticleProcessor):
         # Filter: only sentences that passed the check-worthiness threshold AND
         # meet options.min_confidence (default 0.75) are promoted to Claims.
         t = time.time()
+        selected_sentences = [
+            s for s in sentences
+            if s.is_checkworthy and s.confidence >= options.min_confidence
+        ]
+
+        if not selected_sentences and sentences:
+            fallback_limit = max(1, min(options.max_claims, len(sentences)))
+            selected_sentences = sorted(
+                sentences,
+                key=lambda s: s.confidence,
+                reverse=True,
+            )[:fallback_limit]
+            logger.warning(
+                "[Stage 7 | Sentence→Claim] No sentences passed check-worthiness; "
+                "using fallback top-%d sentences by confidence.",
+                fallback_limit,
+            )
+
         result.claims_in_article = [
             Claim(
                 confidence=s.confidence,
@@ -204,8 +222,7 @@ class ClaimExtraction(ArticleProcessor):
                 decontextualised_claim_embedding=s.embedding,
                 NER_entities=s.entities,
             )
-            for s in sentences
-            if s.is_checkworthy and s.confidence >= options.min_confidence
+            for s in selected_sentences
         ]
         logger.info(
             f"[Stage 7 | Sentence→Claim] {len(result.claims_in_article)} claims "
