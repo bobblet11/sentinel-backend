@@ -181,8 +181,14 @@ class Decontextualizer(SentenceProcessor):
             qa_inputs.append({"question": question, "context": evidence or sent_text})
 
         try:
-            # Batch QA processing - pipeline accepts list of dicts
-            qa_results = self.qa_pipe(qa_inputs) if qa_inputs else []
+            # Process QA in mini-batches for better GPU utilization
+            qa_results = []
+            batch_size = 4  # Process 4 QA pairs at a time
+            for i in range(0, len(qa_inputs), batch_size):
+                batch = qa_inputs[i:i + batch_size]
+                # Pipeline can handle list when items have same keys
+                batch_results = [self.qa_pipe(**item) for item in batch]
+                qa_results.extend(batch_results)
         except Exception as e:
             logger.warning(f"Decontextualizer: QA batch failed — {e}")
             return None
