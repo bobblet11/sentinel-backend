@@ -127,10 +127,4 @@ except SystemExit:
     # Service env vars not available — running in component/test context.
     # Pipeline constants above are still fully usable.
     DUMMY_NLP_MODE = False
-    # Fallback device detection for non-service context
-    if torch.backends.mps.is_available():
-        DEVICE = "mps"
-    elif torch.cuda.is_available():
-        DEVICE = "cuda"
-    else:
-        DEVICE = "cpu"
+    DEVICE = "cpu"
