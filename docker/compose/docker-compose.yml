@@ -372,6 +372,7 @@ services:
         
       volumes:
         - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
+        - huggingface-cache:/root/.cache/huggingface
 
       restart: unless-stopped
       networks:
@@ -533,6 +534,9 @@ services:
         reservations:
           cpus: '${RETRIEVAL_CPU_RESERVATION:-0.25}'
           memory: '${RETRIEVAL_MEMORY_RESERVATION:-1G}'
+
+volumes:
+  huggingface-cache:
 
 networks:
   sentinel-net:

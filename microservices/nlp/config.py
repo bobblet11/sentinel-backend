@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from common.env.log_env import print_env, Config, EnvVariable
 from common.env.get_env_var import get_env_var
 from logging import Logger, getLogger
+import torch
 
 load_dotenv()
 config_logger: Logger = getLogger("config")
@@ -50,7 +51,7 @@ DECONTEXT_GEN_BATCH_SIZE = 8    # QG / QA2D generation batch size
 BM25_TOP_K               = 3    # Evidence sentences retrieved per BM25 query
 BERT_MAX_LENGTH          = 512  # Tokenizer truncation for BERT-class models
 DECONTEXT_MAX_GEN_LENGTH = 128  # Max output tokens for decontextualisation rewrites
-DECONTEXT_MAX_UNITS      = 6    # Max ambiguous units resolved per sentence
+DECONTEXT_MAX_UNITS      = 3    # Max ambiguous units resolved per sentence (reduced from 6 for speed)
 DECONTEXT_REWRITE_RATIO  = 2.5  # Reject rewrites longer than N× the original
 BIAS_MAX_CHARS           = 2000 # Article characters fed to bias classifier
 BIAS_SENTIMENT_MAX_LEN   = 128  # Sentiment pipeline token truncation
@@ -89,7 +90,18 @@ try:
     NER_MODEL       = get_env_var("NLP_NER_MODEL",       str, config_logger, NER_MODEL)
     EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, EMBEDDING_MODEL)
     BIAS_POLITICAL_MODEL = get_env_var("NLP_BIAS_MODEL", str, config_logger, BIAS_POLITICAL_MODEL)
-    DEVICE = "cuda" if get_env_var("USE_GPU", str, config_logger, "false").lower() == "true" else "cpu"
+    
+    # Device detection: MPS (Apple Silicon) > CUDA (NVIDIA) > CPU
+    use_gpu_env = get_env_var("USE_GPU", str, config_logger, "false").lower()
+    if use_gpu_env == "true":
+        if torch.backends.mps.is_available():
+            DEVICE = "mps"
+        elif torch.cuda.is_available():
+            DEVICE = "cuda"
+        else:
+            DEVICE = "cpu"
+    else:
+        DEVICE = "cpu"
 
     input_streams: List[str] = INPUT_STREAMS
     output_streams: List[str] = [USER_OUTPUT_STREAM, BACKGROUND_OUTPUT_STREAM, FAILURE_OUTPUT_STREAM]
@@ -117,4 +129,10 @@ except SystemExit:
     # Service env vars not available — running in component/test context.
     # Pipeline constants above are still fully usable.
     DUMMY_NLP_MODE = False
-    DEVICE = "cpu"
+    # Fallback device detection for non-service context
+    if torch.backends.mps.is_available():
+        DEVICE = "mps"
+    elif torch.cuda.is_available():
+        DEVICE = "cuda"
+    else:
+        DEVICE = "cpu"

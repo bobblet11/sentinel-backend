@@ -129,7 +129,7 @@ log_info "Deploying services with the '$CONFIG_NAME' configuration..."
 run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" down 
 
 echo "==> Forcefully removing old service images to prevent tag conflicts..."
-run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" down --rmi local -v --remove-orphans || true
+run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" down --rmi local --remove-orphans || true
 
 echo "==> Removing host-mounted data directories..."
 if [ -d "$PROJECT_ROOT/data/postgres_data" ]; then

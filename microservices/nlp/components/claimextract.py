@@ -157,12 +157,15 @@ class ClaimExtraction(ArticleProcessor):
 
         # ── Stage 4 — Decontextualization ────────────────────────────────────────
         t = time.time()
-        try:
-            sentences = self.decontextualizer.run(article, result, options, sentences)
-        except Exception as e:
-            logger.error(f"ClaimExtraction [Stage 4 Decontextualizer] failed: {e}")
-            raise
-        logger.info(f"[Stage 4 | Decontextualizer] complete in {time.time() - t:.2f}s")
+        if options.enable_decontextualization:
+            try:
+                sentences = self.decontextualizer.run(article, result, options, sentences)
+            except Exception as e:
+                logger.error(f"ClaimExtraction [Stage 4 Decontextualizer] failed: {e}")
+                raise
+            logger.info(f"[Stage 4 | Decontextualizer] complete in {time.time() - t:.2f}s")
+        else:
+            logger.info("[Stage 4 | Decontextualizer] skipped (disabled in options)")
 
         # ── Stage 5 — Check-Worthiness Scoring ──────────────────────────────────
         t = time.time()

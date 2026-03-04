@@ -116,7 +116,7 @@ class Decontextualizer(SentenceProcessor):
         ).to(self.device)
         with torch.no_grad():
             outputs = model.generate(
-                **inputs, max_length=DECONTEXT_MAX_GEN_LENGTH, num_beams=4,
+                **inputs, max_length=DECONTEXT_MAX_GEN_LENGTH, num_beams=2,  # Reduced from 4 to 2
                 repetition_penalty=2.5, early_stopping=True,
             )
         return [self._sanitize(tokenizer.decode(o, skip_special_tokens=True)) for o in outputs]
@@ -181,12 +181,8 @@ class Decontextualizer(SentenceProcessor):
             qa_inputs.append({"question": question, "context": evidence or sent_text})
 
         try:
-            # QuestionAnsweringPipeline.__call__ is (self, **kwargs) — no positional
-            # args are accepted. Must call with explicit keyword arguments per input.
-            qa_results = [
-                self.qa_pipe(question=inp["question"], context=inp["context"])
-                for inp in qa_inputs
-            ]
+            # Batch QA processing - pipeline accepts list of dicts
+            qa_results = self.qa_pipe(qa_inputs) if qa_inputs else []
         except Exception as e:
             logger.warning(f"Decontextualizer: QA batch failed — {e}")
             return None

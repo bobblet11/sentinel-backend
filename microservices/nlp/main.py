@@ -1,4 +1,4 @@
-from logging import Logger, getLogger, DEBUG
+from logging import Logger, getLogger, DEBUG, INFO
 import signal
 from common.io.logging import setup_logging
 from common.models.api.dtos.job import JobType
@@ -10,7 +10,7 @@ from microservices.nlp.nlp_service import NLPService
 SERVICE_NAME = "NLP"
 
 if __name__ == "__main__":
-    setup_logging(level=DEBUG, container_name="nlp")
+    setup_logging(level=INFO, container_name="nlp")
     main_logger: Logger = getLogger("__main__")
     
     config = ServiceConfig(

@@ -36,6 +36,7 @@ class NLPOptions:
     enable_bias_detection: bool = True
     enable_ner: bool = True
     enable_claim_extraction: bool = True
+    enable_decontextualization: bool = True  # Set to False to skip decontextualization for speed
     max_claims: int = 10
     min_confidence: float = 0.50  # Recalibrated: hybrid CW ensemble tops out ~0.65; 0.50 gates low-signal sentences
     # If True, include high-dimensional embeddings in the final response
