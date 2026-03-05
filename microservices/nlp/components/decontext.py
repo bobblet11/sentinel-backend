@@ -5,7 +5,7 @@ import spacy
 import torch
 from typing import List, Optional
 from rank_bm25 import BM25Okapi
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForQuestionAnswering
 
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
@@ -89,14 +89,12 @@ class Decontextualizer(SentenceProcessor):
             torch_dtype=torch.float16 if use_fp16 else torch.float32,
         ).to(self.device)
 
-        # Extractive QA pipeline — accepts a list of {"question", "context"} dicts
-        # as the first positional arg; batch_size drives internal GPU batching.
-        self.qa_pipe = pipeline(
-            "question-answering",
-            model=QA_MODEL,
-            device=self.device_id,
+        # Extractive QA model (replaces the pipeline, which was removed in transformers >=4.52)
+        self.qa_tokenizer = AutoTokenizer.from_pretrained(QA_MODEL)
+        self.qa_model = AutoModelForQuestionAnswering.from_pretrained(
+            QA_MODEL,
             torch_dtype=torch.float16 if use_fp16 else torch.float32,
-        )
+        ).to(self.device)
 
         # Generative rewrite model (FLAN-T5)
         self.gen_tokenizer = AutoTokenizer.from_pretrained(GEN_MODEL)
@@ -153,11 +151,44 @@ class Decontextualizer(SentenceProcessor):
             )
         return results
 
+    def _qa_infer(self, question: str, context: str) -> dict:
+        """
+        Single extractive QA inference using AutoModelForQuestionAnswering.
+        Returns {"score": float, "answer": str} to match the old pipeline output.
+        """
+        inputs = self.qa_tokenizer(
+            question,
+            context,
+            return_tensors="pt",
+            truncation=True,
+            max_length=BERT_MAX_LENGTH,
+            padding=True,
+        ).to(self.device)
+        with torch.no_grad():
+            outputs = self.qa_model(**inputs)
+        start_probs = torch.softmax(outputs.start_logits[0], dim=-1)
+        end_probs   = torch.softmax(outputs.end_logits[0],   dim=-1)
+        seq_len     = start_probs.size(0)
+        max_span    = 50  # cap answer span at 50 tokens
+        # Build score matrix; zero-out invalid spans (end < start or too long)
+        score_matrix = torch.outer(start_probs, end_probs)
+        mask = torch.tril(torch.ones(seq_len, seq_len, device=self.device))
+        score_matrix = score_matrix * mask
+        for i in range(seq_len):
+            if i + max_span < seq_len:
+                score_matrix[i, i + max_span :] = 0.0
+        best_idx    = score_matrix.argmax()
+        best_start  = (best_idx // seq_len).item()
+        best_end    = (best_idx % seq_len).item()
+        best_score  = score_matrix[best_start, best_end].item()
+        answer_ids  = inputs["input_ids"][0][best_start : best_end + 1]
+        answer      = self.qa_tokenizer.decode(answer_ids, skip_special_tokens=True)
+        return {"score": best_score, "answer": answer}
+
     def _qa_batch(self, inputs: List[dict], batch_size: int) -> List[dict]:
         """
         Chunked extractive QA inference.
-        QuestionAnsweringPipeline.__call__ only accepts keyword args (question=, context=),
-        not a positional list.  This helper iterates in chunks and logs progress.
+        Iterates in chunks and logs progress.
         """
         if not inputs:
             return []
@@ -165,13 +196,11 @@ class Decontextualizer(SentenceProcessor):
         total_chunks = (total + batch_size - 1) // batch_size
         results: List[dict] = []
         for chunk_idx, chunk_start in enumerate(range(0, total, batch_size), start=1):
-            chunk     = inputs[chunk_start : chunk_start + batch_size]
+            chunk       = inputs[chunk_start : chunk_start + batch_size]
             done_so_far = chunk_start + len(chunk)
             t0 = time.perf_counter()
             for inp in chunk:
-                results.append(
-                    self.qa_pipe(question=inp["question"], context=inp["context"])
-                )
+                results.append(self._qa_infer(inp["question"], inp["context"]))
             elapsed = time.perf_counter() - t0
             logger.info(
                 f"Decontextualizer [QA] chunk {chunk_idx}/{total_chunks} "
