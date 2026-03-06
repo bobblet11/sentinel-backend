@@ -1,20 +1,15 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+from dataclasses import dataclass
+
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import distinct, select
+
+from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, CreateOrModifySentiment, CreateOrModifyOutlet, CreateOrModifyClaim, Evidence, UpdateJob
 from microservices.retrieval_layer.db.models import (
-    Article, Claim, Entity, NewsOutlet, Author, SentimentAnalysis, claim_to_entity_table
+    Article, Claim, Entity, Job, JobTimestamp, NewsOutlet, Author, SentimentAnalysis, claim_to_entity_table
 )
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 
-
-def get_or_create_outlet(db: Session, name: str, leaning: Optional[str] = None) -> NewsOutlet:
-    row = db.execute(select(NewsOutlet).where(NewsOutlet.name == name)).scalar_one_or_none()
-    if row:
-        return row
-    n = NewsOutlet(name=name)
-    db.add(n)
-    db.flush()
-    return n
 
 
 def get_or_create_author(db: Session, name: str) -> Author:
@@ -26,105 +21,183 @@ def get_or_create_author(db: Session, name: str) -> Author:
     db.flush()
     return a
 
-
-def get_or_create_entity(db: Session, name: str, type_: Optional[str] = None) -> Entity:
-    q = select(Entity).where(Entity.name == name)
-    if type_:
-        q = q.where(Entity.type == type_)
-    row = db.execute(q).scalar_one_or_none()
-    if row:
-        return row
-    e = Entity(name=name, type=type_)
-    db.add(e)
-    db.flush()
-    return e
-
-
-def get_or_create_sentiment(db: Session, sent: Dict[str, Any]) -> SentimentAnalysis:
+#first entity is redis model, second entity is db obj
+def get_or_create_all_entities(db: Session, entities: List[Entity]) -> List[Entity]:
     
-    s = SentimentAnalysis(
-        bias_category=sent.get("bias_category"),
-        bias_score=sent.get("bias_score"),
-        bias_analysis_confidence=sent.get("bias_analysis_confidence"),
-        sentiment_category=sent.get("sentiment_category"),
-        sentiment_analysis_confidence=sent.get("sentiment_analysis_confidence"),
+    added_entities:List[Entity] = []
+    existing_entities: List[Entity] = []
+    for entity in entities:
+        name = entity.name
+        type_ = entity.type
+        
+        query_to_find_entity = select(Entity).where(Entity.name == name)
+        if type_:
+            query_to_find_entity = query_to_find_entity.where(Entity.type == type_)
+            
+        existing_entity = db.execute(query_to_find_entity).scalar_one_or_none()
+        
+        if existing_entity:
+            existing_entities.append(existing_entity)
+            continue
+        
+        new_entity = Entity(name=name, type=type_)
+        db.add(new_entity)
+        db.flush()
+        db.refresh(new_entity)
+        added_entities.append(new_entity)
+    return added_entities + existing_entities
+
+def create_sentiment(db: Session, sentiment_dto: CreateOrModifySentiment) -> SentimentAnalysis:
+    new_sentiment_entry = SentimentAnalysis(
+        bias_category=sentiment_dto.bias_category,
+        bias_score=sentiment_dto.bias_score,
+        bias_analysis_confidence=sentiment_dto.bias_analysis_confidence,
+        sentiment_category=sentiment_dto.sentiment_category,
+        sentiment_analysis_confidence=sentiment_dto.sentiment_analysis_confidence,
     )
-    db.add(s)
+    
+    db.add(new_sentiment_entry)
     db.flush()
-    return s
+    return new_sentiment_entry
 
-
-def get_or_create_article(db: Session, article_d: Dict[str, Any]) -> Article:
-    url = article_d.get("url")
-    if not url:
+def get_or_create_outlet(db: Session, outlet_dto: CreateOrModifyOutlet) -> NewsOutlet:
+    existing_outlet_entry = db.execute(select(NewsOutlet).where(NewsOutlet.name == outlet_dto.name)).scalar_one_or_none()
+    if existing_outlet_entry:
+        return existing_outlet_entry
+    
+    new_outlet_entry = NewsOutlet(name=outlet_dto.name)
+    db.add(new_outlet_entry)
+    db.flush()
+    return new_outlet_entry
+    
+def get_or_create_article(db: Session, article_dto: CreateOrModifyArticle, sentiment_dto: CreateOrModifySentiment, outlet_dto: CreateOrModifyOutlet) -> Article:
+    if not article_dto.article_url:
         raise ValueError("article must include url")
 
-    row = db.execute(select(Article).where(Article.url == url)).scalar_one_or_none()
-    if row:
-        return row
+    stmt = select(Article).where(Article.url == article_dto.article_url)
+    existing = db.execute(stmt).scalar_one_or_none()
+    
+    outlet_entry = get_or_create_outlet(db, outlet_dto)
+    sentiment_entry = create_sentiment(db, sentiment_dto)
+    
+    if existing:
+        # Always overwrite all fields, even if they were already set
+        existing.html = article_dto.article_html
+        existing.text = article_dto.article_text
+        existing.title = article_dto.article_title
+        existing.publishedAt = article_dto.publish_date
 
-    outlet_name = article_d.get("outlet_name") or article_d.get("source") or article_d.get("news_outlet")
-    outlet = None
-    if outlet_name:
-        outlet = get_or_create_outlet(db, outlet_name)
-
-    sentiment = None
-    if article_d.get("sentiment"):
-        sentiment = get_or_create_sentiment(db, article_d["sentiment"])
-
-    published_at = None
-    if article_d.get("publishedAt"):
-        try:
-            published_at = datetime.fromisoformat(article_d["publishedAt"])
-        except Exception:
-            published_at = None
-
-    article = Article(
-        url=url,
-        title=article_d.get("title"),
-        text=article_d.get("text") or article_d.get("content"),
-        html=article_d.get("html"),
-        publishedAt=published_at,
-        outlet=outlet,
-        sentiment_id=sentiment.id if sentiment else None,
+        existing.outlet_id = outlet_entry.id if outlet_entry else None
+        existing.sentiment_id = sentiment_entry.id if sentiment_entry else None
+        db.flush()
+        return existing
+    
+    new_article_entry = Article(
+        url=article_dto.article_url,
+        title=article_dto.article_title,
+        text=article_dto.article_text,
+        html=article_dto.article_html,
+        publishedAt=article_dto.publish_date,
+        outlet_id=outlet_entry.id if outlet_entry else None,
+        sentiment_id=sentiment_entry.id if sentiment_entry else None,
     )
-    db.add(article)
+    
+    db.add(new_article_entry)
     db.flush()
-
-    return article
-
+    return new_article_entry
 
 def create_claim_and_link_entities(
     db: Session,
-    claim_d: Dict[str, Any],
-    article_obj: Article,
+    claim_dto: CreateOrModifyClaim,
+    article_entry: Article,
 ) -> Claim:
-    """
-    claim_d expected keys:
-      - original_sentence
-      - decontextualised_claim
-      - decontextualised_embedding (list or None)
-      - centrality_score (float)
-      - entities: list of {'name','type'}
-    """
+    
     claim = Claim(
-        original_sentence=claim_d.get("original_sentence"),
-        decontextualised_claim=claim_d.get("decontextualised_claim"),
-        decontextualised_embedding=claim_d.get("decontextualised_embedding"),
-        centrality_score=claim_d.get("centrality_score"),
-        article_id=article_obj.id,
+        original_sentence=claim_dto.original_sentence,
+        decontextualised_claim=claim_dto.decontextualised_claim,
+        decontextualised_embedding=claim_dto.decontextualised_embedding,
+        centrality_score=claim_dto.centrality_score,
+        article_id=article_entry.id
     )
+    
     db.add(claim)
     db.flush()
-
-    entities = claim_d.get("entities", []) or []
-    for ent in entities:
-        name = ent.get("name")
-        type_ = ent.get("type")
-        if not name:
-            continue
-        db_ent = get_or_create_entity(db, name=name, type_=type_)
-        if db_ent not in claim.entities:
-            claim.entities.append(db_ent)
-    db.flush()
+    db.refresh(claim)
     return claim
+
+def extend_evidence_claims_into_articles(db: Session, claim_ids: List[int], current_article_id: int) -> List[Dict[str, Any]]:
+    """
+    Fetch related articles based on matched claim IDs.
+    Returns articles that contain the matched claims, excluding the current article.
+    """
+    
+    if not claim_ids:
+        return []
+    
+    articles = db.execute(
+        select(Article)
+        .options(joinedload(Article.outlet))
+        .options(joinedload(Article.sentiment))
+        .join(Claim, Claim.article_id == Article.id)
+        .where(Claim.id.in_(claim_ids))
+        .where(Article.id != current_article_id)
+        .group_by(Article.id)
+    ).scalars().unique().all()
+    
+    if not articles:
+        return []
+    
+    related = []
+    for article in articles:
+    
+        article_excerpt = article.text[:300] if article.text else ""
+        if len(article.text or "") > 300:
+            article_excerpt += "..."
+        
+        bias_category = article.sentiment.bias_category if article.sentiment.bias_category else "center"
+        
+        if bias_category.lower() not in ["left", "center-left", "center", "center-right", "right"]:
+            mapping = {
+                "liberal": "left",
+                "progressive": "left",
+                "conservative": "right",
+                "neutral": "center",
+                "moderate": "center",
+            }
+            bias_category = mapping.get(bias_category.lower() , "center")
+
+        
+        evidence = Evidence(
+            id = str(article.id),
+            title = article.title or "Untitled",
+            source = article.outlet.name if article.outlet else "Unknown",
+            url = article.url,
+            bias = bias_category,
+            publishedAt = article.publishedAt.isoformat() if article.publishedAt else "",
+            excerpt = article_excerpt
+        )
+        
+        related.append(evidence)    
+    return related
+
+def finalise_and_complete_job(db: Session, job_dto: UpdateJob):
+    if not job_dto.job_id or not job_dto.job_uid:
+        raise ValueError("job must include id and uid")
+    
+    query_to_find_job = select(Job).where(Job.uid == job_dto.job_uid)
+    existing_job = db.execute(query_to_find_job).scalar_one_or_none()
+
+    if not existing_job:
+        raise ValueError("job does not exist! should exist for user jobs")
+
+    for timestamp in job_dto.stage_timestamps:
+        jt_to_add = JobTimestamp(
+            job_id = existing_job.id,
+            stage_name = timestamp.stage_name,
+            timestamp = timestamp.wall_time,
+            monotonic_timestamp = timestamp.offset_s
+        )
+        db.add(jt_to_add)
+        
+    db.flush()
+    return existing_job

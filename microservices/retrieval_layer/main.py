@@ -2,13 +2,13 @@ import signal
 from logging import DEBUG
 
 from common.io.logging import setup_logging
+from common.models.api.dtos.job import JobType
 from common.service.service_template import ServiceConfig
 from common.redis_client.prioritised_consumer_combiner import BlockPrioritisationLevel
 
 from microservices.retrieval_layer.services.retrieval_service import RetrievalService
 from microservices.retrieval_layer.config import (
     INPUT_STREAMS,
-    USER_OUTPUT_STREAM,
     FAILURE_OUTPUT_STREAM,
     GROUP_NAME,
     CONSUMER_NAME,
@@ -22,19 +22,20 @@ if __name__ == "__main__":
     setup_logging(level=DEBUG, container_name=CONTAINER_NAME)
 
     config = ServiceConfig(
-        routing_key=["header","type"],                     
-        max_workers=1,                        
         service_name=SERVICE_NAME,
-        input_streams=INPUT_STREAMS,# user:to.be.retrieval
+                
+        input_streams=INPUT_STREAMS, # user:to.be.retrieval, background:to.be.retrieval
+        failure_output_stream=FAILURE_OUTPUT_STREAM,
+        output_streams=[],  
         
-        output_streams=[USER_OUTPUT_STREAM],  
-        router_key_values=["user"],
-        
+        routing_key=["header","type"],     
+        router_key_values=[JobType.USER.value, JobType.BACKGROUND.value],
         block_prioritisation_level=BlockPrioritisationLevel.LINEAR,
         group_name=GROUP_NAME,
         consumer_name=CONSUMER_NAME,
-        failure_output_stream=FAILURE_OUTPUT_STREAM,
+        
         is_concurrent=False,
+        max_workers=1,                 
         batch_size=BATCH_SIZE,
     )
 

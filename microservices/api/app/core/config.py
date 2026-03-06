@@ -21,6 +21,7 @@ POSTGRES_PASSWORD: str = get_env_var("POSTGRES_PASSWORD",str, config_logger)
 
 # Redis stream configs
 OUTPUT_STREAM: str = get_env_var("OUTPUT_STREAM",str, config_logger)
+HASH_STORE_NAMESPACE: str = get_env_var("HASH_STORE_NAMESPACE",str, config_logger)
 
 env_variables: List[EnvVariable] = [
     EnvVariable("API_SERVICE_PORT", API_SERVICE_PORT), 
@@ -32,6 +33,7 @@ env_variables: List[EnvVariable] = [
     EnvVariable("POSTGRES_PASSWORD", POSTGRES_PASSWORD),
     
     EnvVariable("OUTPUT_STREAM", OUTPUT_STREAM),
+    EnvVariable("HASH_STORE_NAMESPACE", HASH_STORE_NAMESPACE),
 ]
 
 output_streams = [OUTPUT_STREAM]
