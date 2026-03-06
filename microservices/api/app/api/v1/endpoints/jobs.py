@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from psycopg2 import IntegrityError
+from common.models.api.dtos.job import JobStatus
+from common.redis_client.hash_store import RedisHashStore
+from microservices.api.app.core.config import HASH_STORE_NAMESPACE
 from microservices.api.app.crud.crud_article import create_article
 from microservices.api.app.db.session import get_db
 from microservices.api.app.dtos.job import JobCreate, JobResponse
@@ -15,7 +18,8 @@ from common.redis_client.connection import RedisConnection
 from typing import Dict, Any, List
 
 router = APIRouter()
-redis_connection = RedisConnection()
+result_hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
+
 
 
 def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: Dict[str, Any]) -> Dict[str, Any]:
@@ -44,9 +48,7 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
             "keyClaims": [...]
         }
     """
-    # Extract article metadata
     article_content = article.text or ""
-    # Truncate content to ~1800 chars
     article_content = article_content[:1800] if article_content else ""
     
     article_section = {
@@ -90,14 +92,14 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
     # Build biasAnalysis from article sentiment if available
     # For now, provide placeholder values (in production, would fetch from sentiment_analysis table)
     bias_analysis = {
-        "overallBias": "center",  # Placeholder
+        "overallBias": "PLACEHOLD_center",  # Placeholder
         "biasScore": 0,  # Placeholder (-100 to +100)
         "confidence": 50,  # Placeholder
-        "sentiment": "neutral",  # Placeholder
+        "sentiment": "PLACEHOLD_neutral",  # Placeholder
         "indicators": {
-            "language": "Neutral language detected",
-            "sources": "Multiple sources cited",
-            "framing": "Balanced presentation",
+            "language": "PLACEHOLD_Neutral language detected",
+            "sources": "PLACEHOLD_Multiple sources cited",
+            "framing": "PLACEHOLD_Balanced presentation",
         },
     }
     
@@ -158,6 +160,13 @@ def read_job_status(job_id: int, db: Session = Depends(get_db)):
     return job
 
 
+# result = {
+#         "save_data_result" : self.data.payload.save_data_result,
+#         "save_job_result": self.data.payload.save_job_result,
+#         "matches": self.data.payload.matches,
+#         "related_articles": self.data.payload.related_articles
+# }
+
 @router.get("/{job_uid}/result", response_model=dict, status_code=status.HTTP_200_OK)
 async def get_retrieval_result(job_uid: UUID, timeout: int = Query(30, ge=5, le=60), db: Session = Depends(get_db)):
     """
@@ -168,49 +177,37 @@ async def get_retrieval_result(job_uid: UUID, timeout: int = Query(30, ge=5, le=
     - Returns 404 if result not found after timeout
     """
     try:
-        client = redis_connection.get_client()
         start_time = asyncio.get_event_loop().time()
         search_for_uid = str(job_uid)
         
         while asyncio.get_event_loop().time() - start_time < timeout:
-            # Read all messages from retrieval results stream (from beginning to latest)
-            # xrange(key, min, max) with min='-' (earliest) and max='+' (latest)
-            results = client.xrange("user:retrieval.results", min="-", max="+", count=100)
+            result = result_hash_store.get(search_for_uid)
             
-            # redis_connection uses decode_responses=True, so all data is already strings
-            for msg_id, data in results:
-                if 'payload' in data:
-                    try:
-                        # data['payload'] is already a string (not bytes)
-                        payload = json.loads(data['payload'])
-                        found_uid = str(payload.get('job_uid', ''))
-                        
-                        if found_uid == search_for_uid:
-                            retrieval_result = payload.get('retrieval_result', {})
-                            
-                            # Get the article from database
-                            article_id = retrieval_result.get('created_article_id')
-                            if article_id:
-                                article = db.query(Article).filter(Article.id == article_id).first()
-                                if article:
-                                    # Transform into frontend format
-                                    formatted_response = _transform_retrieval_to_frontend_format(article, retrieval_result)
-                                    return {
-                                        "ok": True,
-                                        "job_uid": str(job_uid),
-                                        "status": payload.get('status', 'completed'),
-                                        "data": formatted_response
-                                    }
-                            
-                            # Fallback if article not found
-                            return {
-                                "ok": True,
-                                "job_uid": str(job_uid),
-                                "status": payload.get('status', 'completed'),
-                                "data": retrieval_result
-                            }
-                    except (json.JSONDecodeError, TypeError) as e:
-                        continue
+            if result:
+                
+                retrieval_result = {
+                    "matches": result.get('matches', {}),
+                    "related_articles": result.get('related_articles', {}),
+                }
+                
+                article_id = retrieval_result.get('save_data_result',{}).get("article_entry_id", None)
+                
+                if not article_id:
+                    raise Exception("Cannot return result! No article_id")
+                
+                article = db.query(Article).filter(Article.id == article_id).first()
+                
+                if not article:
+                    raise Exception("Cannot return result! No article in database")
+                
+                formatted_response = _transform_retrieval_to_frontend_format(article, retrieval_result)
+                
+                return {
+                    "ok": True,
+                    "job_uid": str(job_uid),
+                    "status": JobStatus.COMPLETE,
+                    "data": formatted_response
+                }
             
             await asyncio.sleep(1)
         
@@ -221,6 +218,7 @@ async def get_retrieval_result(job_uid: UUID, timeout: int = Query(30, ge=5, le=
         
     except HTTPException:
         raise
+    
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

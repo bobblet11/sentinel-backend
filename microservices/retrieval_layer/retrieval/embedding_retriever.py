@@ -1,8 +1,10 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-# from microservices.retrieval_layer.retrieval.embedding_utils import is_valid_embedding
+from typing import Dict, List, Tuple
 
-MAX_CANDIDATES = 50  # hard cap BEFORE NLI
+from sqlalchemy.orm import Session
+from sqlalchemy import select, text
+from microservices.retrieval_layer.db.models import Claim
+from pgvector.sqlalchemy import Vector
+MAX_CANDIDATES = 100  # hard cap BEFORE NLI
 
 
 def is_valid_embedding(embedding, dim=768) -> bool:
@@ -14,56 +16,79 @@ def is_valid_embedding(embedding, dim=768) -> bool:
         return False
     return True
 
+
+#top k is not good, replace it with teh thing we learned in NLP, convert every candidate into a percentage, sum up all the claims until it reaches some  threshold.
 def retrieve_by_embedding(
     db: Session,
     query_embedding: list[float],
-    candidate_claim_ids: list[int] | None = None,
+    candidate_claim_ids: list[int],  
     top_k: int = MAX_CANDIDATES,
     exclude_claim_id: int | None = None,
-):
+) -> List[Tuple[Dict[str, str | int], float]]:
     if not is_valid_embedding(query_embedding):
         return []
-
-    sql = """
-    SELECT id, decontextualised_claim, decontextualised_embedding <=> CAST(:query_embedding AS vector) AS distance
-    FROM claim
-    WHERE decontextualised_embedding IS NOT NULL
-    """
-
-
-    if exclude_claim_id is not None:
-        sql += " AND id != :exclude_id"
-
-    sql += """
-    ORDER BY decontextualised_embedding <=> CAST(:query_embedding AS vector)
-    LIMIT :limit
-    """
-
-    params = {
-        "query_embedding": query_embedding,
-        "limit": top_k,
-    }
-
-        
     
-    if exclude_claim_id is not None:
-        params["exclude_id"] = exclude_claim_id
-
-    rows = db.execute(text(sql), params).fetchall()
+    query_vec = Vector(query_embedding)
+    stmt = (
+        select(
+            Claim.id,
+            Claim.decontextualised_claim,
+            Claim.decontextualised_embedding.cosine_distance(query_vec).label("distance")
+        )
+        .where(Claim.decontextualised_embedding.is_not(None))
+        .where(Claim.id.in_(candidate_claim_ids))
+    )
     
-    if not rows:
+    if exclude_claim_id:
+        stmt = stmt.where(Claim.id != exclude_claim_id)
+    
+    stmt = stmt.order_by(Claim.decontextualised_embedding.cosine_distance(query_vec)).limit(top_k)
+    results = db.execute(stmt).fetchall()
+    
+    processed = []
+    for row in results:
+        similarity = 1.0 - row.distance
+        claim_dict = {
+            "id": row.id,
+            "decontextualised_claim": row.decontextualised_claim,
+        }
+        processed.append((claim_dict, similarity))
+    
+    return processed
+
+
+def retrieve_by_embedding_full_scan(
+    db: Session,
+    query_embedding: list[float],
+    top_k: int = MAX_CANDIDATES,
+    exclude_claim_id: int | None = None,
+) -> List[Tuple[Dict[str, str | int], float]]:
+    if not is_valid_embedding(query_embedding):
         return []
     
-    results = []
-    for r in rows:
-        similarity = 1 - r.distance  # cosine similarity
-
-        claim = {
-            "id": r.id,
-            "decontextualised_claim": r.decontextualised_claim,
-        }
-        results.append(
-            (claim, similarity)
+    query_vec = Vector(query_embedding)
+    stmt = (
+        select(
+            Claim.id,
+            Claim.decontextualised_claim,
+            Claim.decontextualised_embedding.cosine_distance(query_vec).label("distance")
         )
-
-    return results
+        .where(Claim.decontextualised_embedding.is_not(None))
+    )
+    
+    if exclude_claim_id:
+        stmt = stmt.where(Claim.id != exclude_claim_id)
+    
+    stmt = stmt.order_by(Claim.decontextualised_embedding.cosine_distance(query_vec)).limit(top_k)
+    results = db.execute(stmt).fetchall()
+    
+    processed = []
+    for row in results:
+        similarity = 1.0 - row.distance
+        claim_dict = {
+            "id": row.id,
+            "decontextualised_claim": row.decontextualised_claim,
+        }
+        processed.append((claim_dict, similarity))
+    
+    return processed

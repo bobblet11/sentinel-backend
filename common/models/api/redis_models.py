@@ -2,7 +2,7 @@ import datetime
 from datetime import timezone
 import time
 from typing import Any, List, Union, Dict, Optional
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pydantic import BaseModel
 
 from common.models.api.dtos.job import JobStage
@@ -28,6 +28,9 @@ In redis, each message looks like this
         }
 
 """
+
+
+
 
 #redis message wraps a message/job object
 @dataclass
@@ -59,6 +62,7 @@ class MessageTimestamp(BaseModel):
     stage_name: str
     wall_time: str
     offset_s: float
+    
 class MessageHeader(BaseModel):
     """
     Represents the basic information used to identify and get stats on Messages
@@ -142,10 +146,11 @@ class Claim:
 @dataclass
 class BiasProfile:
     """Result of political and emotional bias analysis."""
-    political_bias: str  # e.g., "Left", "Center", "Right"
-    confidence: float
-    scores: Dict[str, float]  # e.g., {"left": 0.1, "right": 0.8}
-    emotional_tone: Optional[str] = None
+    bias_category:Optional[str] # e.g., "Left", "Center", "Right"
+    bias_score:Optional[float]
+    bias_analysis_confidence:Optional[float]
+    sentiment_category:Optional[str]
+    sentiment_analysis_confidence:Optional[float]
 
 
 @dataclass
@@ -155,6 +160,15 @@ class NLPResult:
     claims_in_article: List[Claim] = field(default_factory=list)
     entities_in_article: List[Entity] = field(default_factory=list)
     bias_profile: Optional[BiasProfile] = None
+
+@dataclass
+class RetrievalResult:
+    """The aggregate object containing all insights produced by the pipeline."""
+    save_data_result: Dict[Any]
+    save_job_result: Dict[Any]
+    matches: Any
+    related_articles: Any
+
 
 class MessagePayload(BaseModel):
     """
@@ -178,6 +192,12 @@ class MessagePayload(BaseModel):
     entities_in_article: List[Entity] = field(default_factory=list)
     bias_profile: Optional[BiasProfile] = None
     
+    #retrieval
+    save_data_result: Dict[Any]
+    save_job_result: Dict[Any]
+    matches: Any
+    related_articles: Any
+    
     
 class Message(BaseModel):
     """
@@ -196,7 +216,14 @@ class StreamMessage:
     
     # following field are the actual job keys
     data: Message # the actual message object, i.e the class above
-
+    
+    @property
+    def header(self) -> Optional[MessageHeader]:
+        return self.data.header
+    
+    @property
+    def stage_timestamps(self) -> Optional[List[MessageTimestamp]]:
+        return self.data.stage_timestamps
 
     @property
     def type(self) -> Optional[str]:
@@ -219,6 +246,14 @@ class StreamMessage:
         return self.data.payload.title
     
     @property
+    def publish_date(self) -> Optional[str]:
+        return self.data.payload.publish_date
+    
+    @property
+    def news_outlet_name(self) -> Optional[str]:
+        return self.data.payload.news_outlet
+    
+    @property
     def all_claims(self) -> Optional[List[Claim]]:
         return self.data.payload.claims_in_article
     
@@ -227,10 +262,25 @@ class StreamMessage:
         return self.data.payload.entities_in_article
     
     @property
-    def bias_result(self) -> Optional[BiasProfile]:
+    def bias_profile(self) -> Optional[BiasProfile]:
         return self.data.payload.bias_profile
-
     
+    @property
+    def uid(self) -> Optional[str]:
+        return self.data.header.uid
+    
+    @property
+    def retrieval_results(self) -> Optional[Dict[Any]]:
+        
+        result = {
+                "save_data_result" : self.data.payload.save_data_result,
+                "save_job_result": self.data.payload.save_job_result,
+                "matches": self.data.payload.matches,
+                "related_articles": self.data.payload.related_articles
+        }
+        
+        return result
+
     def set_raw_html(self, page_html: str) -> None:
         self.data.payload.raw_html = page_html
     
@@ -263,10 +313,21 @@ class StreamMessage:
             
         if not self.data.payload.bias_profile and nlp_result.bias_profile:
             self.data.payload.bias_profile = nlp_result.bias_profile
+
+    def set_retrieval_result(self, retrieval_result: RetrievalResult) -> None:
+        if not self.data.payload.save_data_result and retrieval_result.save_data_result:
+            self.data.payload.save_data_result = retrieval_result.save_data_result
             
+        if not self.data.payload.save_job_result and retrieval_result.save_job_result:
+            self.data.payload.save_job_result = retrieval_result.save_job_result
+        
+        if not self.data.payload.matches and retrieval_result.matches:
+            self.data.payload.matches = retrieval_result.matches
+        
+        if not self.data.payload.related_articles and retrieval_result.related_articles:
+            self.data.payload.related_articles = retrieval_result.related_articles
+
     def add_timestamp(self, stage_name: JobStage) -> None:
-        
-        
         wall = datetime.datetime.now(datetime.timezone.utc)
         offset = time.monotonic() - job_start_mono
 

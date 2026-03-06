@@ -63,6 +63,9 @@ DUMMY_SEED_MODE: bool = get_env_var(
     default=False,
 )
 
+HASH_STORE_NAMESPACE: str = get_env_var("HASH_STORE_NAMESPACE",str, config_logger)
+TEST_MODE: bool = True
+
 env_variables: List[EnvVariable] = [
     EnvVariable("POSTGRES_HOST", POSTGRES_HOST),
     EnvVariable("POSTGRES_PORT", POSTGRES_PORT),
@@ -74,15 +77,18 @@ env_variables: List[EnvVariable] = [
     EnvVariable("FAILURE_OUTPUT_STREAM", FAILURE_OUTPUT_STREAM),
     EnvVariable("GROUP_NAME", GROUP_NAME),
     EnvVariable("CONSUMER_NAME", CONSUMER_NAME),
+    EnvVariable("HASH_STORE_NAMESPACE", HASH_STORE_NAMESPACE),
     
     EnvVariable("BATCH_SIZE", BATCH_SIZE),
     
     EnvVariable("DUMMY_NLP_MODE", DUMMY_NLP_MODE),
     EnvVariable("DUMMY_SEED_MODE", DUMMY_SEED_MODE),
+    
+    
 ]
 
 input_streams = INPUT_STREAMS
-output_streams = [FAILURE_OUTPUT_STREAM]
+output_streams = [FAILURE_OUTPUT_STREAM, HASH_STORE_NAMESPACE]
 
 print_env(Config(env_variables, input_streams, output_streams), config_logger)
 

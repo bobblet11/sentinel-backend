@@ -52,22 +52,29 @@ class ServiceTemplate(ABC):
 		self.batch_size = config.batch_size
 		self.keep_running: bool = True
 		self.is_concurrent = config.is_concurrent
-		self.input_streams = config.input_streams
-		stream_to_priority_map = PrioritisedRedisConsumerCombiner.generate_stream_to_priority_mapping(config.input_streams)
-		stream_to_block_map = PrioritisedRedisConsumerCombiner.generate_stream_to_block_mapping(input_streams=config.input_streams, level=config.block_prioritisation_level)
-		routing_map = RedisPublisherRouter.generate_router_mapping(config.output_streams, config.router_key_values)
   
-		self.message_consumer = PrioritisedRedisConsumerCombiner(
-			stream_to_priority_map=stream_to_priority_map,
-			stream_to_block_map=stream_to_block_map,
-          		group_name=config.group_name, 
-            		consumer_name=config.consumer_name
-              	)
-  
-		self.success_publish_router = RedisPublisherRouter(
-			routing_key=config.routing_key, routing_map=routing_map
-		)
-		self.fail_publisher = RedisPublisher(config.failure_output_stream)
+		if config.input_streams:
+			self.input_streams = config.input_streams
+			stream_to_priority_map = PrioritisedRedisConsumerCombiner.generate_stream_to_priority_mapping(config.input_streams)
+			stream_to_block_map = PrioritisedRedisConsumerCombiner.generate_stream_to_block_mapping(input_streams=config.input_streams, level=config.block_prioritisation_level)
+			self.message_consumer = PrioritisedRedisConsumerCombiner(
+				stream_to_priority_map=stream_to_priority_map,
+				stream_to_block_map=stream_to_block_map,
+				group_name=config.group_name, 
+				consumer_name=config.consumer_name
+			)
+   
+		if config.output_streams:
+			self.output_streams = config.output_streams
+			routing_map = RedisPublisherRouter.generate_router_mapping(config.output_streams, config.router_key_values)
+			self.success_publish_router = RedisPublisherRouter(
+				routing_key=config.routing_key, routing_map=routing_map
+			)
+
+		if config.failure_output_stream:
+			self.failure_output_stream = self.failure_output_stream
+			self.fail_publisher = RedisPublisher(config.failure_output_stream)
+   
 		self.is_cut_and_paste_mode = config.is_cut_and_paste_mode
 		self.logger.info(f"config of service: {config}")
 
@@ -210,7 +217,6 @@ class ServiceTemplate(ABC):
 			# The logging for this is handled inside _handle_failure, 
 			# but a summary log is good practice.
 			self.logger.info(f"Handled {failure_count} unroutable messages by sending to failure stream.")
-
 
 	def _process_batch_concurrently(self, executor: ThreadPoolExecutor, raw_messages: List[Dict[str,Any]]):
 		self.logger.info(f"Fetched {len(raw_messages)} messages. Processing...")

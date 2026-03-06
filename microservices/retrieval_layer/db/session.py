@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from microservices.retrieval_layer.config import (
@@ -26,3 +28,16 @@ SessionLocal = sessionmaker(
 
 def get_db_session() -> Session:
     return SessionLocal()
+
+@contextmanager
+def get_db_transaction() -> Session:
+    """Get a session with automatic transaction management."""
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()

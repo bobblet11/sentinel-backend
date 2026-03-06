@@ -1,698 +1,385 @@
-from datetime import datetime
-import json
-import uuid
-from typing import Any, Dict, Optional, List
+from asyncio import as_completed
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List, Tuple
 
+from requests import Session
+
+from common.models.api.dtos.job import JobStage, JobStatus, JobType
+from common.redis_client.hash_store import RedisHashStore
 from common.service.service_template import ServiceTemplate
-from common.models.api.redis_models import Message, StreamMessage
+from common.models.api.redis_models import BiasProfile, Claim, Message, RetrievalResult, StreamMessage
 from common.redis_client.publisher import RedisPublisher
-from microservices.retrieval_layer.processor import process_nlp_message
+from microservices.retrieval_layer.retrieval.common_words import STOP_WORDS
+from microservices.retrieval_layer.retrieval.embedding_retriever import retrieve_by_embedding
+from microservices.retrieval_layer.retrieval.entity_filter import find_evidence_by_entity_match
+from microservices.retrieval_layer.retrieval.keyword_filter import find_evidence_by_keyword_match
+from microservices.retrieval_layer.retrieval.nli import classify_claim_relation
+from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, CreateOrModifySentiment, CreateOrModifyOutlet, CreateOrModifyClaim, UpdateJob
+
 from microservices.retrieval_layer.config import (
-    USER_OUTPUT_STREAM,
-    FAILURE_OUTPUT_STREAM,
-    DUMMY_NLP_MODE,
-    DUMMY_SEED_MODE,
+    HASH_STORE_NAMESPACE,
 )
-from microservices.retrieval_layer.retrieval.pipeline import retrieve_candidate_claims
-from microservices.retrieval_layer.db.session import get_db_session
-from microservices.retrieval_layer.db.models import Article, Claim, SentimentAnalysis, NewsOutlet
+
+from microservices.retrieval_layer.db.session import get_db_session, get_db_transaction
 from microservices.retrieval_layer.storage.crud import (
+    extend_evidence_claims_into_articles,
+    finalise_and_complete_job,
+    get_or_create_all_entities,
     get_or_create_article,
     create_claim_and_link_entities,
 )
-from logging import error, getLogger
-from pydantic import ValidationError
-from sqlalchemy.orm import joinedload
-from sqlalchemy import select, distinct
 
+
+MAX_CANDIDATES_BEFORE_SIMILARITY = 100
+MAX_CANDIDATES_BEFORE_NLI = 10
+MIN_SIMILARITY = 0.25
 EMBEDDING_DIM = 768
-_DUMMY_CORPUS_SEEDED = False
-_DUMMY_BASE_EMBEDDING = [0.05] * EMBEDDING_DIM
-
-# Define 3 distinct dummy article embeddings
-_DUMMY_EMBEDDINGS = {
-    "article_1": [0.1] * EMBEDDING_DIM,  # Government/Taxes
-    "article_2": [0.3] * EMBEDDING_DIM,  # Climate
-    "article_3": [0.5] * EMBEDDING_DIM,  # Healthcare
-}
-
-
-def _create_similar_embedding(base_pattern: float, noise_level: float = 0.05) -> List[float]:
-    """Create an embedding similar to a base pattern with slight variation."""
-    return [base_pattern + (noise_level if i % 2 == 0 else -noise_level) for i in range(EMBEDDING_DIM)]
-
-
-def _extract_sentiment(payload: Any) -> Dict[str, Any]:
-    import random
-    
-    bias_profile = getattr(payload, "bias_profile", None)
-    if not bias_profile:
-        # Return random dummy sentiment if no bias profile is provided
-        bias_categories = ["left", "center", "right", "neutral"]
-        sentiment_categories = ["positive", "negative", "neutral", "critical", "optimistic", "concerned"]
-        return {
-            "bias_category": random.choice(bias_categories),
-            "bias_score": round(random.uniform(0.3, 0.9), 2),
-            "bias_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
-            "sentiment_category": random.choice(sentiment_categories),
-            "sentiment_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
-        }
-
-    scores = getattr(bias_profile, "scores", None)
-    bias_score = None
-    if isinstance(scores, dict) and scores:
-        bias_score = max(scores.values())
-
-    return {
-        "bias_category": getattr(bias_profile, "political_bias", None),
-        "bias_score": bias_score,
-        "bias_analysis_confidence": getattr(bias_profile, "confidence", None),
-        "sentiment_category": getattr(bias_profile, "emotional_tone", None),
-        "sentiment_analysis_confidence": getattr(bias_profile, "confidence", None),
-    }
-
-
-def _normalize_claims(claims: List[Any]) -> List[Dict[str, Any]]:
-    normalized: List[Dict[str, Any]] = []
-    for c in claims or []:
-        if isinstance(c, dict):
-            normalized.append(
-                {
-                    "original_sentence": c.get("original_sentence") or c.get("contextualised_claim"),
-                    "decontextualised_claim": c.get("decontextualised_claim"),
-                    "decontextualised_embedding": c.get("decontextualised_embedding"),
-                    "centrality_score": c.get("centrality_score"),
-                    "entities": c.get("entities", []),
-                }
-            )
-            continue
-
-        entities = []
-        for ent in getattr(c, "NER_entities", []) or []:
-            entities.append(
-                {
-                    "name": getattr(ent, "entity_text", None),
-                    "type": getattr(ent, "type_of_entity", None),
-                }
-            )
-
-        normalized.append(
-            {
-                "original_sentence": getattr(c, "contextualised_claim_text", None),
-                "decontextualised_claim": getattr(c, "decontextualised_claim_text", None),
-                "decontextualised_embedding": getattr(c, "decontextualised_claim_embedding", None),
-                "centrality_score": None,
-                "entities": entities,
-            }
-        )
-
-    return normalized
-
-
-def _build_dummy_message(article_url: str, claim_text: str) -> Dict[str, Any]:
-    import random
-    
-    # Generate random dummy sentiment for user-submitted articles
-    bias_categories = ["left", "center", "right", "neutral"]
-    sentiment_categories = ["positive", "negative", "neutral", "critical", "optimistic", "concerned"]
-    
-    return {
-        "article": {
-            "url": article_url,
-            "title": "Dummy Article",
-            "text": "A short dummy article about taxes and policy.",
-            "html": "<p>Dummy article about taxes and policy.</p>",
-            "publishedAt": "2026-02-23T00:00:00",
-            "outlet_name": "Dummy Outlet",
-            "sentiment": {
-                "bias_category": random.choice(bias_categories),
-                "bias_score": round(random.uniform(0.3, 0.9), 2),
-                "bias_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
-                "sentiment_category": random.choice(sentiment_categories),
-                "sentiment_analysis_confidence": round(random.uniform(0.6, 0.95), 2),
-            },
-        },
-        "claims": [
-            {
-                "original_sentence": claim_text,
-                "decontextualised_claim": claim_text,
-                "decontextualised_embedding": _DUMMY_BASE_EMBEDDING,
-                "centrality_score": 0.95,
-                "entities": [
-                    {"name": "Government", "type": "ORG"},
-                    {"name": "taxes", "type": "TOPIC"},
-                ],
-            }
-        ],
-    }
-
-
-def _seed_dummy_corpus() -> None:
-    global _DUMMY_CORPUS_SEEDED
-    if _DUMMY_CORPUS_SEEDED:
-        return
-
-    db = get_db_session()
-    try:
-        # Define 3 dummy articles with different topics and embeddings
-        articles_data = [
-            {
-                "url": "https://dummy.local/article/seed-1",
-                "title": "Dummy Article 1: Government Policy",
-                "text": "Article about government taxation policies and economic impact.",
-                "outlet_name": "Dummy Outlet 1",
-                "embedding": _DUMMY_EMBEDDINGS["article_1"],
-                "sentiment": {
-                    "bias_category": "left",
-                    "bias_score": 0.65,
-                    "bias_analysis_confidence": 0.80,
-                    "sentiment_category": "critical",
-                    "sentiment_analysis_confidence": 0.75,
-                },
-                "claims": [
-                    ("Government raised taxes", "Government raised taxes", 0.0),
-                    ("Tax increases impact citizens", "Tax increases impact citizens", 0.01),
-                    ("Revenue from taxes increased", "Revenue from taxes increased", 0.02),
-                ]
-            },
-            {
-                "url": "https://dummy.local/article/seed-2",
-                "title": "Dummy Article 2: Climate Change",
-                "text": "Article about climate change impacts and environmental policies.",
-                "outlet_name": "Dummy Outlet 2",
-                "embedding": _DUMMY_EMBEDDINGS["article_2"],
-                "sentiment": {
-                    "bias_category": "neutral",
-                    "bias_score": 0.50,
-                    "bias_analysis_confidence": 0.85,
-                    "sentiment_category": "concerned",
-                    "sentiment_analysis_confidence": 0.82,
-                },
-                "claims": [
-                    ("Climate is changing rapidly", "Climate is changing rapidly due to human activity", 0.0),
-                    ("Carbon emissions are rising", "Carbon emissions continue to rise globally", 0.01),
-                    ("Green energy is critical", "Renewable energy solutions are critical for sustainability", 0.02),
-                ]
-            },
-            {
-                "url": "https://dummy.local/article/seed-3",
-                "title": "Dummy Article 3: Healthcare Reform",
-                "text": "Article about healthcare system improvements and medical innovations.",
-                "outlet_name": "Dummy Outlet 3",
-                "embedding": _DUMMY_EMBEDDINGS["article_3"],
-                "sentiment": {
-                    "bias_category": "right",
-                    "bias_score": 0.60,
-                    "bias_analysis_confidence": 0.78,
-                    "sentiment_category": "optimistic",
-                    "sentiment_analysis_confidence": 0.80,
-                },
-                "claims": [
-                    ("Healthcare costs are rising", "Healthcare costs continue to rise across the nation", 0.0),
-                    ("Medications are unaffordable", "Prescription medications are becoming increasingly unaffordable", 0.01),
-                    ("Medical technology advancing", "New medical technology is advancing patient care significantly", 0.02),
-                ]
-            },
-        ]
-
-        for article_data in articles_data:
-            article = get_or_create_article(
-                db,
-                {
-                    "url": article_data["url"],
-                    "title": article_data["title"],
-                    "text": article_data["text"],
-                    "html": f"<p>{article_data['text']}</p>",
-                    "publishedAt": "2026-02-23T00:00:00",
-                    "outlet_name": article_data["outlet_name"],
-                    "sentiment": article_data["sentiment"],
-                },
-            )
-            
-            # Create 3 claims for each article with slightly different embeddings
-            base_value = article_data["embedding"][0]
-            for original_sentence, decontextualised_claim, noise_offset in article_data["claims"]:
-                # Create unique embedding for each claim by adding a small offset
-                claim_embedding = [base_value + noise_offset] * EMBEDDING_DIM
-                
-                create_claim_and_link_entities(
-                    db,
-                    {
-                        "original_sentence": original_sentence,
-                        "decontextualised_claim": decontextualised_claim,
-                        "decontextualised_embedding": claim_embedding,
-                        "centrality_score": 0.9,
-                        "entities": [
-                            {"name": "General", "type": "TOPIC"},
-                        ],
-                    },
-                    article_obj=article,
-                )
-
-        db.commit()
-        _DUMMY_CORPUS_SEEDED = True
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
-def _create_synthetic_user_claims() -> List[Dict[str, Any]]:
-    """
-    Create 3 synthetic claims for user articles, each with embedding directly matching a dummy article.
-    This ensures retrieval matches against each of the 3 dummy article topics.
-    """
-    claims = [
-        {
-            "original_sentence": "Government policy affects citizens",
-            "decontextualised_claim": "Government policy affects citizens",
-            "decontextualised_embedding": _DUMMY_EMBEDDINGS["article_1"],  # Direct match to Article 1
-            "centrality_score": 0.85,
-            "entities": [{"name": "Government", "type": "ORG"}],
-        },
-        {
-            "original_sentence": "Environmental changes are occurring",
-            "decontextualised_claim": "Environmental changes are occurring",
-            "decontextualised_embedding": _DUMMY_EMBEDDINGS["article_2"],  # Direct match to Article 2
-            "centrality_score": 0.87,
-            "entities": [{"name": "Environment", "type": "TOPIC"}],
-        },
-        {
-            "original_sentence": "Healthcare systems are evolving",
-            "decontextualised_claim": "Healthcare systems are evolving",
-            "decontextualised_embedding": _DUMMY_EMBEDDINGS["article_3"],  # Direct match to Article 3
-            "centrality_score": 0.86,
-            "entities": [{"name": "Healthcare", "type": "TOPIC"}],
-        },
-    ]
-    return claims
-
-
-logger = getLogger(__name__)
-
-
-def _calculate_verdict_and_confidence(matches: list[dict]) -> tuple[str, int]:
-    """
-    Calculate verdict and confidence for a claim based on its retrieval matches.
-    
-    Verdict: "true" | "mostly-true" | "mixed" | "mostly-false" | "false" | "unverified"
-    Confidence: 0-100 integer
-    """
-    if not matches:
-        return "unverified", 0
-    
-    # Count relations
-    support_count = sum(1 for m in matches if m["relation"] == "support")
-    contradict_count = sum(1 for m in matches if m["relation"] == "contradict")
-    irrelevant_count = sum(1 for m in matches if m["relation"] == "irrelevant")
-    unknown_count = sum(1 for m in matches if m["relation"] == "unknown")
-    
-    total = len(matches)
-    
-    # Calculate verdict based on support/contradict ratio
-    if irrelevant_count == total or (support_count == 0 and contradict_count == 0):
-        verdict = "unverified"
-    elif contradict_count == 0:
-        if support_count == total:
-            verdict = "true"
-        else:
-            verdict = "mostly-true"
-    elif support_count == 0:
-        if contradict_count == total:
-            verdict = "false"
-        else:
-            verdict = "mostly-false"
-    else:
-        # Both support and contradict present
-        support_ratio = support_count / total
-        if support_ratio > 0.66:
-            verdict = "mostly-true"
-        elif support_ratio < 0.33:
-            verdict = "mostly-false"
-        else:
-            verdict = "mixed"
-    
-    # Calculate confidence (0-100) based on:
-    # 1. Number of high-quality matches (similarity > 0.5 and relation != 'irrelevant')
-    # 2. Consistency of results (90+ confidence in NLI predictions)
-    high_quality_matches = [
-        m for m in matches 
-        if m["similarity"] > 0.5 and m["relation"] != "irrelevant"
-    ]
-    high_confidence_matches = [
-        m for m in high_quality_matches 
-        if m["confidence"] >= 0.9
-    ]
-    
-    if not high_quality_matches:
-        confidence = 20  # Low confidence when no high-quality matches
-    else:
-        # Base confidence on number and quality of matches
-        match_count_score = min(len(high_quality_matches) * 20, 60)  # Max 60 from match count
-        avg_similarity = sum(m["similarity"] for m in high_quality_matches) / len(high_quality_matches)
-        similarity_score = int(avg_similarity * 30)  # Max 30 from similarity
-        high_conf_bonus = len(high_confidence_matches) * 10  # Max 10 from high-confidence matches
-        
-        confidence = min(match_count_score + similarity_score + high_conf_bonus, 100)
-    
-    return verdict, confidence
-
-
-def _map_bias_category(bias_category: str) -> str:
-    """Map bias category to frontend expected values."""
-    if not bias_category:
-        return "center"
-    
-    category_lower = bias_category.lower()
-    if category_lower in ["left", "center-left", "center", "center-right", "right"]:
-        return category_lower
-    
-    # Map common variations
-    mapping = {
-        "liberal": "left",
-        "progressive": "left",
-        "conservative": "right",
-        "neutral": "center",
-        "moderate": "center",
-    }
-    return mapping.get(category_lower, "center")
-
-
-def _fetch_related_articles(db, claim_ids: List[int], current_article_id: int) -> List[Dict[str, Any]]:
-    """
-    Fetch related articles based on matched claim IDs.
-    Returns articles that contain the matched claims, excluding the current article.
-    """
-    if not claim_ids:
-        return []
-    
-    # Get unique article IDs from the matched claims
-    article_ids = db.execute(
-        select(distinct(Claim.article_id))
-        .where(Claim.id.in_(claim_ids))
-        .where(Claim.article_id != current_article_id)
-    ).scalars().all()
-    
-    if not article_ids:
-        return []
-    
-    # Fetch articles with their relationships
-    articles = db.execute(
-        select(Article)
-        .options(joinedload(Article.outlet))
-        .where(Article.id.in_(article_ids))
-        .limit(5)  # Limit to top 5 related articles
-    ).scalars().unique().all()
-    
-    related = []
-    for article in articles:
-        # Fetch sentiment if available
-        sentiment = None
-        if article.sentiment_id:
-            sentiment = db.execute(
-                select(SentimentAnalysis).where(SentimentAnalysis.id == article.sentiment_id)
-            ).scalar_one_or_none()
-        
-        # Create excerpt from article text
-        excerpt = article.text[:300] if article.text else ""
-        if len(article.text or "") > 300:
-            excerpt += "..."
-        
-        related.append({
-            "id": str(article.id),
-            "title": article.title or "Untitled",
-            "source": article.outlet.name if article.outlet else "Unknown",
-            "url": article.url,
-            "bias": _map_bias_category(sentiment.bias_category if sentiment and sentiment.bias_category else "center"),
-            "publishedAt": article.publishedAt.isoformat() if article.publishedAt else "",
-            "excerpt": excerpt,
-        })
-    
-    return related
 
 
 class RetrievalService(ServiceTemplate):
     def __init__(self, config):
         super().__init__(config)
-        # self.config = config
-        self.user_publisher = RedisPublisher(USER_OUTPUT_STREAM)
-        self.failure_publisher = RedisPublisher(FAILURE_OUTPUT_STREAM)
+        self.hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
         
-        # Seed dummy corpus once at startup if in dummy seed mode
-        if DUMMY_SEED_MODE:
-            logger.info("DUMMY_SEED_MODE enabled - seeding dummy corpus at startup")
-            _seed_dummy_corpus()
-            logger.info("Dummy corpus seeded successfully")
-
-    # -------------------------------
-    # 1. Parse Redis message
-    # -------------------------------
-    def _parse_message(self, raw_msg: Dict[str, Any]) -> Optional[StreamMessage]:
-        msg_data = raw_msg.get("data", {})
-
-        try:
-            # First, check if the message has the new format (wrapped in "payload")
-            if "payload" in msg_data and "header" not in msg_data:
-                # New format: everything is JSON-stringified inside "payload"
-                inner_data = json.loads(msg_data["payload"])
-                reconstructed = {
-                    "header": inner_data.get("header", {}),
-                    "payload": inner_data.get("payload", {}),
-                    "stage_timestamps": inner_data.get("stage_timestamps", []),
-                }
-            elif "header" in msg_data:
-                # Old format: header/payload/stage_timestamps are separate fields, already JSON strings
-                reconstructed = {
-                    "header": json.loads(msg_data["header"]) if isinstance(msg_data["header"], str) else msg_data["header"],
-                    "payload": json.loads(msg_data.get("payload", "{}")) if isinstance(msg_data.get("payload", "{}"), str) else msg_data.get("payload", {}),
-                    "stage_timestamps": json.loads(msg_data.get("stage_timestamps", "[]")) if isinstance(msg_data.get("stage_timestamps", "[]"), str) else msg_data.get("stage_timestamps", []),
-                }
-            else:
-                # Fallback: treat entire msg_data as payload
-                reconstructed = {
-                    "header": {},
-                    "payload": msg_data,
-                    "stage_timestamps": [],
-                }
-
-            hdr = reconstructed["header"]
-            hdr.setdefault("uid", str(uuid.uuid4()))
-            hdr.setdefault("type", "user")
-            hdr.setdefault("status", "pending")
-            hdr.setdefault("created_at", datetime.utcnow().isoformat())
-
-            parsed = Message.model_validate(reconstructed)
-
-            return StreamMessage(
-                stream=raw_msg["stream"],
-                redis_id=raw_msg["redis_message_id"],
-                data=parsed,
-                priority=0,
-            )
-
-        except (ValidationError, json.JSONDecodeError) as e:
-            logger.exception("Failed to parse retrieval message")
-            self._handle_failure(raw_msg, e)
-            return None
-
-    # -------------------------------
-    # 2. Business logic
-    # -------------------------------
-    def _process_message(self, message: StreamMessage) -> StreamMessage:
-        payload = message.data.payload
-
-        if DUMMY_NLP_MODE:
-            message_dict = _build_dummy_message(
-                article_url=f"https://dummy.local/article/user-{message.data.header.uid}",
-                claim_text="Government increased taxes",
-            )
-        else:
-            sentiment = _extract_sentiment(payload)
-            claims = _normalize_claims(payload.claims_in_article)
-            message_dict = {
-                "article": {
-                    "url": payload.article_url,
-                    "title": payload.title,
-                    "text": payload.parsed_text,
-                    "html": payload.raw_html,
-                    "publishedAt": payload.publish_date,
-                    "outlet_name": payload.news_outlet,
-                    "sentiment": sentiment,
-                },
-                "claims": claims,
-            }
+    def _calculate_verdict_and_confidence(self,matches: List[Dict[Any]]) -> tuple[str, int]:
+        """
+        Calculate verdict and confidence for a claim based on its retrieval matches.
+        
+        Verdict: "true" | "mostly-true" | "mixed" | "mostly-false" | "false" | "unverified"
+        Confidence: 0-100 integer
+        """
+        
+        if not matches:
+            return "unverified", 0
+        relevant = [m for m in matches if m["relation"] in ("support", "contradict")]
+        if not relevant:
+            return "unverified", 0
+        
+        # Calculate verdict ("true" | "mostly-true" | "mixed" | "mostly-false" | "false" | "unverified") based on:
+        support_weight = sum(m["confidence"] for m in relevant if m["relation"] == "support")
+        contradict_weight = sum(m["confidence"] for m in relevant if m["relation"] == "contradict")
+        total_weight = support_weight + contradict_weight
+        if total_weight == 0:
+            self.logger.error("total weight is 0! Division by 0 error!")
             
-            # Log original NLP claims before synthetic replacement
-            if message.data.header.type == "user" and claims:
-                logger.info(
-                    "=== ORIGINAL NLP RESULTS FOR USER ARTICLE ===\n"
-                    "uid=%s, title=%s\n"
-                    "Number of claims: %d",
-                    message.data.header.uid,
-                    payload.title,
-                    len(claims),
-                )
-                for i, claim in enumerate(claims, 1):
-                    embedding_sample = claim.get("decontextualised_embedding", [])
-                    embedding_sample = embedding_sample[:3] if embedding_sample else []
-                    logger.info(
-                        "  Claim %d: %s\n"
-                        "    Embedding sample (first 3 values): %s\n"
-                        "    Centrality score: %.2f",
-                        i,
-                        claim.get("decontextualised_claim"),
-                        embedding_sample,
-                        claim.get("centrality_score", 0),
-                    )
-
-        # For user articles, generate 3 synthetic claims matching dummy articles (for demo/testing)
-        if message.data.header.type == "user":
-            original_claims_count = len(message_dict.get("claims", []))
-            message_dict["claims"] = _create_synthetic_user_claims()
-            logger.info(
-                "=== REPLACING WITH 3 SYNTHETIC CLAIMS ===\n"
-                "uid=%s\n"
-                "Original NLP claims: %d → Synthetic claims: 3",
-                message.data.header.uid,
-                original_claims_count,
-            )
-            for i, claim in enumerate(message_dict["claims"], 1):
-                embedding_sample = claim.get("decontextualised_embedding", [])
-                embedding_sample = embedding_sample[:3] if embedding_sample else []
-                logger.info(
-                    "  Synthetic Claim %d: %s\n"
-                    "    Embedding sample (first 3 values): %s",
-                    i,
-                    claim["decontextualised_claim"],
-                    embedding_sample,
-                )
-
-        logger.info(
-            "Retrieval received message uid=%s type=%s url=%s claims=%s",
-            message.data.header.uid,
-            message.data.header.type,
-            message_dict.get("article", {}).get("url"),
-            len(message_dict.get("claims", []) or []),
-        )
-
-        result = process_nlp_message(message_dict)
-        logger.info(
-            "DB write result article_id=%s claim_ids=%s",
-            result.get("created_article_id"),
-            result.get("created_claim_ids"),
-        )
-
-        retrieval_output = None
-        related_articles = []
-
-        has_claims = bool(message_dict.get("claims"))
-        if message.data.header.type == "user" and has_claims:
-            # Run retrieval on all claims for user articles
-            db = get_db_session()
-            try:
-                top_k = 3 if DUMMY_NLP_MODE else 5
-                all_retrieval_results = []
-                
-                for claim in message_dict["claims"]:
-                    retrieval_results = retrieve_candidate_claims(
-                        db=db,
-                        claim_text=claim["decontextualised_claim"],
-                        claim_embedding=claim["decontextualised_embedding"],
-                        entities=[e["name"] for e in claim.get("entities", [])],
-                        top_k=top_k,
-                        run_nli=not DUMMY_NLP_MODE,
-                    )
-                    
-                    # Store results with claim text for reference
-                    if DUMMY_NLP_MODE:
-                        # When run_nli=False, only (claim, score) is returned
-                        claim_results = [
-                            {
-                                "claim_id": c["id"],
-                                "claim_text": c["decontextualised_claim"],
-                                "similarity": float(score),
-                                "relation": "unknown",
-                                "confidence": 0.0,
-                                "query_claim": claim["decontextualised_claim"],
-                            }
-                            for c, score in retrieval_results
-                        ]
-                    else:
-                        # When run_nli=True, (claim, score, label, confidence) is returned
-                        claim_results = [
-                            {
-                                "claim_id": c["id"],
-                                "claim_text": c["decontextualised_claim"],
-                                "similarity": float(score),
-                                "relation": label,
-                                "confidence": confidence,
-                                "query_claim": claim["decontextualised_claim"],
-                            }
-                            for c, score, label, confidence in retrieval_results
-                        ]
-                    
-                    all_retrieval_results.extend(claim_results)
-                
-                # Group results by query_claim and calculate verdict + confidence
-                from collections import defaultdict
-                grouped_results = defaultdict(list)
-                for item in all_retrieval_results:
-                    grouped_results[item["query_claim"]].append(item)
-                
-                # Build retrieval_output with verdict and confidence for each claim
-                retrieval_output = []
-                for query_claim, matches in grouped_results.items():
-                    verdict, confidence_score = _calculate_verdict_and_confidence(matches)
-                    
-                    retrieval_output.append({
-                        "query_claim": query_claim,
-                        "verdict": verdict,
-                        "confidence": confidence_score,
-                        "matches": matches,
-                        "match_count": len(matches),
-                    })
-                
-                # Fetch related articles based on matched claims
-                matched_claim_ids = [item["claim_id"] for item in all_retrieval_results]
-                current_article_id = result.get("created_article_id") or 0
-                related_articles = _fetch_related_articles(
-                    db=db,
-                    claim_ids=matched_claim_ids,
-                    current_article_id=current_article_id
-                )
-            finally:
-                db.close()
-
-            logger.info(
-                "Retrieval matches uid=%s count=%s",
-                message.data.header.uid,
-                0 if retrieval_output is None else len(retrieval_output),
-            )
+        net_support = (support_weight - contradict_weight) / total_weight if total_weight > 0 else 0
         
         
-        # publish success
-        self.user_publisher.publish_one({
-        "job_uid": message.data.header.uid,
-        "status": "completed",
-        "retrieval_result": {
-            **result,
-            "matches": retrieval_output,
-            "related_articles": related_articles,
-            }
-        })
+        if net_support >= 0.5:
+            verdict = "true"
+        elif net_support >= 0.1:
+            verdict = "mostly-true"
+        elif net_support <= -0.5:
+            verdict = "false"
+        elif net_support <= 0.1:
+            verdict = "mostly-false"
+        else:
+            verdict = "mixed"
+        
+        # Calculate confidence (0-100) based on:
+        avg_quality = sum(m["similarity"] * m["confidence"] for m in relevant) / len(relevant)
+        perfect_evidence = len(relevant) * 1.0  # Max quality = 1.0
+        evidence_ratio = ( avg_quality * len(relevant) ) / perfect_evidence
+        confidence = int(evidence_ratio * 100)
+        return verdict, confidence
 
-        return message
+    def _save_data_into_postgres(self, db: Session, message: StreamMessage):
+        
+        claims: List[Claim] = message.all_claims 
+        
+        self.logger.debug(
+                "=== SAVING JOB FOR ARTICLE ===\n"
+                "\tuid=%s, title=%s\n"
+                "\tNumber of claims: %d",
+                message.uid,
+                message.title,
+                len(claims),
+        )
+        
+        self.logger.debug("\t3 Claims from job")
+        for i in range(min(3, len(claims))):
+            self.logger.debug(
+                "\tClaim %d: %s\n"
+                "\t\tEmbedding sample (first 3 values): %s\n"
+                "\t\tCentrality score: %.2f",
+                i,
+                claims[i].original_sentence,
+                claims[i].decontextualised_embedding[:3],
+                claims[i].centrality_score,
+            )
+        
+        bias_profile = message.bias_profile
+        
+        article_dto = CreateOrModifyArticle(message.link, message.title, message.text, message.html, message.publish_date)
+        sentiment_dto = CreateOrModifySentiment(bias_profile.bias_category, bias_profile.bias_score, bias_profile.bias_analysis_confidence, bias_profile.sentiment_category, bias_profile.sentiment_analysis_confidence)
+        outlet_dto = CreateOrModifyOutlet(message.news_outlet_name)
+        
+        article_entry = get_or_create_article(db, article_dto, sentiment_dto, outlet_dto)
 
-    # -------------------------------
-    # 3. Failure handling
-    # -------------------------------
-    def _handle_failure(self, raw_msg: Dict[str, Any], error: Exception):
-        logger.error("Routing message to failure stream")
+        all_entities_added = []
+        all_claims_added = []
+        
+        for claim in claims:
+            claim_dto = CreateOrModifyClaim(
+                claim.contextualised_claim_text, 
+                claim.decontextualised_claim_text, 
+                claim.decontextualised_claim_embedding, 
+                claim.confidence, 
+                NER_entities=claim.NER_entities)
+            new_claim_entry = create_claim_and_link_entities(db, claim_dto, article_entry)
+            entities_added = get_or_create_all_entities(db, claim_dto.NER_entities)
+            
+            all_entities_added.extend(entities_added)
+            all_claims_added.append(new_claim_entry)
+            
+        self.logger.info(
+            "DB write result article=%s claims=%s entities=%s (limited to 3 rows)",
+            article_entry,
+            all_entities_added[:3],
+            all_claims_added[:3],
+        )
+        
+        return {
+            "article_entry_id": article_entry.id,
+            "all_entity_ids_added" : [x.id for x in all_entities_added],
+            "all_claim_ids_added" : [x.id for x in all_claims_added]
+        }
+        
+    def _retrieve_evidence_for_claim(self, db: Session, claim: Claim) -> Dict[str, Any]:
+        self.logger.debug("=== FINDING EVIDENCE ===\n")
+        input_claim_text = claim.decontextualised_claim_text
+        claim_candidates = set()
+        
+        def filter_step() -> List[int | str]:
+            # for now, improve it with TD-IDF or whatever. this is just every word, not really keywords
+            key_words_to_match = [
+                x.strip(" .,;:'")
+                for x in input_claim_text.split(" ")
+                if x.strip(" .,;:'").lower() not in STOP_WORDS
+            ]        
+            # low limit because the matches are going to be low.
+            claim_candidates.update(find_evidence_by_keyword_match(db, key_words_to_match, 20))
+            entities_in_claim = [entity.entity_text for entity in claim.NER_entities]
+            # higher limit because the matches are going to be higher.
+            claim_candidates.update(find_evidence_by_entity_match(db, entities_in_claim, 50))
+        
+            if not claim_candidates:
+                return []
+            
+            capped_filter_step_candidate_list = list(claim_candidates)[:MAX_CANDIDATES_BEFORE_SIMILARITY]
+            # list of db Claim objects
+            capped_filter_step_candidate_ids = [filtered_claim.id for filtered_claim in capped_filter_step_candidate_list]
+            return capped_filter_step_candidate_ids
+        
+        def similarity_step(capped_filter_step_candidate_ids) -> List[Tuple[Dict[str, str | int], float]]:
+            claim_text_embedding = claim.decontextualised_claim_embedding
+            best_ranked_similarity_evidence = retrieve_by_embedding(db, claim_text_embedding, capped_filter_step_candidate_ids)
+            
+            best_ranked_similarity_evidence = [
+                (claim_dict, similarity) 
+                for claim_dict, similarity 
+                in best_ranked_similarity_evidence 
+                if similarity >= MIN_SIMILARITY
+            ]
+            
+            if not best_ranked_similarity_evidence:
+                return []
+        
+            capped_similarity_step_candidate_list = best_ranked_similarity_evidence[:MAX_CANDIDATES_BEFORE_NLI]
+            return capped_similarity_step_candidate_list
+        
+        def classification_step(capped_similarity_step_candidate_list) -> List[Tuple[Dict, float, str, float]]:
+            classified_evidence = []
+            
+            for evidence_claim, similarity_score in capped_similarity_step_candidate_list:
+                try:
+                    label, confidence = classify_claim_relation(
+                        input_claim_text,
+                        evidence_claim.get("decontextualised_claim")
+                    )
+                    
+                except Exception as e:
+                    self.logger.error(f"Error during NLI for claim ID {claim.id}:")
+                    self.logger.error(e)
+                    label, confidence = "irrelevant", 0.0
 
-        self.failure_publisher.publish_one(
+                classified_evidence.append(
+                    (evidence_claim, similarity_score, label, confidence)
+                )
+            return classified_evidence
+            
+        evidence_matches = [
             {
-                "error": str(error),
-                "raw_message": raw_msg,
-                "failed_at": datetime.utcnow().isoformat(),
+                "claim_id": int(claim_dict.get("id")),
+                "claim_text": claim_dict.get("decontextualised_claim"),
+                "similarity": float(similarity),
+                "relation": classifcation_label,
+                "confidence": confidence,
+                "query_claim": input_claim_text,
             }
+            for claim_dict, similarity, classifcation_label, confidence in classification_step(similarity_step(filter_step()))
+        ]
+        
+        total_verdict, total_confidence_score = self._calculate_verdict_and_confidence(evidence_matches)
+            
+        claim_evidence_results = { 
+            "query_claim": input_claim_text,
+            
+            "verdict": total_verdict,
+            "confidence": total_confidence_score,
+            
+            "matches": evidence_matches,
+            "match_count": len(evidence_matches),
+        }
+        
+        return claim_evidence_results
+    
+    def _retrieve_evidence(self, db:Session, message:StreamMessage, original_article_id: int):
+        # evaluate each input claim to get evidence matches, verdict, and confidence
+        query_claim_evidence_map:Dict[str, List[Dict]] = {}
+        evidence_claim_ids = []
+        
+        for input_claim in message.all_claims:
+            input_claim_text = input_claim.decontextualised_claim_text
+            input_claim_evaluation = self._retrieve_evidence_for_claim(
+                db=db,
+                claim=input_claim
+            )
+            
+            if not query_claim_evidence_map[input_claim_text]:
+                query_claim_evidence_map[input_claim_text] = input_claim_evaluation
+            else:
+                query_claim_evidence_map[input_claim_text].extend(input_claim_evaluation)
+            
+            evidence_claim_ids.extend([evidence_claim.get("claim_id") for evidence_claim in input_claim_evaluation.get("matches", [])])
+        
+        # Extend evidence claims into articles
+        related_articles = extend_evidence_claims_into_articles(
+            db=db,
+            claim_ids=evidence_claim_ids,
+            current_article_id=original_article_id
         )
+        
+        self.logger.info(
+            "Retrieval matches on job uid=%s claim_matches=%s",
+            message.data.header.uid,
+            len(evidence_claim_ids),
+        )
+        
+        return query_claim_evidence_map.values(), related_articles
+    
+    def _save_job_into_postgres(self, db:Session, message:StreamMessage):
+        job_dto = UpdateJob(message.header.id, message.header.uid, JobStatus.COMPLETE, message.stage_timestamps)
+        job_entry = finalise_and_complete_job(db, job_dto)        
+        self.logger.info(
+            "DB write result job=%s",
+            job_entry
+        )
+        return job_entry 
+        
+    def _process_and_publish_worker(self, message: StreamMessage) -> Tuple[str, str]:
+        """Worker for concurrent mode. Processes, then publishes."""
+        try:
+            processed_message:StreamMessage = self._process_message(message)
+                       
+            payload = processed_message.retrieval_results
+            
+            new_id = "END OF PIPELINE"
+            if message.type == JobType.USER:
+                self.hash_store.set(message.uid, payload)
+                new_id = message.uid
+
+            if self.is_cut_and_paste_mode:
+                self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
+            else:
+                self.message_consumer.acknowledge(message.stream, message.redis_id)
+                
+            return message.redis_id, new_id #id in hashset
+
+        except Exception as e:
+            # Catch any exception, including ProcessingError, and route to failure.
+            self._handle_failure(message, e)
+            # Raise it again so as_completed knows the future failed
+            raise
+	
+    def _process_batch_sequentially(self, raw_messages: List[Dict[str, Any]]) -> None:
+        self.logger.info(f"Fetched {len(raw_messages)} messages. Processing...")
+
+        stream_messages: List[StreamMessage] = [msg for m in raw_messages if (msg := self._parse_message(m))]
+        ack_count = 0
+        failure_count = 0
+        
+        for message in stream_messages:
+            try:
+                processed_message = self._process_message(message)
+                
+                payload = processed_message.retrieval_results  
+                new_id = "END OF PIPELINE"
+                if message.type == JobType.USER:
+                    self.hash_store.set(message.uid, payload)
+                    new_id = message.uid
+                
+                if self.is_cut_and_paste_mode:
+                    self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
+                else:
+                    self.message_consumer.acknowledge(message.stream, message.redis_id)
+                
+                self.logger.debug(f"Successfully published Msg {message.redis_id} -> {new_id} in hashset")
+                ack_count+=1
+
+            except Exception as e:
+                self.logger.warning(f"Failed to publish message {message.redis_id}. See previous error logs for details.")
+                self._handle_failure(message, e)
+                failure_count+=1
+ 
+        
+        if ack_count > 0:
+            self.logger.info(f"Successfully saved and acknowledged {ack_count} messages.")
+        
+        if failure_count > 0:
+            # The logging for this is handled inside _handle_failure, 
+            # but a summary log is good practice.
+            self.logger.info(f"Handled {failure_count} failed messages by sending to failure stream.")
+
+    def _process_batch_concurrently(self, executor: ThreadPoolExecutor, raw_messages: List[Dict[str,Any]]):
+        self.logger.info(f"Fetched {len(raw_messages)} messages. Processing...")
+        stream_messages = [msg for m in raw_messages if (msg := self._parse_message(m))]
+
+        future_to_message = {
+            executor.submit(self._process_and_publish_worker, msg): msg for msg in stream_messages
+        }
+
+        for future in as_completed(future_to_message):
+            original_message = future_to_message[future] 
+
+            try:
+                old_redis_id, new_redis_id = future.result() 
+                self.logger.debug(f"Successfully published Msg {old_redis_id} -> {new_redis_id} in hashset")
+            except Exception:
+                self.logger.warning(f"A worker for message {original_message.redis_id} failed. See previous error logs for details.")
+
+    def _process_message(self, message: StreamMessage) -> StreamMessage:
+        
+        # one db session to make sure the entire thing is 1 transcation
+        # just raise an exception and it will roll back everything
+        with get_db_transaction() as db:
+            save_data_result = self._save_data_into_postgres(db, message)
+            if message.type == JobType.BACKGROUND:
+                return message
+            
+            #continue to retrieval
+            # retrieval stuff is only for user jobs
+            original_article_id = save_data_result.get("article_entry_id") or 0
+            claim_evidence_matches, related_articles = self._retrieve_evidence(db, message, original_article_id)
+            save_job_result = self._save_job_into_postgres(db, message)
+            
+            message.set_retrieval_result(
+                RetrievalResult(
+                    save_data_result,
+                    save_job_result,
+                    claim_evidence_matches,
+                    related_articles
+                )
+            )
+            return message
+                    
