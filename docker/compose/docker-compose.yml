@@ -43,7 +43,7 @@ services:
     networks:
       - sentinel-net
     command: >
-      redis-server  --appendonly no                   --appendfsync everysec         --save 60 1                    --timeout 300              --tcp-keepalive 60         --dbfilename "dump.rdb" --dir /data
+      redis-server --appendonly no --appendfsync everysec --save 60 1 --timeout 300 --tcp-keepalive 60 --dbfilename "dump.rdb" --dir /data
 
     <<: *common-env
     deploy:
