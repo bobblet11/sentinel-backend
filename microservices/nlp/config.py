@@ -1,4 +1,6 @@
 from typing import List
+import platform
+import torch
 from dotenv import load_dotenv
 from common.env.log_env import print_env, Config, EnvVariable
 from common.env.get_env_var import get_env_var
@@ -99,7 +101,15 @@ try:
     NER_MODEL       = get_env_var("NLP_NER_MODEL",       str, config_logger, NER_MODEL)
     EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, EMBEDDING_MODEL)
     BIAS_POLITICAL_MODEL = get_env_var("NLP_BIAS_MODEL", str, config_logger, BIAS_POLITICAL_MODEL)
-    DEVICE = "cuda" if get_env_var("USE_GPU", str, config_logger, "false").lower() == "true" else "cpu"
+    
+    # Device selection: CUDA > MPS (Mac) > CPU
+    use_gpu = get_env_var("USE_GPU", str, config_logger, "false").lower() == "true"
+    if use_gpu and torch.cuda.is_available():
+        DEVICE = "cuda"
+    elif platform.system() == "Darwin" and torch.backends.mps.is_available():
+        DEVICE = "mps"
+    else:
+        DEVICE = "cpu"
 
     input_streams: List[str] = INPUT_STREAMS
     output_streams: List[str] = [USER_OUTPUT_STREAM, BACKGROUND_OUTPUT_STREAM, FAILURE_OUTPUT_STREAM]

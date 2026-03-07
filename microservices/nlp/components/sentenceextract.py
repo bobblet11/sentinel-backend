@@ -1,4 +1,5 @@
 import logging
+import platform
 import torch
 import numpy as np
 import torch.nn.functional as F
@@ -27,8 +28,14 @@ class SentenceExtraction(SentenceProcessor):
     Accepts and returns a local sentences list; does NOT touch result.
     """
     def __init__(self, use_fp16: bool = True):
+        # Device selection: CUDA > MPS (Mac) > CPU
+        if torch.cuda.is_available():
+            self.device = "cuda"
+        elif platform.system() == "Darwin" and torch.backends.mps.is_available():
+            self.device = "mps"
+        else:
+            self.device = "cpu"
         self.use_fp16 = use_fp16 and torch.cuda.is_available()
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         logger.info(f"SentenceExtraction: Initializing models on {self.device} "
                     f"(fp16={self.use_fp16})...")

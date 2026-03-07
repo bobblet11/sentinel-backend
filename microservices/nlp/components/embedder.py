@@ -1,4 +1,5 @@
 import logging
+import platform
 import torch
 import numpy as np
 from typing import List
@@ -43,7 +44,13 @@ class Embedder(SentenceProcessor):
 
     def __init__(self, model_name: str = EMBEDDING_MODEL):
         self.model_name = model_name
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Device selection: CUDA > MPS (Mac) > CPU
+        if torch.cuda.is_available():
+            self.device = "cuda"
+        elif platform.system() == "Darwin" and torch.backends.mps.is_available():
+            self.device = "mps"
+        else:
+            self.device = "cpu"
         use_fp16 = torch.cuda.is_available()
 
         logger.info(f"Embedder: Loading '{self.model_name}' on {self.device} (fp16={use_fp16})...")

@@ -2,6 +2,7 @@ import logging
 import re
 import time
 import spacy
+import platform
 import torch
 from typing import List, Optional
 from rank_bm25 import BM25Okapi
@@ -66,7 +67,16 @@ class Decontextualizer(SentenceProcessor):
     )
 
     def __init__(self, use_gpu: bool = True, nlp=None):
-        self.device    = "cuda" if use_gpu and torch.cuda.is_available() else "cpu"
+        # Device selection: CUDA > MPS (Mac) > CPU
+        if use_gpu:
+            if torch.cuda.is_available():
+                self.device = "cuda"
+            elif platform.system() == "Darwin" and torch.backends.mps.is_available():
+                self.device = "mps"
+            else:
+                self.device = "cpu"
+        else:
+            self.device = "cpu"
         self.device_id = 0 if self.device == "cuda" else -1
         use_fp16       = self.device == "cuda"
 
