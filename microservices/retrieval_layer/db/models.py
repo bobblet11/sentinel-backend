@@ -57,7 +57,7 @@ class Article(Base):
     title = Column(String(1024), nullable=True)
     text = Column(Text, nullable=True)
     html = Column(Text, nullable=True)
-    publishedAt = Column(DateTime(timezone=True), nullable=True)
+    publishedAt = Column('publishedat', DateTime(timezone=True), nullable=True)
     sentiment_id = Column(Integer, ForeignKey("sentiment_analysis.id"), nullable=True)
     outlet_id = Column(Integer, ForeignKey("news_outlet.id"), nullable=True)
 
@@ -74,6 +74,7 @@ class SentimentAnalysis(Base):
     bias_analysis_confidence = Column(Float, nullable=True)
     sentiment_category = Column(String(50), nullable=True)
     sentiment_analysis_confidence = Column(Float, nullable=True)
+    article = relationship("Article", back_populates="sentiment")
 
 
 class Job(Base):
@@ -83,7 +84,7 @@ class Job(Base):
     status = Column(String(50), nullable=True)
     type = Column(String(50), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    article_id = Column(Integer, ForeignKey("article.id"), nullable=True)
+    article_id = Column(Integer, ForeignKey("article.id"), nullable=False)
 
 
 class JobTimestamp(Base):
@@ -92,4 +93,3 @@ class JobTimestamp(Base):
     job_id = Column(Integer, ForeignKey("job.id"), nullable=False)
     stage_name = Column(String(255), nullable=False)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
-    monotonic_timestamp = Column(Float, nullable=True)

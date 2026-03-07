@@ -164,8 +164,8 @@ class NLPResult:
 @dataclass
 class RetrievalResult:
     """The aggregate object containing all insights produced by the pipeline."""
-    save_data_result: Dict[Any]
-    save_job_result: Dict[Any]
+    save_data_result: Dict[str, Any]
+    save_job_result: Dict[str, Any]
     matches: Any
     related_articles: Any
 
@@ -193,10 +193,10 @@ class MessagePayload(BaseModel):
     bias_profile: Optional[BiasProfile] = None
     
     #retrieval
-    save_data_result: Dict[Any]
-    save_job_result: Dict[Any]
-    matches: Any
-    related_articles: Any
+    save_data_result: Optional[Dict[str, Any]] = None
+    save_job_result: Optional[Dict[str, Any]] = None
+    matches: Any = None
+    related_articles: Any = None
     
     
 class Message(BaseModel):
@@ -270,7 +270,7 @@ class StreamMessage:
         return self.data.header.uid
     
     @property
-    def retrieval_results(self) -> Optional[Dict[Any]]:
+    def retrieval_results(self) -> Optional[Dict[str, Any]]:
         
         result = {
                 "save_data_result" : self.data.payload.save_data_result,

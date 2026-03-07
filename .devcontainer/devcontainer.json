@@ -3,7 +3,9 @@
         "build": {
                 "dockerfile": "Dockerfile"
         },
-        "mounts": ["source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"],
+        "mounts": [
+                "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+        ],
         "customizations": {
                 "vscode": {
                         "settings": {
@@ -11,7 +13,12 @@
                                 "python.linting.pylintEnabled": true,
                                 "python.linting.enabled": true
                         },
-                        "extensions": ["ms-python.python", "ms-python.vscode-pylance", "ms-azuretools.vscode-docker", "eamodio.gitlens"]
+                        "extensions": [
+                                "ms-python.python",
+                                "ms-python.vscode-pylance",
+                                "ms-azuretools.vscode-docker",
+                                "eamodio.gitlens"
+                        ]
                 }
         },
         "remoteUser": "vscode",

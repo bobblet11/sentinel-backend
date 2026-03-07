@@ -171,107 +171,107 @@ services:
           memory: '${INGESTOR_MEMORY_RESERVATION:-256M}'
 
   web_scraper-service:
-      container_name: sentinel-web-scraper-service-container
-      image: sentinel/web-scraper-service:latest
-      build: 
-        context: ../../
-        dockerfile: ./microservices/web_scraper/Dockerfile
-      shm_size: '${WEB_SCRAPER_SHM_SIZE:-4gb}'
-      ipc: host 
+    container_name: sentinel-web-scraper-service-container
+    image: sentinel/web-scraper-service:latest
+    build:
+      context: ../../
+      dockerfile: ./microservices/web_scraper/Dockerfile
+    shm_size: '${WEB_SCRAPER_SHM_SIZE:-4gb}'
+    ipc: host
 
-      depends_on:
-        - postgres
-        - redis
+    depends_on:
+      - postgres
+      - redis
 
-      profiles: 
-        - scraper
-        
-      volumes:
-        - ${HOST_LOG_ROOT}/scraper/logs:/app/logs
-        - ${HOST_LOG_ROOT}/scraper/screenshots:/app/screenshots
-      
-      restart: unless-stopped
-      networks:
-        - sentinel-net
+    profiles:
+      - scraper
 
-      <<: *common-env
-      environment:
-     
-        - INPUT_STREAMS=${WEB_SCRAPER_INPUT_STREAMS:-user:to.be.scraped, background:to.be.scraped}
-        - USER_OUTPUT_STREAM=${WEB_SCRAPER_USER_OUTPUT_STREAM:-user:to.be.nlp}
-        - BACKGROUND_OUTPUT_STREAM=${WEB_SCRAPER_BACKGROUND_OUTPUT_STREAM:-background:to.be.nlp}
-        - FAILURE_OUTPUT_STREAM=${WEB_SCRAPER_FAILURE_OUTPUT_STREAM:-failure:to.be.scraped}
-        - GROUP_NAME=${WEB_SCRAPER_GROUP_NAME:-default}
-        - CONSUMER_NAME=${WEB_SCRAPER_CONSUMER_NAME:-web-scraper-1}
-        - LOG_MODE=${WEB_SCRAPER_LOG_MODE:-10}
-        - MAX_SCREENSHOT_FOLDER_SIZE=${WEB_SCRAPER_MAX_SCREENSHOT_FOLDER_SIZE:-10000000}
-        - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
-        - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
-        # performance tuning
-        - BATCH_SIZE=${WEB_SCRAPER_BATCH_SIZE:-10}
-        - SCRAPER_MAX_WORKERS=${WEB_SCRAPER_MAX_WORKERS:-2}
-        - MAX_PROXY_VALIDATION_WORKERS=${WEB_SCRAPER_MAX_PROXY_VALIDATION_WORKERS:-100}
-        - MAX_FETCH_RETRIES=${WEB_SCRAPER_MAX_FETCH_RETRIES:-3}
-        - INITIAL_FETCH_DELAY_S=${WEB_SCRAPER_INITIAL_FETCH_DELAY_S:-1}
-        - FETCH_DELAY_GROWTH_RATE=${WEB_SCRAPER_FETCH_DELAY_GROWTH_RATE:-1.2}
+    volumes:
+      - ${HOST_LOG_ROOT}/scraper/logs:/app/logs
+      - ${HOST_LOG_ROOT}/scraper/screenshots:/app/screenshots
 
-      deploy:
-        resources:
-          limits:
-            cpus: '${WEB_SCRAPER_CPU_LIMIT:-1.0}'
-            memory: '${WEB_SCRAPER_MEMORY_LIMIT:-2G}'
-          reservations:
-            cpus: '${WEB_SCRAPER_CPU_RESERVATION:-0.5}'
-            memory: '${WEB_SCRAPER_MEMORY_RESERVATION:-1G}'
-      
+    restart: unless-stopped
+    networks:
+      - sentinel-net
+
+    <<: *common-env
+    environment:
+
+      - INPUT_STREAMS=${WEB_SCRAPER_INPUT_STREAMS:-user:to.be.scraped, background:to.be.scraped}
+      - USER_OUTPUT_STREAM=${WEB_SCRAPER_USER_OUTPUT_STREAM:-user:to.be.nlp}
+      - BACKGROUND_OUTPUT_STREAM=${WEB_SCRAPER_BACKGROUND_OUTPUT_STREAM:-background:to.be.nlp}
+      - FAILURE_OUTPUT_STREAM=${WEB_SCRAPER_FAILURE_OUTPUT_STREAM:-failure:to.be.scraped}
+      - GROUP_NAME=${WEB_SCRAPER_GROUP_NAME:-default}
+      - CONSUMER_NAME=${WEB_SCRAPER_CONSUMER_NAME:-web-scraper-1}
+      - LOG_MODE=${WEB_SCRAPER_LOG_MODE:-10}
+      - MAX_SCREENSHOT_FOLDER_SIZE=${WEB_SCRAPER_MAX_SCREENSHOT_FOLDER_SIZE:-10000000}
+      - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
+      - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
+      # performance tuning
+      - BATCH_SIZE=${WEB_SCRAPER_BATCH_SIZE:-10}
+      - SCRAPER_MAX_WORKERS=${WEB_SCRAPER_MAX_WORKERS:-2}
+      - MAX_PROXY_VALIDATION_WORKERS=${WEB_SCRAPER_MAX_PROXY_VALIDATION_WORKERS:-100}
+      - MAX_FETCH_RETRIES=${WEB_SCRAPER_MAX_FETCH_RETRIES:-3}
+      - INITIAL_FETCH_DELAY_S=${WEB_SCRAPER_INITIAL_FETCH_DELAY_S:-1}
+      - FETCH_DELAY_GROWTH_RATE=${WEB_SCRAPER_FETCH_DELAY_GROWTH_RATE:-1.2}
+
+    deploy:
+      resources:
+        limits:
+          cpus: '${WEB_SCRAPER_CPU_LIMIT:-1.0}'
+          memory: '${WEB_SCRAPER_MEMORY_LIMIT:-2G}'
+        reservations:
+          cpus: '${WEB_SCRAPER_CPU_RESERVATION:-0.5}'
+          memory: '${WEB_SCRAPER_MEMORY_RESERVATION:-1G}'
+
   nlp-service:
-      container_name: sentinel-nlp-service-container
-      image: sentinel/nlp-service:latest
-      build: 
-        context: ../../
-        dockerfile: ./microservices/nlp/Dockerfile
-      shm_size: '${NLP_SHM_SIZE:-4gb}'
+    container_name: sentinel-nlp-service-container
+    image: sentinel/nlp-service:latest
+    build:
+      context: ../../
+      dockerfile: ./microservices/nlp/Dockerfile
+    shm_size: '${NLP_SHM_SIZE:-4gb}'
 
-      depends_on:
-        - postgres
-        - redis
+    depends_on:
+      - postgres
+      - redis
 
-      profiles: 
-        - nlp
-        
-      volumes:
-        - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
+    profiles:
+      - nlp
 
-      restart: unless-stopped
-      networks:
-        - sentinel-net
+    volumes:
+      - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
 
-      <<: *common-env
-      environment:
-        - INPUT_STREAMS=${NLP_INPUT_STREAMS:-user:to.be.nlp, background:to.be.nlp}
-        - USER_OUTPUT_STREAM=${NLP_USER_OUTPUT_STREAM:-user:to.be.retrieval}
-        - BACKGROUND_OUTPUT_STREAM=${NLP_BACKGROUND_OUTPUT_STREAM:-background:to.be.retrieval}
-        - FAILURE_OUTPUT_STREAM=${NLP_FAILURE_OUTPUT_STREAM:-failure:to.be.nlp}
-        - GROUP_NAME=${NLP_GROUP_NAME:-default}
-        - CONSUMER_NAME=${NLP_CONSUMER_NAME:-nlp-1}
-        - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
-        - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
-        # performance tuning
-        - BATCH_SIZE=${NLP_BATCH_SIZE:-10}
-        - NLP_MAX_WORKERS=${NLP_MAX_WORKERS:-2}
-        - NLP_EMBEDDING_MODEL=${NLP_EMBEDDING_MODEL}
-        - NLP_NER_MODEL=${NLP_NER_MODEL}
-        - NLP_BIAS_MODEL=${NLP_BIAS_MODEL}
-        - USE_GPU=${USE_GPU}
+    restart: unless-stopped
+    networks:
+      - sentinel-net
 
-      deploy:
-        resources:
-          limits:
-            cpus: '${NLP_CPU_LIMIT:-1.0}'
-            memory: '${NLP_MEMORY_LIMIT:-2G}'
-          reservations:
-            cpus: '${NLP_CPU_RESERVATION:-0.5}'
-            memory: '${NLP_MEMORY_RESERVATION:-1G}'
+    <<: *common-env
+    environment:
+      - INPUT_STREAMS=${NLP_INPUT_STREAMS:-user:to.be.nlp, background:to.be.nlp}
+      - USER_OUTPUT_STREAM=${NLP_USER_OUTPUT_STREAM:-user:to.be.retrieval}
+      - BACKGROUND_OUTPUT_STREAM=${NLP_BACKGROUND_OUTPUT_STREAM:-background:to.be.retrieval}
+      - FAILURE_OUTPUT_STREAM=${NLP_FAILURE_OUTPUT_STREAM:-failure:to.be.nlp}
+      - GROUP_NAME=${NLP_GROUP_NAME:-default}
+      - CONSUMER_NAME=${NLP_CONSUMER_NAME:-nlp-1}
+      - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
+      - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
+      # performance tuning
+      - BATCH_SIZE=${NLP_BATCH_SIZE:-10}
+      - NLP_MAX_WORKERS=${NLP_MAX_WORKERS:-2}
+      - NLP_EMBEDDING_MODEL=${NLP_EMBEDDING_MODEL}
+      - NLP_NER_MODEL=${NLP_NER_MODEL}
+      - NLP_BIAS_MODEL=${NLP_BIAS_MODEL}
+      - USE_GPU=${USE_GPU}
+
+    deploy:
+      resources:
+        limits:
+          cpus: '${NLP_CPU_LIMIT:-1.0}'
+          memory: '${NLP_MEMORY_LIMIT:-2G}'
+        reservations:
+          cpus: '${NLP_CPU_RESERVATION:-0.5}'
+          memory: '${NLP_MEMORY_RESERVATION:-1G}'
 
   retrieval-layer-service:
     container_name: sentinel-retrieval-layer-service-container
@@ -315,7 +315,6 @@ services:
 
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
-
 
     deploy:
       resources:

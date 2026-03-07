@@ -40,3 +40,13 @@ class UpdateJob:
     job_uid: str
     status: str
     stage_timestamps: List[MessageTimestamp]
+
+@dataclass
+class Evidence:
+    id: str
+    title: str
+    source: str
+    url: str
+    bias: str
+    publishedAt: str
+    excerpt: str
