@@ -41,7 +41,7 @@ class RetrievalService(ServiceTemplate):
         super().__init__(config)
         self.hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
         
-    def _calculate_verdict_and_confidence(self,matches: List[Dict[Any]]) -> tuple[str, int]:
+    def _calculate_verdict_and_confidence(self,matches: List[Dict[str, Any]]) -> tuple[str, int]:
         """
         Calculate verdict and confidence for a claim based on its retrieval matches.
         
@@ -246,7 +246,8 @@ class RetrievalService(ServiceTemplate):
                 claim=input_claim
             )
             
-            if not query_claim_evidence_map[input_claim_text]:
+            # if not query_claim_evidence_map[input_claim_text]:
+            if input_claim_text not in query_claim_evidence_map:
                 query_claim_evidence_map[input_claim_text] = input_claim_evaluation
             else:
                 query_claim_evidence_map[input_claim_text].extend(input_claim_evaluation)
@@ -262,7 +263,8 @@ class RetrievalService(ServiceTemplate):
         
         self.logger.info(
             "Retrieval matches on job uid=%s claim_matches=%s",
-            message.data.header.uid,
+            # message.data.header.uid,
+            message.header.uid,
             len(evidence_claim_ids),
         )
         
@@ -275,7 +277,13 @@ class RetrievalService(ServiceTemplate):
             "DB write result job=%s",
             job_entry
         )
-        return job_entry 
+        # return job_entry 
+        return {
+            "job_id": job_entry.id,
+            "job_uid": job_entry.uid,
+            "status": job_entry.status,
+            "type": job_entry.type,
+        }
         
     def _process_and_publish_worker(self, message: StreamMessage) -> Tuple[str, str]:
         """Worker for concurrent mode. Processes, then publishes."""

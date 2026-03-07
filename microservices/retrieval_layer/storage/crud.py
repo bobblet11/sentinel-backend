@@ -123,6 +123,10 @@ def create_claim_and_link_entities(
     db.add(claim)
     db.flush()
     db.refresh(claim)
+#added parts
+    entities = get_or_create_all_entities(db, claim_dto.NER_entities)
+    claim.entities.extend(entities)
+    db.flush()
     return claim
 
 def extend_evidence_claims_into_articles(db: Session, claim_ids: List[int], current_article_id: int) -> List[Dict[str, Any]]:
@@ -154,7 +158,7 @@ def extend_evidence_claims_into_articles(db: Session, claim_ids: List[int], curr
         if len(article.text or "") > 300:
             article_excerpt += "..."
         
-        bias_category = article.sentiment.bias_category if article.sentiment.bias_category else "center"
+        bias_category = article.sentiment.bias_category if article.sentiment and article.sentiment.bias_category  else "center"
         
         if bias_category.lower() not in ["left", "center-left", "center", "center-right", "right"]:
             mapping = {
@@ -195,7 +199,7 @@ def finalise_and_complete_job(db: Session, job_dto: UpdateJob):
             job_id = existing_job.id,
             stage_name = timestamp.stage_name,
             timestamp = timestamp.wall_time,
-            monotonic_timestamp = timestamp.offset_s
+            # monotonic_timestamp = timestamp.offset_s
         )
         db.add(jt_to_add)
         

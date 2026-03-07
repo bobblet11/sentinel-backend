@@ -72,7 +72,7 @@ class ServiceTemplate(ABC):
 			)
 
 		if config.failure_output_stream:
-			self.failure_output_stream = self.failure_output_stream
+			self.failure_output_stream = config.failure_output_stream
 			self.fail_publisher = RedisPublisher(config.failure_output_stream)
    
 		self.is_cut_and_paste_mode = config.is_cut_and_paste_mode
