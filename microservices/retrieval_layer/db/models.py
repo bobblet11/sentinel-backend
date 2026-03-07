@@ -8,8 +8,8 @@ Base = declarative_base()
 claim_to_entity_table = Table(
     "claim_to_entity",
     Base.metadata,
-    Column("entity_id", Integer, ForeignKey("entity.id"), primary_key=True),
     Column("claim_id", Integer, ForeignKey("claim.id"), primary_key=True),
+    Column("entity_id", Integer, ForeignKey("entity.id"), primary_key=True),
 )
 
 class Entity(Base):
@@ -38,7 +38,7 @@ class Claim(Base):
 class NewsOutlet(Base):
     __tablename__ = "news_outlet"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(255), nullable=False, unique=True)
+    name = Column(String(50), nullable=False, unique=True)
 
     articles = relationship("Article", back_populates="outlet")
 
@@ -53,7 +53,7 @@ class Author(Base):
 class Article(Base):
     __tablename__ = "article"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    url = Column(String(1024), nullable=False, unique=True)
+    url = Column(String(250), nullable=False, unique=True)
     title = Column(String(1024), nullable=True)
     text = Column(Text, nullable=True)
     html = Column(Text, nullable=True)
@@ -80,9 +80,9 @@ class SentimentAnalysis(Base):
 class Job(Base):
     __tablename__ = "job"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    uid = Column(String(36), nullable=True)  # uuid text
-    status = Column(String(50), nullable=True)
-    type = Column(String(50), nullable=True)
+    uid = Column(String(36), nullable=False)  # uuid text
+    status = Column(String(50), nullable=False)
+    type = Column(String(20), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     article_id = Column(Integer, ForeignKey("article.id"), nullable=False)
 
@@ -91,5 +91,5 @@ class JobTimestamp(Base):
     __tablename__ = "job_timestamp"
     id = Column(Integer, primary_key=True, autoincrement=True)
     job_id = Column(Integer, ForeignKey("job.id"), nullable=False)
-    stage_name = Column(String(255), nullable=False)
+    stage_name = Column(String(50), nullable=False)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
