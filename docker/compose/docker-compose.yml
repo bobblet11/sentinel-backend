@@ -121,7 +121,7 @@ services:
       - OUTPUT_STREAM=${API_OUTPUT_STREAM:-user:to.be.scraped}
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
-
+      - HASH_STORE_NAMESPACE=${HASH_STORE_NAMESPACE}
     deploy:
       resources:
         limits:
@@ -321,6 +321,7 @@ services:
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
       
       - USE_GPU=${USE_GPU}
+      - HASH_STORE_NAMESPACE=${HASH_STORE_NAMESPACE}
 
     deploy:
       resources:
