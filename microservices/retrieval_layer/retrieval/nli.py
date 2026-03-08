@@ -1,4 +1,5 @@
 from transformers import pipeline
+import torch
 
 _nli = None
 
@@ -8,8 +9,7 @@ def get_nli():
         _nli = pipeline(
             "text-classification",
             model="typeform/distilbert-base-uncased-mnli",
-            device=-1,  # CPU <- replace with config later
-            # batch_size=16,  # KEY: batch 16 at once
+            device=0 if torch.cuda.is_available() else -1,  
         )
     return _nli
 

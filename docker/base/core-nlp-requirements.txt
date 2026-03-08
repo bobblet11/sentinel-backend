@@ -1,0 +1,10 @@
+# NLP Backbone
+# torch>=2.5.1 is done via wget
+transformers>=4.43.4
+numpy>=1.26.4
+
+# NLP Processing
+spacy>=3.7.2
+sentence-transformers>=3.0.0
+scikit-learn>=1.4.0
+pandas>=2.2.0
