@@ -13,3 +13,4 @@ user-agents
 fake-useragent==2.2.0
 filelock
 requests>=2.31.0
+redis
