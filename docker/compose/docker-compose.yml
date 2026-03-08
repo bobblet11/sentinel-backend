@@ -227,7 +227,9 @@ services:
   nlp-service:
     container_name: sentinel-nlp-service-container
     image: sentinel/nlp-service:latest
-    build:
+    build: 
+      args:
+        BASE_IMAGE: ${NLP_BASE:-sentinel/python-ml-cpu:3.12} 
       context: ../../
       dockerfile: ./microservices/nlp/Dockerfile
     shm_size: '${NLP_SHM_SIZE:-4gb}'
@@ -278,6 +280,8 @@ services:
     shm_size: '${RETRIEVAL_LAYER_SHM_SIZE:-2gb}'
     image: sentinel/retrieval-layer-service:latest
     build:
+      args:
+        BASE_IMAGE: ${RETRIEVAL_BASE:-sentinel/python-ml-cpu:3.12} 
       context: ../../
       dockerfile: ./microservices/retrieval_layer/Dockerfile
 
@@ -315,6 +319,8 @@ services:
 
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
+      
+      - USE_GPU=${USE_GPU}
 
     deploy:
       resources:

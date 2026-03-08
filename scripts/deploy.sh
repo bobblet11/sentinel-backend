@@ -114,9 +114,7 @@ log_warn "Creating log folders at: $HOST_LOG_ROOT"
 sudo mkdir -p "$HOST_LOG_ROOT/ingestor"
 sudo mkdir -p "$HOST_LOG_ROOT/scraper/logs"
 sudo mkdir -p "$HOST_LOG_ROOT/scraper/screenshots"
-sudo mkdir -p "$HOST_LOG_ROOT/scraper_prioritiser"
 sudo mkdir -p "$HOST_LOG_ROOT/api"
-sudo mkdir -p "$HOST_LOG_ROOT/nlp_prioritiser"
 sudo mkdir -p "$HOST_LOG_ROOT/nlp"
 
 sudo mkdir -p "$HOST_ROOT/data/redis_data"
@@ -165,11 +163,31 @@ run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" down --remove-orp
 log_warn "Pruning any remaining dangling Docker images..."
 run_and_log sudo -E docker image prune -f
 
-log_warn "Building base Docker image 1..."
-run_and_log sudo -E docker build --pull -t sentinel/base-image:1.0 -f "$PROJECT_ROOT/docker/base/base1/Dockerfile" "$PROJECT_ROOT"  
 
-log_warn "Building base Docker image 2..."
-run_and_log sudo -E docker build --pull -t sentinel/base-image:1.1 -f "$PROJECT_ROOT/docker/base/base2/Dockerfile" "$PROJECT_ROOT"  
+
+log_warn "Building base Docker image \"light_python_3_11\"..."
+run_and_log sudo -E docker build --pull -t sentinel/python-light:3.11 -f "$PROJECT_ROOT/docker/base/light_python_3_11/Dockerfile" "$PROJECT_ROOT"  
+
+log_warn "Building base Docker image \"light_python_3_12\"..."
+run_and_log sudo -E docker build --pull -t sentinel/python-light:3.12 -f "$PROJECT_ROOT/docker/base/light_python_3_12/Dockerfile" "$PROJECT_ROOT"  
+
+
+
+log_warn "Building base Docker image \"common_3_11\"..."
+run_and_log sudo -E docker build --pull=false -t sentinel/python-light-common:3.11 -f "$PROJECT_ROOT/docker/base/common_layer_3_11/Dockerfile" "$PROJECT_ROOT"  
+
+log_warn "Building base Docker image \"common_3_12\"..."
+run_and_log sudo -E docker build --pull=false -t sentinel/python-light-common:3.12 -f "$PROJECT_ROOT/docker/base/common_layer_3_12/Dockerfile" "$PROJECT_ROOT"  
+
+
+
+
+log_warn "Building base Docker image \"CPU_ML_base\"..."
+run_and_log sudo -E docker build --pull=false -t sentinel/python-ml-cpu:3.12 -f "$PROJECT_ROOT/docker/base/CPU_ML_base/Dockerfile" "$PROJECT_ROOT"
+
+log_warn "Building base Docker image \"GPU_ML_base\"..."
+run_and_log sudo -E docker build --pull -t sentinel/python-ml-gpu:3.12-cuda121 -f "$PROJECT_ROOT/docker/base/GPU_ML_base/Dockerfile" "$PROJECT_ROOT"  
+
 
 log_info "Building service images for '$CONFIG_NAME' configuration..."
 run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" build  || true
