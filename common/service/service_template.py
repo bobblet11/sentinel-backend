@@ -40,6 +40,7 @@ class ServiceConfig():
         max_workers:int = 1
         batch_size:int = 10
         is_cut_and_paste_mode: bool = True
+        retry_failure_mode: bool = False
 
         
 
@@ -52,6 +53,10 @@ class ServiceTemplate(ABC):
 		self.batch_size = config.batch_size
 		self.keep_running: bool = True
 		self.is_concurrent = config.is_concurrent
+
+		# will fetch from failure stream if truly no jobs exist in user or background
+		if config.retry_failure_mode:
+			config.input_streams.append(config.failure_output_stream)
   
 		if config.input_streams:
 			self.input_streams = config.input_streams

@@ -1,13 +1,17 @@
-FROM sentinel/base-image:1.1
+ARG BASE_IMAGE=sentinel/python-ml-cpu:3.11
+FROM $BASE_IMAGE
 
 WORKDIR /app
 
 COPY microservices/retrieval_layer/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+RUN apt-get update && \
+    pip install --no-cache-dir -r requirements.txt && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+    
+RUN python3 -c 'import torch; print(torch.cuda.is_available())'
 
 COPY microservices/retrieval_layer /app/microservices/retrieval_layer
-COPY common/ /app/common/
-
 
 CMD ["python", "-m", "microservices.retrieval_layer.main"]
-# CMD ["tail", "-f", "/dev/null"]
+
