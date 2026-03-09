@@ -149,7 +149,7 @@ def extend_evidence_claims_into_articles(db: Session, claim_ids: List[int], curr
         .join(Claim, Claim.article_id == Article.id)
         .where(Claim.id.in_(claim_ids))
         .where(Article.id != current_article_id)
-        .group_by(Article.id)
+        .distinct(Article.id)
     ).scalars().unique().all()
     
     if not articles:

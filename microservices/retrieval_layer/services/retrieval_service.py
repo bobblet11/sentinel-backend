@@ -151,6 +151,7 @@ class RetrievalService(ServiceTemplate):
         claim_candidates = set()
         
         def filter_step() -> List[int | str]:
+            self.logger.debug("FILTERING")
             # for now, improve it with TD-IDF or whatever. this is just every word, not really keywords
             key_words_to_match = [
                 x.strip(" .,;:'")
@@ -158,9 +159,11 @@ class RetrievalService(ServiceTemplate):
                 if x.strip(" .,;:'").lower() not in STOP_WORDS
             ]        
             # low limit because the matches are going to be low.
+            self.logger.debug("FILTERING BY KEYWORD")
             claim_candidates.update(find_evidence_by_keyword_match(db, key_words_to_match, 20))
             entities_in_claim = [entity.entity_text for entity in claim.NER_entities]
             # higher limit because the matches are going to be higher.
+            self.logger.debug("FILTERING BY ENTITY")
             claim_candidates.update(find_evidence_by_entity_match(db, entities_in_claim, 50))
         
             if not claim_candidates:
@@ -172,6 +175,7 @@ class RetrievalService(ServiceTemplate):
             return capped_filter_step_candidate_ids
         
         def similarity_step(capped_filter_step_candidate_ids) -> List[Tuple[Dict[str, str | int], float]]:
+            self.logger.debug("SIMILARITY STEP")
             claim_text_embedding = claim.decontextualised_claim_embedding
             best_ranked_similarity_evidence = retrieve_by_embedding(db, claim_text_embedding, capped_filter_step_candidate_ids)
             
@@ -189,6 +193,7 @@ class RetrievalService(ServiceTemplate):
             return capped_similarity_step_candidate_list
         
         def classification_step(capped_similarity_step_candidate_list) -> List[Tuple[Dict, float, str, float]]:
+            self.logger.debug("CLASSIFICATION STEP")
             classified_evidence = []
             
             for evidence_claim, similarity_score in capped_similarity_step_candidate_list:
@@ -197,10 +202,14 @@ class RetrievalService(ServiceTemplate):
                         input_claim_text,
                         evidence_claim.get("decontextualised_claim")
                     )
-                    
+                    self.logger.debug(f"NLI success: {label} (conf: {confidence:.2f})")
+                except (RuntimeError, ValueError, KeyError) as e:
+                    claim_id = evidence_claim.get("id", "unknown")
+                    self.logger.error(f"NLI failed for claim {claim_id}: {e}")
+                    label, confidence = "irrelevant", 0.0
                 except Exception as e:
-                    self.logger.error(f"Error during NLI for claim ID {claim.id}:")
-                    self.logger.error(e)
+                    claim_id = evidence_claim.get("id", "unknown")
+                    self.logger.error(f"Unexpected NLI error for claim {claim_id}: {type(e).__name__}: {e}")
                     label, confidence = "irrelevant", 0.0
 
                 classified_evidence.append(
@@ -245,7 +254,7 @@ class RetrievalService(ServiceTemplate):
                 db=db,
                 claim=input_claim
             )
-            
+            self.logger.debug("EVIDENCE RETRIEVED")
             # if not query_claim_evidence_map[input_claim_text]:
             if input_claim_text not in query_claim_evidence_map:
                 query_claim_evidence_map[input_claim_text] = input_claim_evaluation
@@ -255,6 +264,7 @@ class RetrievalService(ServiceTemplate):
             evidence_claim_ids.extend([evidence_claim.get("claim_id") for evidence_claim in input_claim_evaluation.get("matches", [])])
         
         # Extend evidence claims into articles
+        self.logger.debug("EXTENDING CLAIMS INTO ARTICLES")
         related_articles = extend_evidence_claims_into_articles(
             db=db,
             claim_ids=evidence_claim_ids,
@@ -268,7 +278,7 @@ class RetrievalService(ServiceTemplate):
             len(evidence_claim_ids),
         )
         
-        return query_claim_evidence_map.values(), related_articles
+        return list(query_claim_evidence_map.values()), related_articles
     
     def _save_job_into_postgres(self, db:Session, message:StreamMessage):
         job_dto = UpdateJob(message.header.id, message.header.uid, JobStatus.COMPLETE, message.stage_timestamps)
