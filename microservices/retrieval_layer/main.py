@@ -37,6 +37,8 @@ if __name__ == "__main__":
         is_concurrent=False,
         max_workers=1,                 
         batch_size=BATCH_SIZE,
+        retry_failure_mode=True
+        
     )
 
     retrieval_service = RetrievalService(config)

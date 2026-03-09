@@ -25,20 +25,23 @@ def retrieve_by_embedding(
     top_k: int = MAX_CANDIDATES,
     exclude_claim_id: int | None = None,
 ) -> List[Tuple[Dict[str, str | int], float]]:
+    
     if not is_valid_embedding(query_embedding):
         return []
     
-    query_vec = Vector(query_embedding)
+    if not candidate_claim_ids:
+        return []
+
+    
+    query_vec = query_embedding
+    distance_expr = Claim.decontextualised_embedding.cosine_distance(query_vec)
     stmt = (
-        select(
-            Claim.id,
-            Claim.decontextualised_claim,
-            Claim.decontextualised_embedding.cosine_distance(query_vec).label("distance")
-        )
+        select(Claim.id, Claim.decontextualised_claim, distance_expr.label("distance"))
         .where(Claim.decontextualised_embedding.is_not(None))
         .where(Claim.id.in_(candidate_claim_ids))
+        .order_by(distance_expr)
     )
-    
+        
     if exclude_claim_id:
         stmt = stmt.where(Claim.id != exclude_claim_id)
     
