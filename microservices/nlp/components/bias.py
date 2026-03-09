@@ -34,10 +34,11 @@ class BiasDetector(NLPComponent):
         # 2. Dummy Global Bias Profile
         # Create a BiasProfile with hardcoded values
         dummy_profile = BiasProfile(
-            political_bias="Center", 
-            confidence=0.15,
-            scores={"left": 0.4, "center": 0.2, "right": 0.4},
-            emotional_tone="Neutral"
+            bias_category="DUMMY_center", 
+            bias_score=0.5,
+            bias_analysis_confidence=0.5,
+            sentiment_category="DUMMY_neutral",
+            sentiment_analysis_confidence=0.5
         )
         
         # 3. Update Result
