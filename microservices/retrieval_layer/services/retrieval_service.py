@@ -103,9 +103,9 @@ class RetrievalService(ServiceTemplate):
                 "\t\tEmbedding sample (first 3 values): %s\n"
                 "\t\tCentrality score: %.2f",
                 i,
-                claims[i].original_sentence,
-                claims[i].decontextualised_embedding[:3],
-                claims[i].centrality_score,
+                claims[i].contextualised_claim_text,
+                claims[i].decontextualised_claim_embedding[:3],
+                claims[i].confidence,
             )
         
         bias_profile = message.bias_profile

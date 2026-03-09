@@ -61,6 +61,7 @@ def create_sentiment(db: Session, sentiment_dto: CreateOrModifySentiment) -> Sen
     return new_sentiment_entry
 
 def get_or_create_outlet(db: Session, outlet_dto: CreateOrModifyOutlet) -> NewsOutlet:
+    
     existing_outlet_entry = db.execute(select(NewsOutlet).where(NewsOutlet.name == outlet_dto.name)).scalar_one_or_none()
     if existing_outlet_entry:
         return existing_outlet_entry
@@ -77,7 +78,10 @@ def get_or_create_article(db: Session, article_dto: CreateOrModifyArticle, senti
     stmt = select(Article).where(Article.url == article_dto.article_url)
     existing = db.execute(stmt).scalar_one_or_none()
     
-    outlet_entry = get_or_create_outlet(db, outlet_dto)
+    outlet_entry = None
+    if outlet_dto.name:
+        outlet_entry = get_or_create_outlet(db, outlet_dto)
+        
     sentiment_entry = create_sentiment(db, sentiment_dto)
     
     if existing:
