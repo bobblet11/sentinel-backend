@@ -41,14 +41,24 @@ class RedisConnection:
     @exponential_retry(
         max_attempts=MAX_RETRIES,
         initial_delay_s=INITIAL_DELAY_S,
-        on_exceptions=(redis.exceptions.ConnectionError, redis.exceptions.TimeoutError),
+        on_exceptions=(
+            redis.exceptions.ConnectionError,
+            redis.exceptions.TimeoutError,
+            redis.exceptions.BusyLoadingError
+        ),
     )
     def connect(self) -> bool:
         """
         Idempotently attempts to establish a connection to the Redis server.
         """
         pool = redis.ConnectionPool(
-            host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True
+            host=REDIS_HOST, 
+            port=REDIS_PORT, 
+            db=0, 
+            decode_responses=True,
+            socket_timeout=30,          # wait up to 30s for a response
+            socket_connect_timeout=30,  # wait up to 30s to connect
+            retry_on_timeout=True       # retry if a timeout occurs
         )
 
         client = redis.Redis(connection_pool=pool)
@@ -74,7 +84,12 @@ class RedisConnection:
                 return self._client
 
             self.connect()
-
+            
+        try:
+            self._client.ping()
+        except redis.exceptions.ConnectionError:
+            self.connect()
+            
         return self._client
 
     def ping(self) -> bool:
