@@ -404,10 +404,10 @@ services:
           reservations:
             cpus: '${NLP_CPU_RESERVATION:-0.5}'
             memory: '${NLP_MEMORY_RESERVATION:-1G}'
-            devices:
-              - driver: nvidia
-                count: 1
-                capabilities: [gpu]
+            # devices: uncomment if machine supports
+            #   - driver: nvidia
+            #     count: 1
+            #     capabilities: [gpu]
 
     # profiles:
     #   - scraper
