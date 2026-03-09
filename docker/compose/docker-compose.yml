@@ -19,22 +19,11 @@ x-common-env: &common-env
   env_file:
     - ${ENV_FILE_PATH}
 
-x-prioritiser-service: &prioritiser-service
-  image: sentinel/job-prioritiser:latest
-  build:
-    context: ../../
-    dockerfile: ./microservices/job_prioritiser/Dockerfile
-  depends_on:
-    - redis
-  restart: unless-stopped
-  networks:
-    - sentinel-net
-
 services:
   # --- INFRASTRUCTURE ---
   redis:
     container_name: sentinel-redis-container
-    image: "redis:alpine"
+    image: "redis:8.4.0-alpine"
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -43,7 +32,14 @@ services:
     networks:
       - sentinel-net
     command: >
-      redis-server --appendonly no --appendfsync everysec --save 60 1 --timeout 300 --tcp-keepalive 60 --dbfilename "dump.rdb" --dir /data
+      redis-server 
+      --appendonly no 
+      --appendfsync everysec 
+      --save 60 1 
+      --timeout 0 
+      --tcp-keepalive 60 
+      --dbfilename "dump.rdb" 
+      --dir /data
 
     <<: *common-env
     deploy:
@@ -197,7 +193,7 @@ services:
     <<: *common-env
     environment:
 
-      - INPUT_STREAMS=${WEB_SCRAPER_INPUT_STREAMS:-user:to.be.scraped, background:to.be.scraped}
+      - INPUT_STREAMS=${WEB_SCRAPER_INPUT_STREAMS:-user:to.be.scraped,background:to.be.scraped}
       - USER_OUTPUT_STREAM=${WEB_SCRAPER_USER_OUTPUT_STREAM:-user:to.be.nlp}
       - BACKGROUND_OUTPUT_STREAM=${WEB_SCRAPER_BACKGROUND_OUTPUT_STREAM:-background:to.be.nlp}
       - FAILURE_OUTPUT_STREAM=${WEB_SCRAPER_FAILURE_OUTPUT_STREAM:-failure:to.be.scraped}
@@ -250,7 +246,7 @@ services:
 
     <<: *common-env
     environment:
-      - INPUT_STREAMS=${NLP_INPUT_STREAMS:-user:to.be.nlp, background:to.be.nlp}
+      - INPUT_STREAMS=${NLP_INPUT_STREAMS:-user:to.be.nlp,background:to.be.nlp}
       - USER_OUTPUT_STREAM=${NLP_USER_OUTPUT_STREAM:-user:to.be.retrieval}
       - BACKGROUND_OUTPUT_STREAM=${NLP_BACKGROUND_OUTPUT_STREAM:-background:to.be.retrieval}
       - FAILURE_OUTPUT_STREAM=${NLP_FAILURE_OUTPUT_STREAM:-failure:to.be.nlp}

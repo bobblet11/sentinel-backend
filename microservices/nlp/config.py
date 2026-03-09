@@ -7,7 +7,7 @@ load_dotenv()
 
 config_logger: Logger = getLogger("config")
 
-INPUT_STREAMS: List[str] = get_env_var("INPUT_STREAMS",str, config_logger).split(", ")
+INPUT_STREAMS: List[str] = [x.strip(" ,") for x in get_env_var("INPUT_STREAMS",str, config_logger).split(",")]
 USER_OUTPUT_STREAM: str = get_env_var("USER_OUTPUT_STREAM",str, config_logger)
 BACKGROUND_OUTPUT_STREAM: str = get_env_var("BACKGROUND_OUTPUT_STREAM",str, config_logger)
 FAILURE_OUTPUT_STREAM: str = get_env_var("FAILURE_OUTPUT_STREAM",str, config_logger)

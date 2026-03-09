@@ -18,11 +18,7 @@ POSTGRES_USER: str = get_env_var("POSTGRES_USER", str, config_logger)
 POSTGRES_PASSWORD: str = get_env_var("POSTGRES_PASSWORD", str, config_logger)
 
 # Redis stream configs
-INPUT_STREAMS: List[str] = get_env_var(
-    "INPUT_STREAMS",
-    lambda x: x.split(","),
-    config_logger
-)
+INPUT_STREAMS: List[str] = [x.strip(" ,") for x in get_env_var("INPUT_STREAMS",str, config_logger).split(",")]
 
 FAILURE_OUTPUT_STREAM: str = get_env_var(
     "FAILURE_OUTPUT_STREAM",
