@@ -27,8 +27,19 @@ BEGIN
 END 
 $$;
 
--- Grant all privileges on the sentinel_db database
-GRANT ALL PRIVILEGES ON DATABASE "sentinel_db" TO sentinel_user;
+-- Grant privileges on the currently connected database.
+-- This avoids hardcoding a DB name that may differ by environment.
+DO $$
+DECLARE
+  current_db text := current_database();
+BEGIN
+  EXECUTE format('GRANT ALL PRIVILEGES ON DATABASE %I TO %I', current_db, current_user);
+
+  IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'sentinel_user') THEN
+    EXECUTE format('GRANT ALL PRIVILEGES ON DATABASE %I TO sentinel_user', current_db);
+  END IF;
+END
+$$;
 
 BEGIN;
 
