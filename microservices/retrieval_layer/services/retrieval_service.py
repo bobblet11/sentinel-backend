@@ -43,14 +43,24 @@ class RetrievalService(ServiceTemplate):
 
     @staticmethod
     def _normalize_embedding(embedding: List[float] | None) -> List[float] | None:
-        """Ensure claim embedding matches DB vector dimension; otherwise store as NULL."""
+        """Coerce embeddings to the pgvector dimension (pad/truncate) while preserving values."""
         if embedding is None:
             return None
         if not isinstance(embedding, list):
             return None
-        if len(embedding) != EMBEDDING_DIM:
+
+        try:
+            normalized = [float(v) for v in embedding]
+        except (TypeError, ValueError):
             return None
-        return embedding
+
+        if len(normalized) == EMBEDDING_DIM:
+            return normalized
+        if len(normalized) > EMBEDDING_DIM:
+            return normalized[:EMBEDDING_DIM]
+
+        # Zero-pad shorter embeddings (e.g., 384-dim MiniLM) to match Vector(768).
+        return normalized + [0.0] * (EMBEDDING_DIM - len(normalized))
         
     def _calculate_verdict_and_confidence(self,matches: List[Dict[str, Any]]) -> tuple[str, int]:
         """
@@ -131,19 +141,21 @@ class RetrievalService(ServiceTemplate):
         all_claims_added = []
         
         for claim in claims:
-            normalized_embedding = self._normalize_embedding(claim.decontextualised_claim_embedding)
-            if claim.decontextualised_claim_embedding is not None and normalized_embedding is None:
+            raw_embedding = claim.decontextualised_claim_embedding
+            normalized_embedding = self._normalize_embedding(raw_embedding)
+            if raw_embedding is not None and normalized_embedding is None:
                 self.logger.warning(
-                    "Skipping invalid embedding size for claim text=%r (expected=%s)",
+                    "Skipping invalid embedding values for claim text=%r",
                     (claim.decontextualised_claim_text or "")[:80],
-                    EMBEDDING_DIM,
                 )
+
             claim_dto = CreateOrModifyClaim(
-                claim.contextualised_claim_text, 
-                claim.decontextualised_claim_text, 
+                claim.contextualised_claim_text,
+                claim.decontextualised_claim_text,
                 normalized_embedding,
-                claim.confidence, 
-                NER_entities=claim.NER_entities)
+                claim.confidence,
+                NER_entities=claim.NER_entities,
+            )
             new_claim_entry = create_claim_and_link_entities(db, claim_dto, article_entry)
             entities_added = get_or_create_all_entities(db, claim_dto.NER_entities)
             
@@ -229,13 +241,17 @@ class RetrievalService(ServiceTemplate):
         
         def similarity_step(capped_filter_step_candidate_ids) -> List[Tuple[Dict[str, str | int], float]]:
             self.logger.debug("SIMILARITY STEP")
-            claim_text_embedding = claim.decontextualised_claim_embedding
+            claim_text_embedding = self._normalize_embedding(claim.decontextualised_claim_embedding)
+            if claim_text_embedding is None:
+                self.logger.warning("Skipping similarity step due to invalid claim embedding for claim=%r", (input_claim_text or "")[:80])
+                return []
+
             best_ranked_similarity_evidence = retrieve_by_embedding(db, claim_text_embedding, capped_filter_step_candidate_ids)
-            
+
             best_ranked_similarity_evidence = [
-                (claim_dict, similarity) 
-                for claim_dict, similarity 
-                in best_ranked_similarity_evidence 
+                (claim_dict, similarity)
+                for claim_dict, similarity
+                in best_ranked_similarity_evidence
                 if similarity >= MIN_SIMILARITY
             ]
             
