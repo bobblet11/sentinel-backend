@@ -24,7 +24,7 @@ DUMMY_NLP_MODE: bool = get_env_var(
     default=False,
 )
 
-EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, "sentence-transformers/all-mpnet-base-v2")
+EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, "sentence-transformers/all-MiniLM-L6-v2")
 NER_MODEL = get_env_var("NLP_NER_MODEL", str, config_logger, "dslim/bert-base-NER")
 BIAS_MODEL = get_env_var("NLP_BIAS_MODEL", str, config_logger, "facebook/bart-large-mnli")
 CHECKWORTHY_MODEL = get_env_var("NLP_CHECKWORTHY_MODEL", str, config_logger, "valhalla/distilbart-mnli-12-3")
