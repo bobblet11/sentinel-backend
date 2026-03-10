@@ -8,8 +8,9 @@ COPY microservices/retrieval_layer/requirements.txt .
 RUN apt-get update && \
     pip install --no-cache-dir -r requirements.txt && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
-    
+
 RUN python3 -c 'import torch; print(torch.cuda.is_available())'
+RUN python3 -c "from transformers import pipeline; pipeline('text-classification', model='typeform/distilbert-base-uncased-mnli')"
 
 COPY microservices/retrieval_layer /app/microservices/retrieval_layer
 

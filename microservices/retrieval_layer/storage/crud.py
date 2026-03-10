@@ -27,8 +27,10 @@ def get_or_create_all_entities(db: Session, entities: List[Entity]) -> List[Enti
     added_entities:List[Entity] = []
     existing_entities: List[Entity] = []
     for entity in entities:
-        name = entity.name
-        type_ = entity.type
+        # name = entity.name
+        # type_ = entity.type
+        name = entity.entity_text
+        type_ = entity.type_of_entity
         
         query_to_find_entity = select(Entity).where(Entity.name == name)
         if type_:
