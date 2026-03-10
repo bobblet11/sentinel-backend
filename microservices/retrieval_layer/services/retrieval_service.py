@@ -488,13 +488,24 @@ class RetrievalService(ServiceTemplate):
             claim_evidence_matches, related_articles = self._retrieve_evidence(db, message, original_article_id)
             save_job_result = self._save_job_into_postgres(db, message)
             
-            message.set_retrieval_result(
-                RetrievalResult(
-                    save_data_result,
-                    save_job_result,
-                    claim_evidence_matches,
-                    related_articles
-                )
+            # message.set_retrieval_result(
+            #     RetrievalResult(
+            #         save_data_result,
+            #         save_job_result,
+            #         claim_evidence_matches,
+            #         related_articles
+            #     )
+            # )
+            retrieval_result = RetrievalResult(
+            save_data_result,
+            save_job_result,
+            claim_evidence_matches,
+            related_articles
             )
+            # hashstore inside transaction block — if this fails, DB rolls back too
+            # if message.type == JobType.USER:
+            #     self.hash_store.set(message.uid, retrieval_result.__dict__)
+        
+            message.set_retrieval_result(retrieval_result)
             return message
                     

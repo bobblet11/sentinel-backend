@@ -10,7 +10,7 @@ def get_nli():
             "text-classification",
             model="typeform/distilbert-base-uncased-mnli",
             device=0 if torch.cuda.is_available() else -1,  
-            return_all_scores=True
+            # return_all_scores=True
         )
         
     return _nli
