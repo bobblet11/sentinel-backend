@@ -39,6 +39,13 @@ class RedisHashStore:
         """
         return f"{self.hash_namespace}:{uid}"
 
+    @staticmethod
+    def _as_text(value: Any) -> str:
+        """Normalize Redis responses that may be bytes or already-decoded strings."""
+        if isinstance(value, bytes):
+            return value.decode()
+        return str(value)
+
     def set(self, uid: str, data: Dict[str, Any]) -> None:
         """
         Stores a dictionary under a unique UID key, overwriting any existing record.
@@ -77,10 +84,12 @@ class RedisHashStore:
             # Deserialize each field from JSON.
             decoded = {}
             for k, v in raw_data.items():
+                key = self._as_text(k)
+                value_text = self._as_text(v)
                 try:
-                    decoded[k.decode()] = json.loads(v.decode())
+                    decoded[key] = json.loads(value_text)
                 except Exception:
-                    decoded[k.decode()] = v.decode()
+                    decoded[key] = value_text
             return decoded
 
         except Exception as e:
@@ -136,7 +145,7 @@ class RedisHashStore:
         """
         full_pattern = f"{self.hash_namespace}:{pattern}"
         try:
-            keys = [key.decode() for key in self.client.keys(full_pattern)]
+            keys = [self._as_text(key) for key in self.client.keys(full_pattern)]
             return keys
         except Exception as e:
             self.logger.error(f"Failed to list keys: {e}")

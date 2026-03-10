@@ -16,9 +16,11 @@ import asyncio
 import json
 from common.redis_client.connection import RedisConnection
 from typing import Dict, Any, List
+import logging
 
 router = APIRouter()
 result_hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
+logger = logging.getLogger(__name__)
 
 
 
@@ -184,13 +186,22 @@ async def get_retrieval_result(job_uid: UUID, timeout: int = Query(30, ge=5, le=
             result = result_hash_store.get(search_for_uid)
             
             if result:
-                
+                # Keep the complete retrieval payload from Redis hash.
                 retrieval_result = {
-                    "matches": result.get('matches', {}),
-                    "related_articles": result.get('related_articles', {}),
+                    "save_data_result": result.get("save_data_result") or {},
+                    "save_job_result": result.get("save_job_result") or {},
+                    "matches": result.get("matches") or [],
+                    "related_articles": result.get("related_articles") or [],
                 }
-                
-                article_id = retrieval_result.get('save_data_result',{}).get("article_entry_id", None)
+                logger.debug(
+                    "Retrieved hash payload for job_uid=%s keys=%s matches=%d related_articles=%d",
+                    search_for_uid,
+                    sorted(list(result.keys())),
+                    len(retrieval_result.get("matches", [])),
+                    len(retrieval_result.get("related_articles", [])),
+                )
+
+                article_id = retrieval_result.get("save_data_result", {}).get("article_entry_id")
                 
                 if not article_id:
                     raise Exception("Cannot return result! No article_id")
