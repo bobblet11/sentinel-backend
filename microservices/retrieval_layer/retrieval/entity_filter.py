@@ -6,6 +6,7 @@ def find_evidence_by_entity_match(
     db: Session,
     entity_names_to_match: list[str],
     limit: int = 50,
+    exclude_article_id: int | None = None,
 ):
     """
     Return claims that share at least one entity.
@@ -18,7 +19,11 @@ def find_evidence_by_entity_match(
         select(Claim)
         .join(Claim.entities)
         .where(Entity.name.in_(entity_names_to_match))
-        .limit(limit)
     )
+
+    if exclude_article_id is not None:
+        stmt = stmt.where(Claim.article_id != exclude_article_id)
+
+    stmt = stmt.limit(limit)
 
     return db.execute(stmt).scalars().all()
