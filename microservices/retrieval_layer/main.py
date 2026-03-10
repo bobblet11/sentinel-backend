@@ -1,5 +1,5 @@
 import signal
-from logging import DEBUG
+from logging import INFO
 
 from common.io.logging import setup_logging
 from common.models.api.dtos.job import JobType
@@ -19,7 +19,7 @@ SERVICE_NAME = "retrieval"
 CONTAINER_NAME = "retrieval-layer"
 
 if __name__ == "__main__":
-    setup_logging(level=DEBUG, container_name=CONTAINER_NAME)
+    setup_logging(level=INFO, container_name=CONTAINER_NAME)
 
     config = ServiceConfig(
         service_name=SERVICE_NAME,
