@@ -15,22 +15,62 @@ def get_nli():
         
     return _nli
 
-LABEL_MAP = {
-    "LABEL_0": "support",      # 0 = ENTAILMENT
-    "LABEL_1": "irrelevant",   # 1 = NEUTRAL  
-    "LABEL_2": "contradict",   # 2 = CONTRADICTION
+LABEL_ALIASES = {
+    # Common textual labels
+    "entailment": "support",
+    "neutral": "irrelevant",
+    "contradiction": "contradict",
+    # Some checkpoints use this spelling
+    "contradict": "contradict",
+    # Fallback label IDs (ordering can differ by checkpoint)
+    # Keep common MNLI default here; textual labels are preferred when present.
+    "label_0": "entailment",
+    "label_1": "neutral",
+    "label_2": "contradiction",
 }
+
+
+def _normalize_label(raw_label: str) -> str:
+    normalized = str(raw_label or "").strip().lower()
+    mapped = LABEL_ALIASES.get(normalized, normalized)
+    if mapped == "entailment":
+        return "support"
+    if mapped == "contradiction":
+        return "contradict"
+    if mapped == "neutral":
+        return "irrelevant"
+    if mapped in {"support", "contradict", "irrelevant"}:
+        return mapped
+    return "irrelevant"
 
 def classify_claim_relation(user_claim: str, candidate_claim: str):
     nli = get_nli()
     #             premise            hypothesis
     text_pair = f"{user_claim} [SEP] {candidate_claim}"
-    result = nli(
+    raw_result = nli(
         text_pair,
         truncation=True
-    )[0]
+    )
 
-    label = result["label"]
-    score = result["score"]
-    
-    return LABEL_MAP[label], float(score)
+    # Handle output shape differences across transformers versions:
+    # - [[{label, score}, ...]]
+    # - [{label, score}, ...]
+    # - {label, score}
+    score_items = []
+    if isinstance(raw_result, list) and raw_result:
+        first = raw_result[0]
+        if isinstance(first, list):
+            score_items = first
+        elif isinstance(first, dict):
+            score_items = raw_result
+    elif isinstance(raw_result, dict):
+        score_items = [raw_result]
+
+    if not score_items:
+        return "irrelevant", 0.0
+
+    best_result = max(score_items, key=lambda x: float(x.get("score", 0.0)))
+    label = str(best_result.get("label", ""))
+    score = float(best_result.get("score", 0.0))
+
+    return _normalize_label(label), score

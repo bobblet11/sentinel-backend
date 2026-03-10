@@ -40,6 +40,17 @@ class RetrievalService(ServiceTemplate):
     def __init__(self, config):
         super().__init__(config)
         self.hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
+
+    @staticmethod
+    def _normalize_embedding(embedding: List[float] | None) -> List[float] | None:
+        """Ensure claim embedding matches DB vector dimension; otherwise store as NULL."""
+        if embedding is None:
+            return None
+        if not isinstance(embedding, list):
+            return None
+        if len(embedding) != EMBEDDING_DIM:
+            return None
+        return embedding
         
     def _calculate_verdict_and_confidence(self,matches: List[Dict[str, Any]]) -> tuple[str, int]:
         """
@@ -120,10 +131,17 @@ class RetrievalService(ServiceTemplate):
         all_claims_added = []
         
         for claim in claims:
+            normalized_embedding = self._normalize_embedding(claim.decontextualised_claim_embedding)
+            if claim.decontextualised_claim_embedding is not None and normalized_embedding is None:
+                self.logger.warning(
+                    "Skipping invalid embedding size for claim text=%r (expected=%s)",
+                    (claim.decontextualised_claim_text or "")[:80],
+                    EMBEDDING_DIM,
+                )
             claim_dto = CreateOrModifyClaim(
                 claim.contextualised_claim_text, 
                 claim.decontextualised_claim_text, 
-                claim.decontextualised_claim_embedding, 
+                normalized_embedding,
                 claim.confidence, 
                 NER_entities=claim.NER_entities)
             new_claim_entry = create_claim_and_link_entities(db, claim_dto, article_entry)
@@ -145,7 +163,7 @@ class RetrievalService(ServiceTemplate):
             "all_claim_ids_added" : [x.id for x in all_claims_added]
         }
         
-    def _retrieve_evidence_for_claim(self, db: Session, claim: Claim) -> Dict[str, Any]:
+    def _retrieve_evidence_for_claim(self, db: Session, claim: Claim, original_article_id: int) -> Dict[str, Any]:
         self.logger.debug("=== FINDING EVIDENCE ===\n")
         input_claim_text = claim.decontextualised_claim_text
         claim_candidates = set()
@@ -160,11 +178,46 @@ class RetrievalService(ServiceTemplate):
             ]        
             # low limit because the matches are going to be low.
             self.logger.debug("FILTERING BY KEYWORD")
-            claim_candidates.update(find_evidence_by_keyword_match(db, key_words_to_match, 20))
+            keyword_candidates = find_evidence_by_keyword_match(
+                db,
+                key_words_to_match,
+                20,
+                exclude_article_id=original_article_id,
+            )
+            claim_candidates.update(keyword_candidates)
             entities_in_claim = [entity.entity_text for entity in claim.NER_entities]
             # higher limit because the matches are going to be higher.
             self.logger.debug("FILTERING BY ENTITY")
-            claim_candidates.update(find_evidence_by_entity_match(db, entities_in_claim, 50))
+            entity_candidates = find_evidence_by_entity_match(
+                db,
+                entities_in_claim,
+                50,
+                exclude_article_id=original_article_id,
+            )
+            claim_candidates.update(entity_candidates)
+
+            # Sparse-corpus fallback: when DB has only this article (e.g. fresh env),
+            # allow same-article candidates so retrieval still produces evidence.
+            if not claim_candidates:
+                self.logger.info(
+                    "No cross-article candidates for claim; retrying filter without article exclusion."
+                )
+                claim_candidates.update(
+                    find_evidence_by_keyword_match(
+                        db,
+                        key_words_to_match,
+                        20,
+                        exclude_article_id=None,
+                    )
+                )
+                claim_candidates.update(
+                    find_evidence_by_entity_match(
+                        db,
+                        entities_in_claim,
+                        50,
+                        exclude_article_id=None,
+                    )
+                )
         
             if not claim_candidates:
                 return []
@@ -197,18 +250,17 @@ class RetrievalService(ServiceTemplate):
             classified_evidence = []
             
             for evidence_claim, similarity_score in capped_similarity_step_candidate_list:
+                claim_id = evidence_claim.get("id", "unknown")
                 try:
                     label, confidence = classify_claim_relation(
                         input_claim_text,
                         evidence_claim.get("decontextualised_claim")
                     )
-                    self.logger.debug(f"NLI success: {label} (conf: {confidence:.2f})")
-                except (RuntimeError, ValueError, KeyError) as e:
-                    claim_id = evidence_claim.get("id", "unknown")
-                    self.logger.error(f"NLI failed for claim {claim_id}: {e}")
+                    self.logger.debug(f"NLI claim {claim_id}: {label} (confidence: {confidence:.2f})")
+                except (RuntimeError, ValueError, KeyError, TypeError) as e:
+                    self.logger.error(f"NLI failed for claim {claim_id}: {type(e).__name__}: {e}")
                     label, confidence = "irrelevant", 0.0
                 except Exception as e:
-                    claim_id = evidence_claim.get("id", "unknown")
                     self.logger.error(f"Unexpected NLI error for claim {claim_id}: {type(e).__name__}: {e}")
                     label, confidence = "irrelevant", 0.0
 
@@ -252,7 +304,8 @@ class RetrievalService(ServiceTemplate):
             input_claim_text = input_claim.decontextualised_claim_text
             input_claim_evaluation = self._retrieve_evidence_for_claim(
                 db=db,
-                claim=input_claim
+                claim=input_claim,
+                original_article_id=original_article_id,
             )
             self.logger.debug("EVIDENCE RETRIEVED")
             # if not query_claim_evidence_map[input_claim_text]:
@@ -300,12 +353,26 @@ class RetrievalService(ServiceTemplate):
         try:
             processed_message:StreamMessage = self._process_message(message)
                        
-            payload = processed_message.retrieval_results
+            payload = processed_message.retrieval_results or {}
             
             new_id = "END OF PIPELINE"
             if message.type == JobType.USER:
                 self.hash_store.set(message.uid, payload)
                 new_id = message.uid
+                matches = payload.get("matches") or []
+                related_articles = payload.get("related_articles") or []
+                self.logger.info(
+                    "Stored retrieval result for job_uid=%s:\\n"
+                    "  save_data_result keys: %s\\n"
+                    "  save_job_result keys: %s\\n"
+                    "  matches: %d\\n"
+                    "  related_articles: %d",
+                    message.uid,
+                    list(payload.get("save_data_result", {}).keys()) if payload.get("save_data_result") else [],
+                    list(payload.get("save_job_result", {}).keys()) if payload.get("save_job_result") else [],
+                    len(matches),
+                    len(related_articles)
+                )
 
             if self.is_cut_and_paste_mode:
                 self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
@@ -331,11 +398,25 @@ class RetrievalService(ServiceTemplate):
             try:
                 processed_message = self._process_message(message)
                 
-                payload = processed_message.retrieval_results  
+                payload = processed_message.retrieval_results or {}
                 new_id = "END OF PIPELINE"
                 if message.type == JobType.USER:
                     self.hash_store.set(message.uid, payload)
                     new_id = message.uid
+                    matches = payload.get("matches") or []
+                    related_articles = payload.get("related_articles") or []
+                    self.logger.info(
+                        "Stored retrieval result for job_uid=%s:\n"
+                        "  save_data_result keys: %s\n"
+                        "  save_job_result keys: %s\n"
+                        "  matches: %d\n"
+                        "  related_articles: %d",
+                        message.uid,
+                        list(payload.get("save_data_result", {}).keys()) if payload.get("save_data_result") else [],
+                        list(payload.get("save_job_result", {}).keys()) if payload.get("save_job_result") else [],
+                        len(matches),
+                        len(related_articles)
+                    )
                 
                 if self.is_cut_and_paste_mode:
                     self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)

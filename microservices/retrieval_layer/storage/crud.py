@@ -198,11 +198,21 @@ def finalise_and_complete_job(db: Session, job_dto: UpdateJob):
     if not existing_job:
         raise ValueError("job does not exist! should exist for user jobs")
 
+    # Idempotency guard: skip stages that are already present for this job.
+    existing_stage_names = set(
+        db.execute(
+            select(JobTimestamp.stage_name).where(JobTimestamp.job_id == existing_job.id)
+        ).scalars().all()
+    )
+
     for timestamp in job_dto.stage_timestamps:
+        if timestamp.stage_name in existing_stage_names:
+            continue
+
         jt_to_add = JobTimestamp(
-            job_id = existing_job.id,
-            stage_name = timestamp.stage_name,
-            timestamp = timestamp.wall_time,
+            job_id=existing_job.id,
+            stage_name=timestamp.stage_name,
+            timestamp=timestamp.wall_time,
             # monotonic_timestamp = timestamp.offset_s
         )
         db.add(jt_to_add)

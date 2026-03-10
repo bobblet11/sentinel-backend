@@ -6,6 +6,7 @@ def find_evidence_by_keyword_match(
     db: Session,
     keywords_to_match: list[str],
     limit: int = 50,
+    exclude_article_id: int | None = None,
 ):
     if not keywords_to_match:
         return []
@@ -15,5 +16,9 @@ def find_evidence_by_keyword_match(
         for kw in keywords_to_match
     ]
 
-    stmt = select(Claim).where(or_(*conditions)).limit(limit)
+    stmt = select(Claim).where(or_(*conditions))
+    if exclude_article_id is not None:
+        stmt = stmt.where(Claim.article_id != exclude_article_id)
+
+    stmt = stmt.limit(limit)
     return db.execute(stmt).scalars().all()
