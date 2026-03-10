@@ -24,9 +24,13 @@ DUMMY_NLP_MODE: bool = get_env_var(
     default=False,
 )
 
-EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, "all-MiniLM-L6-v2") 
-NER_MODEL = get_env_var("NLP_NER_MODEL", str, config_logger, "dslim/bert-base-NER") 
-BIAS_MODEL = get_env_var("NLP_BIAS_MODEL", str, config_logger, "facebook/bart-large-mnli") 
+EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, "sentence-transformers/all-MiniLM-L6-v2")
+NER_MODEL = get_env_var("NLP_NER_MODEL", str, config_logger, "dslim/bert-base-NER")
+BIAS_MODEL = get_env_var("NLP_BIAS_MODEL", str, config_logger, "facebook/bart-large-mnli")
+CHECKWORTHY_MODEL = get_env_var("NLP_CHECKWORTHY_MODEL", str, config_logger, "valhalla/distilbart-mnli-12-3")
+CHECKWORTHY_BATCH_SIZE: int = get_env_var("NLP_CHECKWORTHY_BATCH_SIZE", int, config_logger, 16)
+MAX_SENTENCES_FOR_CHECKWORTHY: int = get_env_var("NLP_MAX_SENTENCES_FOR_CHECKWORTHY", int, config_logger, 40)
+NER_MAX_TEXT_CHARS: int = get_env_var("NLP_NER_MAX_TEXT_CHARS", int, config_logger, 3000)
 DEVICE = "cuda" if get_env_var("USE_GPU", str, config_logger, "false").lower() == "true" else "cpu"
 
 input_streams: List[str] = INPUT_STREAMS
@@ -44,6 +48,10 @@ env_variables: List[EnvVariable] = [
     EnvVariable("EMBEDDING_MODEL", EMBEDDING_MODEL), 
     EnvVariable("NER_MODEL", NER_MODEL), 
     EnvVariable("BIAS_MODEL", BIAS_MODEL), 
+    EnvVariable("CHECKWORTHY_MODEL", CHECKWORTHY_MODEL),
+    EnvVariable("CHECKWORTHY_BATCH_SIZE", CHECKWORTHY_BATCH_SIZE),
+    EnvVariable("MAX_SENTENCES_FOR_CHECKWORTHY", MAX_SENTENCES_FOR_CHECKWORTHY),
+    EnvVariable("NER_MAX_TEXT_CHARS", NER_MAX_TEXT_CHARS),
     EnvVariable("DEVICE", DEVICE),
     EnvVariable("DUMMY_NLP_MODE", DUMMY_NLP_MODE),
 ]

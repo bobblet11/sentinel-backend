@@ -6,6 +6,7 @@ from sentence_transformers import SentenceTransformer
 # Local imports
 from microservices.nlp.models.base import NLPComponent
 from common.models.api.redis_models import Article, NLPOptions, NLPResult
+from microservices.nlp.config import EMBEDDING_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class Embedder(NLPComponent):
         Args:
             model: Loaded SentenceTransformer model.
         """
-        self.model_name = "sentence-transformers/all-mpnet-base-v2"
+        self.model_name = EMBEDDING_MODEL
         
         if model:
             self.model = model
