@@ -5,6 +5,11 @@ from typing import Any, List
 # Local imports
 from microservices.nlp.models.base import NLPComponent
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, Claim
+from microservices.nlp.config import (
+    CHECKWORTHY_BATCH_SIZE,
+    CHECKWORTHY_MODEL,
+    MAX_SENTENCES_FOR_CHECKWORTHY,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +41,7 @@ class CheckWorthinessFilter(NLPComponent):
                 
                 self.classifier = pipeline(
                     "zero-shot-classification",
-                    model="facebook/bart-large-mnli",
+                    model=CHECKWORTHY_MODEL,
                     device=device
                 )
                 logger.info(f"CheckWorthinessFilter: Loaded on {'GPU' if device==0 else 'CPU'}.")
@@ -52,24 +57,42 @@ class CheckWorthinessFilter(NLPComponent):
         if not result.sentences:
             return
 
-        logger.info(f"CheckWorthiness: Analyzing {len(result.sentences)} sentences...")
+        sentences = result.sentences
+        candidate_indices = list(range(len(sentences)))
 
-        # Optimize by batching: The pipeline accepts a list of strings
-        texts = [s.text for s in result.sentences]
+        # Bound expensive zero-shot work by selecting top-central sentences first.
+        if len(candidate_indices) > MAX_SENTENCES_FOR_CHECKWORTHY:
+            ranked = sorted(
+                candidate_indices,
+                key=lambda idx: sentences[idx].score if sentences[idx].score is not None else 0.0,
+                reverse=True,
+            )
+            candidate_indices = ranked[:MAX_SENTENCES_FOR_CHECKWORTHY]
+
+        logger.info(
+            "CheckWorthiness: Analyzing %s/%s sentences...",
+            len(candidate_indices),
+            len(sentences),
+        )
+
+        # Run model only on selected candidates.
+        texts = [sentences[i].text for i in candidate_indices]
 
         try:
             # Run Inference (Batch)
             predictions = self.classifier(
-                texts, 
-                self.candidate_labels, 
-                multi_label=False
+                texts,
+                self.candidate_labels,
+                multi_label=False,
+                batch_size=CHECKWORTHY_BATCH_SIZE,
                 # Removed hypothesis_template to use the default "This example is {}." which is often more robust for simple labels.
             )
 
             count = 0
             claims_discovered = []
             
-            for i, pred in enumerate(predictions):
+            for local_idx, pred in enumerate(predictions):
+                i = candidate_indices[local_idx]
                 # pred format: 
                 # {'sequence': '...', 'labels': ['fact', 'opinion'], 'scores': [0.85, 0.15]}
                 

@@ -5,6 +5,7 @@ from transformers import pipeline
 # Local imports
 from microservices.nlp.models.base import NLPComponent
 from common.models.api.redis_models import Article, Entity, NLPOptions, NLPResult
+from microservices.nlp.config import NER_MAX_TEXT_CHARS, NER_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +22,12 @@ class EntityRecognizer(NLPComponent):
         if ner_model:
             self.ner_model = ner_model
         else:
-            logger.info("EntityRecognizer: Loading default model 'dslim/bert-base-NER-uncased'...")
+            logger.info("EntityRecognizer: Loading model '%s'...", NER_MODEL)
             try:
                 # We default to CPU (-1) for safety, but main.py/nlp_service should pass a GPU-loaded model
                 self.ner_model = pipeline(
                     "token-classification", 
-                    model="dslim/bert-base-NER-uncased", 
+                    model=NER_MODEL,
                     aggregation_strategy="simple",
                     device=-1 
                 )
@@ -45,10 +46,8 @@ class EntityRecognizer(NLPComponent):
         if not text:
             return
 
-        # NER models have a token limit (usually 512). 
-        # For a robust solution, we truncate or chunk. 
-        # For this sprint, we truncate to first ~10 paragraphs (approx 5000 chars) to prevent errors.
-        safe_text = text[:5000]
+        # Keep NER bounded on very long articles to prevent long CPU inference.
+        safe_text = text[:NER_MAX_TEXT_CHARS]
 
         try:
             # Run Inference
