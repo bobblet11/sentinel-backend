@@ -24,7 +24,7 @@ SERVICE_NAME="scraper"
 CONTAINER_NAME="web_scraper"
 
 if __name__ == "__main__":
-    setup_logging(level=LOG_MODE,container_name=CONTAINER_NAME)
+    setup_logging(level=logging.INFO, container_name=CONTAINER_NAME)
 
     config = ServiceConfig(
         routing_key=["header","type"],
