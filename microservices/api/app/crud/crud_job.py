@@ -23,8 +23,17 @@ def create_job(db: Session, job_in: JobCreate, article_id: int)->Job:
     return db_obj
 
 
-def get_job(db: Session, job_id: str):
+def get_job(db: Session, job_id: int):
     return db.query(Job).filter(Job.id == job_id).first()
+
+
+def get_latest_job_for_article(db: Session, article_id: int, job_type: str) -> Job | None:
+    return (
+        db.query(Job)
+        .filter(Job.article_id == article_id, Job.type == job_type)
+        .order_by(Job.created_at.desc(), Job.id.desc())
+        .first()
+    )
 
 
 def generate_db_statistics(db: Session):
