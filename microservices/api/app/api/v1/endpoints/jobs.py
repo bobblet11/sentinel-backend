@@ -112,8 +112,8 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
         evidence = [
             {
                 "source": f"Claim #{m['claim_id']}",
-                "url": article.url,  # Use article URL as placeholder
-                "excerpt": m.get("claim_text", "")[:500],  # Limit excerpt to 500 chars
+                "url": m.get("source_url") or "",
+                "excerpt": (m.get("source_excerpt") or m.get("claim_text", ""))[:500],
             }
             for m in claim_matches[:3]  # Limit to top 3 evidence items
         ]
