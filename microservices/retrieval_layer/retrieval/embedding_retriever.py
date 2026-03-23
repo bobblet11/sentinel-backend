@@ -42,7 +42,6 @@ def retrieve_by_embedding(
             Claim.decontextualised_claim,
             Claim.article_id,
             Article.url,
-            Article.text,
             distance_expr.label("distance"),
         )
         .join(Article, Article.id == Claim.article_id)
@@ -62,8 +61,8 @@ def retrieve_by_embedding(
     processed = []
     for row in results:
         similarity = 1.0 - row.distance
-        raw_text = row.text or ""
-        source_excerpt = raw_text[:300] + ("..." if len(raw_text) > 300 else "")
+        claim_excerpt = row.decontextualised_claim or ""
+        source_excerpt = claim_excerpt[:300] + ("..." if len(claim_excerpt) > 300 else "")
         claim_dict = {
             "id": row.id,
             "decontextualised_claim": row.decontextualised_claim,
