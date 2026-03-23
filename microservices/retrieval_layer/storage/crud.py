@@ -195,11 +195,14 @@ def finalise_and_complete_job(db: Session, job_dto: UpdateJob):
     if not job_dto.job_id or not job_dto.job_uid:
         raise ValueError("job must include id and uid")
     
-    query_to_find_job = select(Job).where(Job.uid == job_dto.job_uid)
+    query_to_find_job = select(Job).where(Job.id == job_dto.job_id, Job.uid == job_dto.job_uid)
     existing_job = db.execute(query_to_find_job).scalar_one_or_none()
 
     if not existing_job:
         raise ValueError("job does not exist! should exist for user jobs")
+
+    # Persist status transition (e.g. pending -> complete) once retrieval finalizes.
+    existing_job.status = str(job_dto.status)
 
     # Idempotency guard: skip stages that are already present for this job.
     existing_stage_names = set(
