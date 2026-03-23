@@ -223,7 +223,12 @@ class RetrievalService(ServiceTemplate):
                 self.logger.warning("Skipping similarity step due to invalid claim embedding for claim=%r", (input_claim_text or "")[:80])
                 return []
 
-            best_ranked_similarity_evidence = retrieve_by_embedding(db, claim_text_embedding, capped_filter_step_candidate_ids)
+            best_ranked_similarity_evidence = retrieve_by_embedding(
+                db,
+                claim_text_embedding,
+                capped_filter_step_candidate_ids,
+                exclude_article_id=original_article_id,
+            )
 
             best_ranked_similarity_evidence = [
                 (claim_dict, similarity)
@@ -266,12 +271,16 @@ class RetrievalService(ServiceTemplate):
             {
                 "claim_id": int(claim_dict.get("id")),
                 "claim_text": claim_dict.get("decontextualised_claim"),
+                "source_article_id": claim_dict.get("article_id"),
+                "source_url": claim_dict.get("source_url"),
+                "source_excerpt": claim_dict.get("source_excerpt"),
                 "similarity": float(similarity),
                 "relation": classifcation_label,
                 "confidence": confidence,
                 "query_claim": input_claim_text,
             }
             for claim_dict, similarity, classifcation_label, confidence in classification_step(similarity_step(filter_step()))
+            if claim_dict.get("article_id") != original_article_id
         ]
         
         total_verdict, total_confidence_score = self._calculate_verdict_and_confidence(evidence_matches)
