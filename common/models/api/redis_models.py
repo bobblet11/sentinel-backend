@@ -276,7 +276,8 @@ class StreamMessage:
                 "save_data_result" : self.data.payload.save_data_result,
                 "save_job_result": self.data.payload.save_job_result,
                 "matches": self.data.payload.matches,
-                "related_articles": self.data.payload.related_articles
+            "related_articles": self.data.payload.related_articles,
+            "bias_profile": asdict(self.data.payload.bias_profile) if self.data.payload.bias_profile else None,
         }
         
         return result

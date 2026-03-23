@@ -23,6 +23,46 @@ result_hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
 logger = logging.getLogger(__name__)
 
 
+def _build_bias_analysis(bias_profile: Dict[str, Any] | None) -> Dict[str, Any]:
+    if not bias_profile:
+        return {
+            "overallBias": "center",
+            "biasScore": 0,
+            "confidence": 0,
+            "sentiment": "neutral",
+            "indicators": {
+                "language": "No bias profile available",
+                "sources": "No source bias signal available",
+                "framing": "No framing signal available",
+            },
+        }
+
+    bias_category = str(bias_profile.get("bias_category") or "center").lower()
+    sentiment_category = str(bias_profile.get("sentiment_category") or "neutral").lower()
+
+    bias_score_01 = float(bias_profile.get("bias_score") or 0.0)
+    confidence_01 = float(bias_profile.get("bias_analysis_confidence") or 0.0)
+
+    # Frontend schema expects percentage-like ints.
+    # Preserve tiny but non-zero signals (e.g. 0.001 -> 1 instead of 0).
+    bias_score_pct = max(0.0, min(1.0, bias_score_01)) * 100
+    confidence_pct = max(0.0, min(1.0, confidence_01)) * 100
+    bias_score = 1 if 0.0 < bias_score_pct < 1.0 else int(round(bias_score_pct))
+    confidence = 1 if 0.0 < confidence_pct < 1.0 else int(round(confidence_pct))
+
+    return {
+        "overallBias": bias_category,
+        "biasScore": bias_score,
+        "confidence": confidence,
+        "sentiment": sentiment_category,
+        "indicators": {
+            "language": f"Detected {sentiment_category} language tone",
+            "sources": "Bias category derived from article-level NLP classifier",
+            "framing": f"Overall framing classified as {bias_category}",
+        },
+    }
+
+
 
 def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -91,19 +131,7 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
     confidences = [m.get("confidence", 0) for m in matches_list]
     trust_score = int(sum(confidences) / len(confidences)) if confidences else 0
     
-    # Build biasAnalysis from article sentiment if available
-    # For now, provide placeholder values (in production, would fetch from sentiment_analysis table)
-    bias_analysis = {
-        "overallBias": "PLACEHOLD_center",  # Placeholder
-        "biasScore": 0,  # Placeholder (-100 to +100)
-        "confidence": 50,  # Placeholder
-        "sentiment": "PLACEHOLD_neutral",  # Placeholder
-        "indicators": {
-            "language": "PLACEHOLD_Neutral language detected",
-            "sources": "PLACEHOLD_Multiple sources cited",
-            "framing": "PLACEHOLD_Balanced presentation",
-        },
-    }
+    bias_analysis = _build_bias_analysis(retrieval_result.get("bias_profile"))
     
     # Extract related articles from retrieval result
     related_articles = retrieval_result.get("related_articles", [])
@@ -192,6 +220,7 @@ async def get_retrieval_result(job_uid: UUID, timeout: int = Query(30, ge=5, le=
                     "save_job_result": result.get("save_job_result") or {},
                     "matches": result.get("matches") or [],
                     "related_articles": result.get("related_articles") or [],
+                    "bias_profile": result.get("bias_profile") or {},
                 }
                 logger.debug(
                     "Retrieved hash payload for job_uid=%s keys=%s matches=%d related_articles=%d",
