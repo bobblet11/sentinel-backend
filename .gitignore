@@ -17,3 +17,6 @@ data/redis_data
 
 # HuggingFace model cache
 **/.cache/
+
+# Claude Code config
+.claude/

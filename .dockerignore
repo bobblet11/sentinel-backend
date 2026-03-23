@@ -23,3 +23,6 @@ logs/
 .venv
 logs
 screenshots
+
+# Claude Code config
+.claude/

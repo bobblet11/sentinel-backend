@@ -1,0 +1,126 @@
+{
+  "schema_version": "1.0.0",
+  "generated_on": "2026-03-13",
+  "models": [
+    {
+      "key": "NLP_NER_MODEL",
+      "provider": "huggingface",
+      "model_id": "dslim/bert-base-NER-uncased",
+      "task": "token-classification",
+      "source": "microservices/nlp/config.py",
+      "local_path_hint": "huggingface/hub/models--dslim--bert-base-NER-uncased",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "NLP_EMBEDDING_MODEL",
+      "provider": "huggingface",
+      "model_id": "sentence-transformers/all-mpnet-base-v2",
+      "task": "sentence-embeddings",
+      "source": "microservices/nlp/config.py",
+      "local_path_hint": "huggingface/hub/models--sentence-transformers--all-mpnet-base-v2",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "NLP_BERT_SCORING_MODEL",
+      "provider": "huggingface",
+      "model_id": "bert-base-uncased",
+      "task": "sentence-salience",
+      "source": "microservices/nlp/config.py",
+      "local_path_hint": "huggingface/hub/models--bert-base-uncased",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "NLP_NLI_MODEL",
+      "provider": "huggingface",
+      "model_id": "cross-encoder/nli-distilroberta-base",
+      "task": "nli-deduplication",
+      "source": "microservices/nlp/config.py",
+      "local_path_hint": "huggingface/hub/models--cross-encoder--nli-distilroberta-base",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "NLP_QG_MODEL",
+      "provider": "huggingface",
+      "model_id": "mrm8488/t5-base-finetuned-question-generation-ap",
+      "task": "question-generation",
+      "source": "microservices/nlp/config.py",
+      "local_path_hint": "huggingface/hub/models--mrm8488--t5-base-finetuned-question-generation-ap",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "NLP_QA_MODEL",
+      "provider": "huggingface",
+      "model_id": "deepset/roberta-base-squad2",
+      "task": "extractive-qa",
+      "source": "microservices/nlp/config.py",
+      "local_path_hint": "huggingface/hub/models--deepset--roberta-base-squad2",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "NLP_GEN_MODEL",
+      "provider": "huggingface",
+      "model_id": "google/flan-t5-base",
+      "task": "seq2seq-rewrite",
+      "source": "microservices/nlp/config.py",
+      "local_path_hint": "huggingface/hub/models--google--flan-t5-base",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "NLP_BIAS_POLITICAL_MODEL",
+      "provider": "huggingface",
+      "model_id": "typeform/distilbert-base-uncased-mnli",
+      "task": "zero-shot-classification",
+      "source": "microservices/nlp/config.py",
+      "local_path_hint": "huggingface/hub/models--typeform--distilbert-base-uncased-mnli",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "NLP_BIAS_SENTIMENT_MODEL",
+      "provider": "huggingface",
+      "model_id": "cardiffnlp/twitter-roberta-base-sentiment-latest",
+      "task": "sentiment-analysis",
+      "source": "microservices/nlp/config.py",
+      "local_path_hint": "huggingface/hub/models--cardiffnlp--twitter-roberta-base-sentiment-latest",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "NLP_CW_NLI_MODEL",
+      "provider": "huggingface",
+      "model_id": "typeform/distilbert-base-uncased-mnli",
+      "task": "checkworthy-zero-shot",
+      "source": "microservices/nlp/config.py",
+      "local_path_hint": "huggingface/hub/models--typeform--distilbert-base-uncased-mnli",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "RETRIEVAL_NLI_MODEL",
+      "provider": "huggingface",
+      "model_id": "typeform/distilbert-base-uncased-mnli",
+      "task": "claim-relation",
+      "source": "microservices/retrieval_layer/retrieval/nli.py",
+      "local_path_hint": "huggingface/hub/models--typeform--distilbert-base-uncased-mnli",
+      "revision": null,
+      "mutable": false
+    },
+    {
+      "key": "NLP_SPACY_EN_CORE_WEB_SM",
+      "provider": "spacy",
+      "model_id": "en_core_web_sm",
+      "task": "tokenization-pos-ner",
+      "source": "microservices/nlp/components/*.py",
+      "local_path_hint": "spacy/en_core_web_sm",
+      "revision": null,
+      "mutable": false
+    }
+  ]
+}
