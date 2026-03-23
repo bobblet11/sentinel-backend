@@ -37,3 +37,7 @@ def create_article(db: Session, job_in: JobCreate)->Article:
     logger.info(f"Prepared article for creation: {db_obj}")
     return db_obj
 
+
+def get_article_by_url(db: Session, article_url: str) -> Article | None:
+    return db.query(Article).filter(Article.url == article_url).first()
+
