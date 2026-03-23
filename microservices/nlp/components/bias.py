@@ -3,7 +3,12 @@ from typing import Any, Dict, List
 
 from microservices.nlp.models.base import NLPComponent
 from common.models.api.redis_models import Article, BiasProfile, NLPOptions, NLPResult
-from microservices.nlp.config import BIAS_MODEL
+from microservices.nlp.config import (
+    BIAS_MODEL,
+    BIAS_MAX_ARTICLE_TEXT_CHARS,
+    BIAS_MAX_SENTENCES_TO_CLASSIFY,
+    BIAS_MAX_SENTENCE_TEXT_CHARS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +25,9 @@ class BiasDetector(NLPComponent):
     """
     POLITICAL_LABELS: List[str] = ["left", "center", "right"]
     SENTIMENT_LABELS: List[str] = ["positive", "neutral", "negative"]
-    MAX_ARTICLE_TEXT_CHARS: int = 6000
-    MAX_SENTENCES_TO_CLASSIFY: int = 30
+    MAX_ARTICLE_TEXT_CHARS: int = max(500, BIAS_MAX_ARTICLE_TEXT_CHARS)
+    MAX_SENTENCES_TO_CLASSIFY: int = max(0, BIAS_MAX_SENTENCES_TO_CLASSIFY)
+    MAX_SENTENCE_TEXT_CHARS: int = max(80, BIAS_MAX_SENTENCE_TEXT_CHARS)
     TEXT_CLASSIFICATION_MAX_CHARS: int = 2000
 
     def __init__(self, model: Any = None):
@@ -143,7 +149,7 @@ class BiasDetector(NLPComponent):
         return ""
 
     def _annotate_sentences(self, sentences) -> None:
-        if not sentences or not self.model:
+        if not sentences or not self.model or self.MAX_SENTENCES_TO_CLASSIFY <= 0:
             return
 
         ranked = sorted(
@@ -154,7 +160,7 @@ class BiasDetector(NLPComponent):
         selected = ranked[: self.MAX_SENTENCES_TO_CLASSIFY]
 
         for sentence in selected:
-            text = (sentence.text or "").strip()
+            text = (sentence.text or "").strip()[: self.MAX_SENTENCE_TEXT_CHARS]
             if not text:
                 continue
 
@@ -210,16 +216,22 @@ class BiasDetector(NLPComponent):
 
         try:
             if self.model_mode == "zero-shot":
-                political_scores = self._classify(
+                combined_scores = self._classify(
                     text,
-                    self.POLITICAL_LABELS,
-                    "The political leaning of this text is {}.",
+                    self.POLITICAL_LABELS + self.SENTIMENT_LABELS,
+                    "This text is {}.",
                 )
-                sentiment_scores = self._classify(
-                    text,
-                    self.SENTIMENT_LABELS,
-                    "The sentiment of this text is {}.",
-                )
+
+                political_scores = {
+                    label: score
+                    for label, score in combined_scores.items()
+                    if label in self.POLITICAL_LABELS
+                }
+                sentiment_scores = {
+                    label: score
+                    for label, score in combined_scores.items()
+                    if label in self.SENTIMENT_LABELS
+                }
 
                 if not political_scores or not sentiment_scores:
                     result.bias_profile = self._neutral_profile()
@@ -260,6 +272,9 @@ class BiasDetector(NLPComponent):
                 return
 
             self._annotate_sentences(result.sentences)
+
+            if self.MAX_SENTENCES_TO_CLASSIFY <= 0:
+                logger.debug("BiasDetector: sentence-level bias annotation disabled for fast mode.")
 
             logger.info(
                 "BiasDetector: bias=%s (conf=%.3f) sentiment=%s (conf=%.3f)",

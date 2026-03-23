@@ -27,6 +27,9 @@ DUMMY_NLP_MODE: bool = get_env_var(
 EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, "sentence-transformers/all-MiniLM-L6-v2")
 NER_MODEL = get_env_var("NLP_NER_MODEL", str, config_logger, "dslim/bert-base-NER")
 BIAS_MODEL = get_env_var("NLP_BIAS_MODEL", str, config_logger, "facebook/bart-large-mnli")
+BIAS_MAX_ARTICLE_TEXT_CHARS: int = get_env_var("NLP_BIAS_MAX_ARTICLE_TEXT_CHARS", int, config_logger, 3000)
+BIAS_MAX_SENTENCES_TO_CLASSIFY: int = get_env_var("NLP_BIAS_MAX_SENTENCES_TO_CLASSIFY", int, config_logger, 0)
+BIAS_MAX_SENTENCE_TEXT_CHARS: int = get_env_var("NLP_BIAS_MAX_SENTENCE_TEXT_CHARS", int, config_logger, 220)
 CHECKWORTHY_MODEL = get_env_var("NLP_CHECKWORTHY_MODEL", str, config_logger, "valhalla/distilbart-mnli-12-3")
 CHECKWORTHY_BATCH_SIZE: int = get_env_var("NLP_CHECKWORTHY_BATCH_SIZE", int, config_logger, 16)
 MAX_SENTENCES_FOR_CHECKWORTHY: int = get_env_var("NLP_MAX_SENTENCES_FOR_CHECKWORTHY", int, config_logger, 40)
@@ -48,6 +51,9 @@ env_variables: List[EnvVariable] = [
     EnvVariable("EMBEDDING_MODEL", EMBEDDING_MODEL), 
     EnvVariable("NER_MODEL", NER_MODEL), 
     EnvVariable("BIAS_MODEL", BIAS_MODEL), 
+    EnvVariable("BIAS_MAX_ARTICLE_TEXT_CHARS", BIAS_MAX_ARTICLE_TEXT_CHARS),
+    EnvVariable("BIAS_MAX_SENTENCES_TO_CLASSIFY", BIAS_MAX_SENTENCES_TO_CLASSIFY),
+    EnvVariable("BIAS_MAX_SENTENCE_TEXT_CHARS", BIAS_MAX_SENTENCE_TEXT_CHARS),
     EnvVariable("CHECKWORTHY_MODEL", CHECKWORTHY_MODEL),
     EnvVariable("CHECKWORTHY_BATCH_SIZE", CHECKWORTHY_BATCH_SIZE),
     EnvVariable("MAX_SENTENCES_FOR_CHECKWORTHY", MAX_SENTENCES_FOR_CHECKWORTHY),
