@@ -177,7 +177,7 @@ class RetrievalService(ServiceTemplate):
         
     def _retrieve_evidence_for_claim(self, db: Session, claim: Claim, original_article_id: int) -> Dict[str, Any]:
         self.logger.debug("=== FINDING EVIDENCE ===\n")
-        input_claim_text = claim.decontextualised_claim_text
+        input_claim_text = claim.decontextualised_claim_text or claim.contextualised_claim_text or ""
         claim_candidates = set()
         
         def filter_step() -> List[int | str]:
@@ -207,29 +207,6 @@ class RetrievalService(ServiceTemplate):
                 exclude_article_id=original_article_id,
             )
             claim_candidates.update(entity_candidates)
-
-            # Sparse-corpus fallback: when DB has only this article (e.g. fresh env),
-            # allow same-article candidates so retrieval still produces evidence.
-            if not claim_candidates:
-                self.logger.info(
-                    "No cross-article candidates for claim; retrying filter without article exclusion."
-                )
-                claim_candidates.update(
-                    find_evidence_by_keyword_match(
-                        db,
-                        key_words_to_match,
-                        20,
-                        exclude_article_id=None,
-                    )
-                )
-                claim_candidates.update(
-                    find_evidence_by_entity_match(
-                        db,
-                        entities_in_claim,
-                        50,
-                        exclude_article_id=None,
-                    )
-                )
         
             if not claim_candidates:
                 return []
@@ -312,24 +289,21 @@ class RetrievalService(ServiceTemplate):
         return claim_evidence_results
     
     def _retrieve_evidence(self, db:Session, message:StreamMessage, original_article_id: int):
-        # evaluate each input claim to get evidence matches, verdict, and confidence
-        query_claim_evidence_map:Dict[str, List[Dict]] = {}
+        # Evaluate each input claim to get evidence matches, verdict, and confidence.
+        # Keep one output row per input claim (do not merge by claim text).
+        claim_results: List[Dict[str, Any]] = []
         evidence_claim_ids = []
-        
-        for input_claim in message.all_claims:
-            input_claim_text = input_claim.decontextualised_claim_text
+
+        for input_claim in (message.all_claims or []):
             input_claim_evaluation = self._retrieve_evidence_for_claim(
                 db=db,
                 claim=input_claim,
                 original_article_id=original_article_id,
             )
             self.logger.debug("EVIDENCE RETRIEVED")
-            # if not query_claim_evidence_map[input_claim_text]:
-            if input_claim_text not in query_claim_evidence_map:
-                query_claim_evidence_map[input_claim_text] = input_claim_evaluation
-            else:
-                query_claim_evidence_map[input_claim_text].extend(input_claim_evaluation)
-            
+
+            claim_results.append(input_claim_evaluation)
+
             evidence_claim_ids.extend([evidence_claim.get("claim_id") for evidence_claim in input_claim_evaluation.get("matches", [])])
         
         # Extend evidence claims into articles
@@ -346,8 +320,8 @@ class RetrievalService(ServiceTemplate):
             message.header.uid,
             len(evidence_claim_ids),
         )
-        
-        return list(query_claim_evidence_map.values()), related_articles
+
+        return claim_results, related_articles
     
     def _save_job_into_postgres(self, db:Session, message:StreamMessage):
         job_dto = UpdateJob(message.header.id, message.header.uid, JobStatus.COMPLETE, message.stage_timestamps)

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import distinct, select
@@ -187,7 +187,8 @@ def extend_evidence_claims_into_articles(db: Session, claim_ids: List[int], curr
             excerpt = article_excerpt
         )
         
-        related.append(evidence)    
+        # Hash store serialization expects JSON-serializable values.
+        related.append(asdict(evidence))
     return related
 
 def finalise_and_complete_job(db: Session, job_dto: UpdateJob):
