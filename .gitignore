@@ -16,7 +16,9 @@ data/postgres_data
 data/redis_data
 ./backups/*
 backups
+.cache
 
 CLAUDE.md
 .claude
 claude_docs
+.github
