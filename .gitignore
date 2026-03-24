@@ -16,3 +16,7 @@ data/postgres_data
 data/redis_data
 ./backups/*
 backups
+
+CLAUDE.md
+.claude
+claude_docs

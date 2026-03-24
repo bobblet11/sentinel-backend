@@ -63,3 +63,9 @@ env_variables: List[EnvVariable] = [
 ]
 
 print_env(Config(env_variables, input_streams, output_streams), config_logger)
+
+from common.model_manager.manager import ModelManager
+
+# Centralized model manager instance — models are registered but not yet loaded
+model_manager = ModelManager(device=DEVICE, dummy_mode=DUMMY_NLP_MODE)
+model_manager.register_defaults()

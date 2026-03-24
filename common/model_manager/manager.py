@@ -1,0 +1,314 @@
+import logging
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List, Optional
+
+from common.model_manager.exceptions import (
+    ModelLoadError,
+    ModelNotFoundError,
+    ModelNotReadyError,
+)
+from common.model_manager.registry import DevicePolicy, ModelEntry, ModelState
+
+logger = logging.getLogger(__name__)
+
+
+class ModelManager:
+    """
+    Centralized model lifecycle manager for the NLP pipeline.
+
+    Handles registration, loading (sequential on GPU / parallel on CPU),
+    retrieval with blocking during loading, health reporting, and cleanup.
+    """
+
+    def __init__(self, device: str = "cpu", dummy_mode: bool = False) -> None:
+        self._device = device
+        self._dummy_mode = dummy_mode
+        self._registry: Dict[str, ModelEntry] = {}
+        self._events: Dict[str, threading.Event] = {}
+
+    # ------------------------------------------------------------------
+    # Registration
+    # ------------------------------------------------------------------
+
+    def register(self, entry: ModelEntry) -> None:
+        """Add a ModelEntry to the internal registry."""
+        self._registry[entry.key] = entry
+        self._events[entry.key] = threading.Event()
+
+    def register_defaults(self) -> None:
+        """Register all 7 default NLP models."""
+        defaults = [
+            ModelEntry(
+                key="SPACY_SENT",
+                model_name="en_core_web_sm",
+                task_type="spacy_nlp",
+                owner_component="Preprocessor",
+                loader="spacy",
+                device_policy=DevicePolicy.CPU_ONLY,
+                loader_kwargs={"disable": ["ner", "lemmatizer"]},
+                required=True,
+                estimated_memory_mb=50,
+            ),
+            ModelEntry(
+                key="EMBEDDING",
+                model_name=os.environ.get(
+                    "NLP_EMBEDDING_MODEL",
+                    "sentence-transformers/all-MiniLM-L6-v2",
+                ),
+                task_type="sentence_embedding",
+                owner_component="Embedder",
+                loader="sentence_transformer",
+                device_policy=DevicePolicy.PREFER_GPU,
+                required=True,
+                estimated_memory_mb=90,
+            ),
+            ModelEntry(
+                key="BIAS",
+                model_name=os.environ.get(
+                    "NLP_BIAS_MODEL",
+                    "facebook/bart-large-mnli",
+                ),
+                task_type="zero_shot_or_text_classification",
+                owner_component="BiasDetector",
+                loader="transformers_pipeline",
+                device_policy=DevicePolicy.PREFER_GPU,
+                required=False,
+                estimated_memory_mb=1600,
+            ),
+            ModelEntry(
+                key="NER",
+                model_name=os.environ.get(
+                    "NLP_NER_MODEL",
+                    "dslim/bert-base-NER",
+                ),
+                task_type="token_classification",
+                owner_component="EntityRecognizer",
+                loader="transformers_pipeline",
+                device_policy=DevicePolicy.PREFER_GPU,
+                loader_kwargs={"aggregation_strategy": "simple"},
+                required=True,
+                estimated_memory_mb=420,
+            ),
+            ModelEntry(
+                key="CHECKWORTHY",
+                model_name=os.environ.get(
+                    "NLP_CHECKWORTHY_MODEL",
+                    "valhalla/distilbart-mnli-12-3",
+                ),
+                task_type="zero_shot_classification",
+                owner_component="CheckWorthinessFilter",
+                loader="transformers_pipeline",
+                device_policy=DevicePolicy.PREFER_GPU,
+                required=True,
+                estimated_memory_mb=600,
+            ),
+            ModelEntry(
+                key="DECONTEXT_MODEL",
+                model_name="google/flan-t5-base",
+                task_type="seq2seq_generation",
+                owner_component="Decontextualizer",
+                loader="auto_model_seq2seq",
+                device_policy=DevicePolicy.PREFER_GPU,
+                required=False,
+                estimated_memory_mb=950,
+            ),
+            ModelEntry(
+                key="DECONTEXT_TOKENIZER",
+                model_name="google/flan-t5-base",
+                task_type="tokenizer",
+                owner_component="Decontextualizer",
+                loader="auto_tokenizer",
+                device_policy=DevicePolicy.CPU_ONLY,
+                required=False,
+                estimated_memory_mb=10,
+            ),
+        ]
+        for entry in defaults:
+            self.register(entry)
+
+    # ------------------------------------------------------------------
+    # Loading
+    # ------------------------------------------------------------------
+
+    def load(self, key: str) -> None:
+        """Load a single model by key. Transitions: UNLOADED -> LOADING -> READY/ERROR."""
+        if key not in self._registry:
+            raise ModelNotFoundError(f"Model key '{key}' is not registered.")
+
+        entry = self._registry[key]
+        entry.state = ModelState.LOADING
+        # Clear the event so get() will block until loading completes.
+        self._events[key].clear()
+
+        try:
+            instance = self._load_model(entry)
+            entry.instance = instance
+            entry.state = ModelState.READY
+            logger.info("ModelManager: '%s' loaded successfully (%s).", key, entry.loader)
+        except Exception as exc:
+            entry.error = exc
+            entry.state = ModelState.ERROR
+            logger.error("ModelManager: Failed to load '%s': %s", key, exc)
+        finally:
+            # Always set the event so blocked get() calls can proceed.
+            self._events[key].set()
+
+    def load_all(self, keys: Optional[List[str]] = None) -> None:
+        """Load all (or specified) models. Sequential on GPU, parallel on CPU."""
+        if self._dummy_mode:
+            logger.info("ModelManager: dummy mode — skipping all model loading.")
+            return
+
+        entries = [self._registry[k] for k in (keys or list(self._registry.keys()))]
+
+        if self._device == "cuda":
+            # Sequential on GPU to avoid OOM — load smallest first.
+            for entry in sorted(entries, key=lambda e: e.estimated_memory_mb):
+                self.load(entry.key)
+        else:
+            # Parallel on CPU.
+            max_workers = min(4, len(entries)) if entries else 1
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                futures = {pool.submit(self.load, e.key): e.key for e in entries}
+                for future in as_completed(futures):
+                    key = futures[future]
+                    try:
+                        future.result()
+                    except Exception as exc:
+                        logger.error(
+                            "ModelManager: Unhandled error loading '%s': %s", key, exc
+                        )
+
+    # ------------------------------------------------------------------
+    # Retrieval
+    # ------------------------------------------------------------------
+
+    def get(self, key: str) -> Any:
+        """
+        Return the loaded model instance for key.
+
+        Blocks if the model is currently loading.
+        Raises ModelLoadError if in ERROR state.
+        Raises ModelNotReadyError if UNLOADED.
+        Raises ModelNotFoundError if not registered.
+        """
+        if key not in self._registry:
+            raise ModelNotFoundError(f"Model key '{key}' is not registered.")
+
+        entry = self._registry[key]
+
+        if entry.state == ModelState.LOADING:
+            logger.debug("ModelManager: '%s' is loading — blocking until ready.", key)
+            self._events[key].wait()
+
+        if entry.state == ModelState.READY:
+            return entry.instance
+
+        if entry.state == ModelState.ERROR:
+            raise ModelLoadError(
+                f"Model '{key}' failed to load: {entry.error}"
+            ) from entry.error
+
+        # UNLOADED
+        raise ModelNotReadyError(
+            f"Model '{key}' has not been loaded yet. Call load() or load_all() first."
+        )
+
+    def get_state(self, key: str) -> ModelState:
+        """Return the current ModelState for the given key."""
+        if key not in self._registry:
+            raise ModelNotFoundError(f"Model key '{key}' is not registered.")
+        return self._registry[key].state
+
+    # ------------------------------------------------------------------
+    # Health / Cleanup
+    # ------------------------------------------------------------------
+
+    def health_check(self) -> Dict[str, str]:
+        """Return {key: state.value} for all registered models."""
+        return {key: entry.state.value for key, entry in self._registry.items()}
+
+    def unload(self, key: str) -> None:
+        """Unload a model and free its instance reference."""
+        if key not in self._registry:
+            raise ModelNotFoundError(f"Model key '{key}' is not registered.")
+        entry = self._registry[key]
+        entry.instance = None
+        entry.state = ModelState.UNLOADED
+        self._events[key].clear()
+        logger.info("ModelManager: '%s' unloaded.", key)
+
+    def unload_all(self) -> None:
+        """Unload all registered models."""
+        for key in list(self._registry.keys()):
+            self.unload(key)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _resolve_device(self, policy: DevicePolicy) -> str:
+        if policy == DevicePolicy.CPU_ONLY:
+            return "cpu"
+        # PREFER_GPU and GPU_REQUIRED both defer to the instance device.
+        return self._device
+
+    def _resolve_hf_task(self, entry: ModelEntry) -> str:
+        """Map a ModelEntry's task_type to the HuggingFace pipeline task string."""
+        if entry.key == "BIAS":
+            if "mnli" in entry.model_name.lower():
+                return "zero-shot-classification"
+            else:
+                entry.loader_kwargs["return_all_scores"] = True
+                return "text-classification"
+
+        if entry.task_type == "zero_shot_classification":
+            return "zero-shot-classification"
+
+        if entry.task_type == "token_classification":
+            return "token-classification"
+
+        return entry.task_type
+
+    def _load_model(self, entry: ModelEntry) -> Any:
+        """Dispatch to the appropriate loader based on entry.loader."""
+        device = self._resolve_device(entry.device_policy)
+
+        if entry.loader == "spacy":
+            import spacy
+
+            return spacy.load(entry.model_name, **entry.loader_kwargs)
+
+        elif entry.loader == "sentence_transformer":
+            from sentence_transformers import SentenceTransformer
+
+            return SentenceTransformer(entry.model_name, device=device)
+
+        elif entry.loader == "transformers_pipeline":
+            from transformers import pipeline
+
+            hf_device = 0 if device == "cuda" else -1
+            task = self._resolve_hf_task(entry)
+            return pipeline(
+                task, model=entry.model_name, device=hf_device, **entry.loader_kwargs
+            )
+
+        elif entry.loader == "auto_model_seq2seq":
+            from transformers import AutoModelForSeq2SeqLM
+
+            model = AutoModelForSeq2SeqLM.from_pretrained(entry.model_name)
+            if device == "cuda":
+                model = model.to("cuda")
+            return model
+
+        elif entry.loader == "auto_tokenizer":
+            from transformers import AutoTokenizer
+
+            return AutoTokenizer.from_pretrained(entry.model_name)
+
+        else:
+            raise ValueError(
+                f"Unknown loader type '{entry.loader}' for model key '{entry.key}'."
+            )

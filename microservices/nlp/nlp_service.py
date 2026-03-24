@@ -23,7 +23,7 @@ from microservices.nlp.components.embedder import Embedder
 from microservices.nlp.components.bias import BiasDetector
 from microservices.nlp.components.ner import EntityRecognizer
 from microservices.nlp.components.checkworthy import CheckWorthinessFilter
-from microservices.nlp.config import DUMMY_NLP_MODE
+from microservices.nlp.config import DUMMY_NLP_MODE, model_manager
 
 logger = getLogger("NLP")
 EMBEDDING_DIM = 768
@@ -82,15 +82,19 @@ class NLPService(ServiceTemplate):
             logger.info("DUMMY_NLP_MODE enabled - skipping model loading")
             self.pipeline: List[NLPComponent] = []
         else:
-            # Define the execution order of the pipeline
+            # Load all models (sequential on GPU, parallel on CPU)
+            model_manager.load_all()
+
+            # Components now fetch pre-loaded models from the manager
             self.pipeline: List[NLPComponent] = [
                 Preprocessor(),
                 Embedder(),
                 CentralityScorer(),
                 BiasDetector(),
                 EntityRecognizer(),
-                CheckWorthinessFilter()
+                CheckWorthinessFilter(),
             ]
+            logger.info("Model health: %s", model_manager.health_check())
     
     
     def _analyze_html_and_update(self, message: StreamMessage) -> StreamMessage:

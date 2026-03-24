@@ -1,5 +1,4 @@
 import logging
-import spacy
 import re
 from typing import List
 
@@ -19,15 +18,13 @@ class Preprocessor(NLPComponent):
     3. Linguistic Filtering: Uses Spacy's POS tagger to remove short lines (< 7 tokens) 
        that look like sentences but lack verbs (e.g., "Politics", "Frank Gardner").
     """
-    def __init__(self):
-        logger.info("Preprocessor: Loading Spacy 'en_core_web_sm' model...")
-        try:
-            # CRITICAL CHANGE: We REMOVED 'tagger' and 'attribute_ruler' from the disable list.
-            # We need them enabled so Spacy can identify Verbs vs Nouns.
-            self.nlp = spacy.load("en_core_web_sm", disable=["ner", "lemmatizer"])
-        except OSError:
-            logger.error("Spacy model not found. Run: python -m spacy download en_core_web_sm")
-            raise
+    def __init__(self, nlp=None):
+        if nlp:
+            self.nlp = nlp
+        else:
+            from microservices.nlp.config import model_manager
+
+            self.nlp = model_manager.get("SPACY_SENT")
 
     def _clean_and_repair_structure(self, raw_text: str) -> str:
         """

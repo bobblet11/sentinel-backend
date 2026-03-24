@@ -4,7 +4,6 @@ from typing import Any, Dict, List
 from microservices.nlp.models.base import NLPComponent
 from common.models.api.redis_models import Article, BiasProfile, NLPOptions, NLPResult
 from microservices.nlp.config import (
-    BIAS_MODEL,
     BIAS_MAX_ARTICLE_TEXT_CHARS,
     BIAS_MAX_SENTENCES_TO_CLASSIFY,
     BIAS_MAX_SENTENCE_TEXT_CHARS,
@@ -35,42 +34,15 @@ class BiasDetector(NLPComponent):
         Args:
             model: Optional injected zero-shot classification pipeline.
         """
-        self.model = model
-        self.model_mode = "unknown"
+        if model is None:
+            from microservices.nlp.config import model_manager, BIAS_MODEL as _BIAS_MODEL
 
-        if self.model is None:
-            logger.info("BiasDetector: Loading model '%s'...", BIAS_MODEL)
-            try:
-                torch_module = __import__("torch")
-                transformers_module = __import__("transformers", fromlist=["pipeline"])
-                hf_pipeline = getattr(transformers_module, "pipeline")
-
-                device = 0 if torch_module.cuda.is_available() else -1
-                model_name = str(BIAS_MODEL).lower()
-
-                # For non-MNLI models (e.g. toxic-bert), use text-classification.
-                if "mnli" in model_name:
-                    self.model = hf_pipeline(
-                        "zero-shot-classification",
-                        model=BIAS_MODEL,
-                        device=device,
-                    )
-                    self.model_mode = "zero-shot"
-                else:
-                    self.model = hf_pipeline(
-                        "text-classification",
-                        model=BIAS_MODEL,
-                        device=device,
-                        return_all_scores=True,
-                    )
-                    self.model_mode = "text-classification"
-
-                logger.info("BiasDetector: Loaded on %s.", "GPU" if device == 0 else "CPU")
-            except Exception as exc:
-                logger.error("BiasDetector: Failed to load model: %s", exc)
-                self.model = None
-                self.model_mode = "unknown"
+            self.model = model_manager.get("BIAS")
+            self.model_mode = (
+                "zero-shot" if "mnli" in _BIAS_MODEL.lower() else "text-classification"
+            )
         else:
+            self.model = model
             # Default assumption for injected models in current pipeline/tests.
             self.model_mode = "zero-shot"
 
