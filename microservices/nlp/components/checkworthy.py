@@ -1,5 +1,4 @@
 import logging
-import torch
 from typing import Any, List
 
 # Local imports
@@ -33,21 +32,9 @@ class CheckWorthinessFilter(NLPComponent):
 
         # Load model if not provided
         if not self.classifier:
-            logger.info("CheckWorthinessFilter: No classifier provided. Loading 'facebook/bart-large-mnli'...")
-            try:
-                from transformers import pipeline
-                # Detect GPU
-                device = 0 if torch.cuda.is_available() else -1
-                
-                self.classifier = pipeline(
-                    "zero-shot-classification",
-                    model=CHECKWORTHY_MODEL,
-                    device=device
-                )
-                logger.info(f"CheckWorthinessFilter: Loaded on {'GPU' if device==0 else 'CPU'}.")
-            except Exception as e:
-                logger.error(f"CheckWorthinessFilter: Failed to load model: {e}")
-                raise
+            from microservices.nlp.config import model_manager
+
+            self.classifier = model_manager.get("CHECKWORTHY")
 
     def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """

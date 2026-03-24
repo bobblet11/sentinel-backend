@@ -1,6 +1,5 @@
 import logging
 from typing import Any, List
-from transformers import pipeline
 
 # Local imports
 from microservices.nlp.models.base import NLPComponent
@@ -22,18 +21,9 @@ class EntityRecognizer(NLPComponent):
         if ner_model:
             self.ner_model = ner_model
         else:
-            logger.info("EntityRecognizer: Loading model '%s'...", NER_MODEL)
-            try:
-                # We default to CPU (-1) for safety, but main.py/nlp_service should pass a GPU-loaded model
-                self.ner_model = pipeline(
-                    "token-classification", 
-                    model=NER_MODEL,
-                    aggregation_strategy="simple",
-                    device=-1 
-                )
-            except Exception as e:
-                logger.error(f"EntityRecognizer: Failed to load model: {e}")
-                raise
+            from microservices.nlp.config import model_manager
+
+            self.ner_model = model_manager.get("NER")
 
     def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """

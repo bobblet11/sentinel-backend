@@ -1,7 +1,5 @@
 import logging
-import torch
 from typing import Any, List
-from sentence_transformers import SentenceTransformer
 
 # Local imports
 from microservices.nlp.models.base import NLPComponent
@@ -28,15 +26,9 @@ class Embedder(NLPComponent):
         if model:
             self.model = model
         else:
-            logger.info(f"Embedder: Loading {self.model_name}...")
-            try:
-                # Detect device
-                device = "cuda" if torch.cuda.is_available() else "cpu"
-                self.model = SentenceTransformer(self.model_name, device=device)
-                logger.info(f"Embedder: Loaded on {device.upper()}.")
-            except Exception as e:
-                logger.error(f"Embedder: Failed to load model: {e}")
-                raise
+            from microservices.nlp.config import model_manager
+
+            self.model = model_manager.get("EMBEDDING")
 
     def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """
