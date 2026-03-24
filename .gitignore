@@ -16,3 +16,6 @@ data/postgres_data
 data/redis_data
 ./backups/*
 backups
+*.zip
+.zip
+backups.zip
