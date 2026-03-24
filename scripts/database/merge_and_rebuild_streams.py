@@ -262,9 +262,10 @@ for port in ALL_PORTS:  # ports for each backup instance
 				# print(f"[WARN] Skipped malformed job from port {port}")
 				fail_count+=1
     
-	print(f"========== PORT {port} SUMMARY ==========")
+	print(f"\n\n========== PORT {port} SUMMARY ==========")
 	print(f"Total jobs duplicates: {dupe_count}")
 	print(f"Total jobs malformed: {fail_count}")
+	print( "=========================================\n\n")
 
 	total_dupe_count+=dupe_count
 	total_fail_count+=fail_count
