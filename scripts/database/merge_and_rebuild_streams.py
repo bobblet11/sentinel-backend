@@ -8,6 +8,8 @@ import datetime
 import hashlib
 import json
 import time
+import re
+
 from typing import Any, Dict, List
 
 import redis
@@ -25,15 +27,15 @@ ALL_PORTS = [START_PORT + i for i in range(0, NUMBER_OF_BACKUPS)]
 MERGED_PORT = 6379
 job_start_mono = time.monotonic()
 
-AGREED_NEWS_OUTLET_NAMES = {
-	("bbc", "www.bbc.com") : "BBC",
-	("theguardian", "www.theguardian.com") : "The Guardian",
-	("cbc", "www.cbc.ca") : "CBC",
-	("euronews", "www.euronews.com") : "Euronews",
-	("abcnews", "abcnews.go.com") : "ABC",
-	("cbs", "www.cbsnews.com") : "CBS",
-	("nbcnews", "www.nbcnews.com") : "NBC",
-	("npr", "www.npr.org") : "NPR"
+OUTLET_PATTERNS = {
+    r"(bbc\.com|bbc\.co\.uk|www\.bbc\.com)": "BBC",
+    r"(theguardian\.com|www\.theguardian\.com)": "The Guardian",
+    r"(cbc\.ca|www\.cbc\.ca)": "CBC",
+    r"(euronews\.com|www\.euronews\.com)": "Euronews",
+    r"(abcnews\.go\.com|abcnews\.com)": "ABC",
+    r"(cbsnews\.com|www\.cbsnews\.com)": "CBS",
+    r"(nbcnews\.com|www\.nbcnews\.com)": "NBC",
+    r"(npr\.org|www\.npr\.org)": "NPR",
 }
 
 def connect_redis(port: int, host:str="localhost") -> redis.Redis:
@@ -49,11 +51,10 @@ def connect_redis(port: int, host:str="localhost") -> redis.Redis:
 
 
 def match_outlet_name(article_url: str) -> str:
-	for url_patterns, parser in AGREED_NEWS_OUTLET_NAMES:
-		for pattern in url_patterns:
-			if pattern in article_url:
-				return parser
-	return None
+    for pattern, outlet in OUTLET_PATTERNS.items():
+        if re.search(pattern, article_url):
+            return outlet
+    return None
 
 
 def load_stream_jobs(port, stream_keys: List[str]) -> List[Dict[str, Any]]:
@@ -89,6 +90,19 @@ def sort_jobs_by_id(jobs: List[StreamMessage]) -> List[StreamMessage]:
         return (int(parts[0]), int(parts[1]))
     return sorted(jobs, key=lambda j: parse_id(j.redis_id), reverse=True)
 
+def sort_jobs_by_created_at(jobs: List[StreamMessage]) -> List[StreamMessage]:
+    def parse_created_at(job: StreamMessage):
+        try:
+            dt = datetime.datetime.fromisoformat(job.data.header.created_at)
+            # If it's naive, make it UTC
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.timezone.utc)
+            return dt
+        except Exception:
+            return datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+    return sorted(jobs, key=parse_created_at, reverse=True)
+
+
 
 def transform_job(raw_msg: Dict[str, Any]) -> StreamMessage:
 	"""
@@ -122,21 +136,23 @@ def transform_job(raw_msg: Dict[str, Any]) -> StreamMessage:
 
 	if created_at_raw:
 		try:
-			# Try parsing existing string
-			created_at = datetime.datetime.fromisoformat(created_at_raw).isoformat()
+			dt = datetime.datetime.fromisoformat(created_at_raw)
+			if dt.tzinfo is None:
+				dt = dt.replace(tzinfo=datetime.timezone.utc)
+			created_at = dt.isoformat()
 		except Exception:
-			# Fallback if format is wrong
 			print(f"[WARN] Invalid created_at format for {article_url}, falling back to now()")
 			created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 	else:
 		created_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
 
 	uid=hashlib.md5(article_url.encode()).hexdigest()[:36]
  
 	news_outlet = match_outlet_name(article_url)
 	if not news_outlet:
 		print(f"[❌] No outlet match for {article_url} (stream={raw_msg.get('stream')}, redis_id={raw_msg.get('redis_message_id')})")
-		raise RuntimeError(f"Malformed job: missing news outlet\n{json.dumps(raw_msg, indent=2)}")
+		# raise RuntimeError(f"Malformed job: missing news outlet\n{json.dumps(raw_msg, indent=2)}")
 		return None
 
 
@@ -254,7 +270,7 @@ for port in ALL_PORTS:  # ports for each backup instance
 	total_fail_count+=fail_count
 
  
-all_jobs = sort_jobs_by_id(all_jobs)
+all_jobs = sort_jobs_by_created_at(all_jobs)
 
 assert len(all_jobs) == len(article_urls_seen)
 print(f"[INFO] Writing {len(all_jobs)} jobs and {len(article_urls_seen)} URLs to merged Redis...")
