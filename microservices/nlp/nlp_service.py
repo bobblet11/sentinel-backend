@@ -2,6 +2,7 @@
 from typing import List
 from logging import getLogger
 import random
+import torch
 
 from common.models.api.redis_models import (
     Article,
@@ -74,7 +75,10 @@ class NLPService(ServiceTemplate):
 
     def __init__(self, config:ServiceConfig, options: NLPOptions) -> None:
         super().__init__(config)
-        
+        if torch.cuda.is_available():
+            self.logger.info("GPU DETECTED")
+        else:
+            self.logger.info("GPU NOT DETECTED")
         self.options = options or NLPOptions()        
         
         # Only load models if NOT in dummy mode
