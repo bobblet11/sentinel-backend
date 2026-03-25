@@ -156,8 +156,8 @@ fi
 log_info "Changing working directory to $PROJECT_ROOT"
 cd "$PROJECT_ROOT" || { echo "ERROR: Could not cd to $PROJECT_ROOT" >&2; exit 1; }
 
-log_warn "Tearing down the docker-compose project (if it exists)..."
-run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" down --remove-orphans || true
+log_warn "Tearing down the docker compose project (if it exists)..."
+run_and_log sudo -E docker compose "${DOCKER_COMPOSE_ARGS[@]}" down --remove-orphans || true
 
 
 log_warn "Pruning any remaining dangling Docker images..."
@@ -195,10 +195,10 @@ fi
 
 
 log_info "Building service images for '$CONFIG_NAME' configuration..."
-run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" build  || true
+run_and_log sudo -E docker compose "${DOCKER_COMPOSE_ARGS[@]}" build  || true
 
 log_info "Deploying services with the '$CONFIG_NAME' configuration..."
-run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" up --force-recreate --renew-anon-volumes -d  
+run_and_log sudo -E docker compose "${DOCKER_COMPOSE_ARGS[@]}" up --force-recreate --renew-anon-volumes -d  
 
 echo -e "\n${GREEN}✅ Deployment complete! Configuration '$CONFIG_NAME' is running.${NC}\n"
 echo -e "${YELLOW}Use './scripts/logs.sh $CONFIG_NAME' to see the output.${NC}\n"
