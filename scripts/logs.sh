@@ -115,4 +115,4 @@ cd "$PROJECT_ROOT" || { echo "ERROR: Could not cd to $PROJECT_ROOT" >&2; exit 1;
 
 shift || true
 echo "==> Attaching to logs for configuration: '$CONFIG_NAME' (Press Ctrl+C to exit)"
-sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" logs -f "$@" 
+sudo -E docker compose "${DOCKER_COMPOSE_ARGS[@]}" logs -f "$@" 
