@@ -36,4 +36,12 @@ RUN pip install --no-cache-dir \
     -r core-nlp-requirements.txt \
     && rm -rf core-requirements.txt requirements.txt core-nlp-requirements.txt
 
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && \
+    python3.12 /tmp/get-pip.py && \
+    rm /tmp/get-pip.py && \
+    ln -sf /usr/bin/python3.12 /usr/bin/python && \
+    ln -sf /usr/bin/python3.12 /usr/bin/python3
+
+RUN python -m spacy download en_core_web_sm
+
 COPY common/ /app/common/
