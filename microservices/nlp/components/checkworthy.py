@@ -1,8 +1,9 @@
 import logging
-from typing import Any, List
+from typing import Any, List, Optional
 
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
+from microservices.nlp.components.device import DeviceConfig
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, Claim, SentenceScore
 from microservices.nlp.config import (
     CHECKWORTHY_BATCH_SIZE,
@@ -25,9 +26,16 @@ class CheckWorthinessFilter(SentenceProcessor):
     and returns the sentence list.
     """
 
-    def __init__(self, classifier: Any = None, threshold: float = 0.50):
+    def __init__(
+        self,
+        device_config: Optional[DeviceConfig] = None,
+        classifier: Any = None,
+        threshold: float = 0.50,
+    ):
         """
         Args:
+            device_config: Unified device configuration (unused directly — model
+                           is loaded via ModelManager which owns device placement).
             classifier: Loaded pipeline("text-classification")
             threshold: Minimum CFS score to mark a sentence as check-worthy
         """

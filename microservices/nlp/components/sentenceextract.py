@@ -1,5 +1,4 @@
 import logging
-import platform
 import torch
 import numpy as np
 import torch.nn.functional as F
@@ -9,6 +8,7 @@ from torch.amp import autocast
 
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
+from microservices.nlp.components.device import DeviceConfig
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
 from microservices.nlp.config import (
     BERT_SCORING_MODEL, NLI_MODEL,
@@ -27,15 +27,9 @@ class SentenceExtraction(SentenceProcessor):
 
     Accepts and returns a local sentences list; does NOT touch result.
     """
-    def __init__(self, use_fp16: bool = True):
-        # Device selection: CUDA > MPS (Mac) > CPU
-        if torch.cuda.is_available():
-            self.device = "cuda"
-        elif platform.system() == "Darwin" and torch.backends.mps.is_available():
-            self.device = "mps"
-        else:
-            self.device = "cpu"
-        self.use_fp16 = use_fp16 and torch.cuda.is_available()
+    def __init__(self, device_config: DeviceConfig):
+        self.device = device_config.device
+        self.use_fp16 = device_config.use_fp16
 
         logger.info(f"SentenceExtraction: Initializing models on {self.device} "
                     f"(fp16={self.use_fp16})...")
@@ -43,19 +37,17 @@ class SentenceExtraction(SentenceProcessor):
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(BERT_SCORING_MODEL)
             self.scoring_model = AutoModel.from_pretrained(
-                BERT_SCORING_MODEL, low_cpu_mem_usage=False
-            ).to(self.device)
-
-            self.nli_tokenizer = AutoTokenizer.from_pretrained(NLI_MODEL)
-            self.nli_model = (
-                AutoModelForSequenceClassification
-                .from_pretrained(NLI_MODEL, low_cpu_mem_usage=False)
-                .to(self.device)
+                BERT_SCORING_MODEL,
+                dtype=device_config.dtype,
+                device_map=device_config.device_map,
             )
 
-            if self.use_fp16:
-                self.scoring_model = self.scoring_model.half()
-                self.nli_model = self.nli_model.half()
+            self.nli_tokenizer = AutoTokenizer.from_pretrained(NLI_MODEL)
+            self.nli_model = AutoModelForSequenceClassification.from_pretrained(
+                NLI_MODEL,
+                dtype=device_config.dtype,
+                device_map=device_config.device_map,
+            )
         except Exception as e:
             logger.error(f"SentenceExtraction: Failed to load models: {e}")
             raise

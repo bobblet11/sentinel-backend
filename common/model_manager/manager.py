@@ -303,20 +303,18 @@ class ModelManager:
             from transformers import AutoModelForSeq2SeqLM
 
             model = AutoModelForSeq2SeqLM.from_pretrained(
-                entry.model_name, low_cpu_mem_usage=False
+                entry.model_name,
+                device_map={"": device},
             )
-            if device == "cuda":
-                model = model.to("cuda")
             return model
 
         elif entry.loader == "auto_model_qa":
             from transformers import AutoModelForQuestionAnswering
 
             model = AutoModelForQuestionAnswering.from_pretrained(
-                entry.model_name, low_cpu_mem_usage=False
+                entry.model_name,
+                device_map={"": device},
             )
-            if device == "cuda":
-                model = model.to("cuda")
             return model
 
         elif entry.loader == "auto_tokenizer":

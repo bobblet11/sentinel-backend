@@ -17,7 +17,7 @@ from common.models.api.redis_models import (
 from common.service.service_template import ProcessingError, ServiceConfig, ServiceTemplate
 
 from microservices.nlp.components.claimextract import ClaimExtraction
-from microservices.nlp.config import DUMMY_NLP_MODE, model_manager
+from microservices.nlp.config import DUMMY_NLP_MODE, model_manager, DEVICE_CONFIG
 
 logger = getLogger("NLP")
 EMBEDDING_DIM = 768
@@ -99,7 +99,8 @@ class NLPService(ServiceTemplate):
             # and dispatched via typed tags (SentenceGenerator, SentenceProcessor,
             # SentenceConsumer, ArticleProcessor).
             self.pipeline = [
-                (name, cls(), ctype) for name, cls, ctype in PIPELINE_ORDER
+                (name, cls(device_config=DEVICE_CONFIG, model_manager=model_manager), ctype)
+                for name, cls, ctype in PIPELINE_ORDER
             ]
             logger.info("Model health: %s", model_manager.health_check())
 
