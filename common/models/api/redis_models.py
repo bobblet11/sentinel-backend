@@ -42,7 +42,7 @@ class NLPOptions:
     enable_claim_extraction: bool = True
     enable_decontextualization: bool = True
     max_claims: int = 10
-    min_confidence: float = 0.75 # Updated default to match CheckWorthinessFilter
+    min_confidence: float = 0.50  # Matches CheckWorthinessFilter threshold in checkworthy.py
     # If True, include high-dimensional embeddings in the final response
     return_embeddings: bool = True
     
