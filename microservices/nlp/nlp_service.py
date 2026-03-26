@@ -2,6 +2,7 @@
 from typing import List
 from logging import getLogger
 import random
+import torch
 
 from common.models.api.redis_models import (
     Article,
@@ -14,15 +15,8 @@ from common.models.api.redis_models import (
 )
 from common.service.service_template import ProcessingError, ServiceConfig, ServiceTemplate
 
-from microservices.nlp.models.base import NLPComponent
-
-# We will implement these empty skeletons in the next step
-from microservices.nlp.components.preprocess import Preprocessor
-from microservices.nlp.components.centrality import CentralityScorer
-from microservices.nlp.components.embedder import Embedder
-from microservices.nlp.components.bias import BiasDetector
-from microservices.nlp.components.ner import EntityRecognizer
-from microservices.nlp.components.checkworthy import CheckWorthinessFilter
+from microservices.nlp.models.base import ArticleProcessor
+from microservices.nlp.components.claimextract import ClaimExtraction
 from microservices.nlp.config import DUMMY_NLP_MODE, model_manager
 
 logger = getLogger("NLP")
@@ -40,15 +34,15 @@ def _build_dummy_result() -> NLPResult:
         "Tax increases were approved",
         "New tax hike announced",
     ]
-    
+
     entities = [
         Entity(entity_text="Government", type_of_entity="ORG", start_char=0, end_char=10),
         Entity(entity_text="taxes", type_of_entity="TOPIC", start_char=11, end_char=16),
     ]
-    
+
     # Randomly select one of the dummy claims
     claim_text = random.choice(dummy_claims)
-    
+
     claim = Claim(
         confidence=0.9,
         source_sentence_indices=[0],
@@ -70,33 +64,31 @@ def _build_dummy_result() -> NLPResult:
     result.bias_profile = bias_profile
     return result
 
+
 class NLPService(ServiceTemplate):
 
-    def __init__(self, config:ServiceConfig, options: NLPOptions) -> None:
+    def __init__(self, config: ServiceConfig, options: NLPOptions) -> None:
         super().__init__(config)
-        
-        self.options = options or NLPOptions()        
-        
+
+        self.options = options or NLPOptions()
+
         # Only load models if NOT in dummy mode
         if DUMMY_NLP_MODE:
             logger.info("DUMMY_NLP_MODE enabled - skipping model loading")
-            self.pipeline: List[NLPComponent] = []
+            self.pipeline: List[ArticleProcessor] = []
         else:
-            # Load all models (sequential on GPU, parallel on CPU)
+            # Load all registered models via ModelManager before component init.
+            # Sequential on GPU, parallel on CPU.
             model_manager.load_all()
 
-            # Components now fetch pre-loaded models from the manager
-            self.pipeline: List[NLPComponent] = [
-                Preprocessor(),
-                Embedder(),
-                CentralityScorer(),
-                BiasDetector(),
-                EntityRecognizer(),
-                CheckWorthinessFilter(),
+            # ClaimExtraction is the full pipeline orchestrator — it owns all
+            # stages internally (Preprocessor → NER → Extraction → Decontext →
+            # CheckWorthiness → EntityMapping → Embedder → BiasDetector).
+            self.pipeline: List[ArticleProcessor] = [
+                ClaimExtraction(use_gpu=True, model_manager=model_manager),
             ]
             logger.info("Model health: %s", model_manager.health_check())
-    
-    
+
     def _analyze_html_and_update(self, message: StreamMessage) -> StreamMessage:
         """
         The main orchestrator that passes the article through each pipeline stage.
@@ -106,14 +98,23 @@ class NLPService(ServiceTemplate):
 
         for component in self.pipeline:
             try:
-                component.run(article, analysis_result, self.options)                
-            except Exception as e:
-                print(f"Pipeline error in {component.__class__.__name__}: {str(e)}")
+                component.run(article, analysis_result, self.options)
+            except torch.cuda.OutOfMemoryError as oom:
+                logger.error(
+                    "CUDA OOM in %s: %s. Flushing cache and aborting article.",
+                    component.__class__.__name__,
+                    oom,
+                )
+                torch.cuda.empty_cache()
                 raise
-            
+            except Exception as e:
+                logger.error(
+                    "Pipeline error in %s: %s", component.__class__.__name__, e
+                )
+                raise
+
         message.set_nlp_result(analysis_result)
         return message
-
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
         try:
@@ -125,9 +126,12 @@ class NLPService(ServiceTemplate):
                 message.set_nlp_result(dummy_result)
                 return message
 
-            analyzed_message:StreamMessage = self._analyze_html_and_update(message)
+            analyzed_message: StreamMessage = self._analyze_html_and_update(message)
             return analyzed_message
         except Exception as e:
             raise ProcessingError(f"Failed to analyze {message.link}: {e}")
-        
- 
+        finally:
+            # Always flush the GPU cache after a message to prevent OOM accumulation
+            # across articles on long-running stream consumers.
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
