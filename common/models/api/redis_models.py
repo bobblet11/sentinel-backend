@@ -138,8 +138,7 @@ class Claim:
     """
     confidence: float
     source_sentence_indices: List[int] # which sentences are used to form the claim
-    contextualised_claim_text: str
-    decontextualised_claim_text: Optional[str] = None
+    decontextualised_claim_text: str
     decontextualised_claim_embedding: Optional[List[float]] = None
     NER_entities: List[Entity] = field(default_factory=list)
 

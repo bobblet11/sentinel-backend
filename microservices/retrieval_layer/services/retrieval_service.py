@@ -124,7 +124,7 @@ class RetrievalService(ServiceTemplate):
                 "\t\tEmbedding sample (first 3 values): %s\n"
                 "\t\tCentrality score: %.2f",
                 i,
-                claims[i].contextualised_claim_text,
+                claims[i].decontextualised_claim_text,
                 claims[i].decontextualised_claim_embedding[:3],
                 claims[i].confidence,
             )
@@ -150,7 +150,7 @@ class RetrievalService(ServiceTemplate):
                 )
 
             claim_dto = CreateOrModifyClaim(
-                claim.contextualised_claim_text,
+                claim.decontextualised_claim_text,
                 claim.decontextualised_claim_text,
                 normalized_embedding,
                 claim.confidence,
@@ -177,7 +177,7 @@ class RetrievalService(ServiceTemplate):
         
     def _retrieve_evidence_for_claim(self, db: Session, claim: Claim, original_article_id: int) -> Dict[str, Any]:
         self.logger.debug("=== FINDING EVIDENCE ===\n")
-        input_claim_text = claim.decontextualised_claim_text or claim.contextualised_claim_text or ""
+        input_claim_text = claim.decontextualised_claim_text or ""
         claim_candidates = set()
         
         def filter_step() -> List[int | str]:

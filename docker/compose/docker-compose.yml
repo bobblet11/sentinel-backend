@@ -239,6 +239,7 @@ services:
 
     volumes:
       - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
+      - hf-model-cache:/root/.cache/huggingface
 
     restart: unless-stopped
     networks:
@@ -290,6 +291,7 @@ services:
 
     volumes:
       - ${HOST_LOG_ROOT}/retrieval/logs:/app/logs
+      - hf-model-cache:/root/.cache/huggingface
 
     restart: unless-stopped
     networks:
@@ -331,3 +333,6 @@ services:
 networks:
   sentinel-net:
     driver: bridge
+
+volumes:
+  hf-model-cache:

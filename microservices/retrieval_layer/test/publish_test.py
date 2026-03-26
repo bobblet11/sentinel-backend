@@ -24,7 +24,6 @@ full_message = {
         "sentences": [],
         "claims_in_article": [
             {
-                "contextualised_claim_text": "The government raised taxes last year",
                 "decontextualised_claim_text": "Government raised taxes",
                 "decontextualised_claim_embedding": [0.01] * 768,
                 "confidence": 0.8,

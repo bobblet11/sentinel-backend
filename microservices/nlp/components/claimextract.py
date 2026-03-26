@@ -173,17 +173,11 @@ class ClaimExtraction(ArticleProcessor):
             logger.info("[Stage 4 | Decontextualizer] skipped (disabled in options)")
 
         # ── Stage 5 — Check-Worthiness Scoring ──────────────────────────────
-        # CheckWorthinessFilter uses the legacy NLPComponent interface:
-        # it reads/writes result.sentences in-place rather than accepting a
-        # local sentences list. Bridge: assign the local list to result.sentences
-        # so the component can operate on the same objects, then clear
-        # result.claims_in_article afterwards (Stage 7 will rebuild it).
         t = time.time()
         try:
-            result.sentences = sentences
-            self.checkworthiness.run(article, result, options)
-            # sentences and result.sentences are the same objects — confidence
-            # and is_checkworthy are now populated in-place on each SentenceScore.
+            sentences = self.checkworthiness.run(
+                article, result, options, sentences
+            )
             # Clear claims built by CheckWorthinessFilter; Stage 7 rebuilds them.
             result.claims_in_article = []
         except Exception as e:
@@ -263,6 +257,10 @@ class ClaimExtraction(ArticleProcessor):
                     e,
                 )
                 # Non-critical — do not re-raise; claims are already committed
+
+        # Expose processed sentences so set_nlp_result() can copy them
+        # to the MessagePayload for downstream services.
+        result.sentences = sentences
 
         logger.info(
             "--- ClaimExtraction Pipeline complete in %.2fs | "

@@ -91,10 +91,11 @@ class BiasDetector(ArticleProcessor):
     def _neutral_profile(self) -> BiasProfile:
         """Returns a zero-confidence neutral bias profile for graceful degradation."""
         return BiasProfile(
-            political_bias="Center",
-            confidence=0.0,
-            scores={"Left": 0.0, "Center": 0.0, "Right": 0.0},
-            emotional_tone="Neutral",
+            bias_category="Center",
+            bias_score=0.0,
+            bias_analysis_confidence=0.0,
+            sentiment_category="Neutral",
+            sentiment_analysis_confidence=0.0,
         )
 
     def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
@@ -136,6 +137,7 @@ class BiasDetector(ArticleProcessor):
 
         # ── Emotional Tone ──────────────────────────────────────────────────────
         emotional_tone: Optional[str] = None
+        tone_out = None
         try:
             tone_out   = self.sentiment_analyzer(analysis_text[:512])
             raw_tone   = tone_out[0]["label"].lower() if tone_out else "neutral"
@@ -145,11 +147,21 @@ class BiasDetector(ArticleProcessor):
             emotional_tone = "Neutral"
 
         # ── Commit Results ──────────────────────────────────────────────────────
+        # Pick the top score from the political bias scores dict as bias_score
+        bias_score = max(scores.values()) if scores else 0.0
+        sentiment_confidence = 0.0
+        try:
+            if tone_out:
+                sentiment_confidence = float(tone_out[0]["score"])
+        except (KeyError, IndexError, TypeError):
+            pass
+
         result.bias_profile = BiasProfile(
-            political_bias=political_bias,
-            confidence=confidence,
-            scores=scores,
-            emotional_tone=emotional_tone,
+            bias_category=political_bias,
+            bias_score=bias_score,
+            bias_analysis_confidence=confidence,
+            sentiment_category=emotional_tone,
+            sentiment_analysis_confidence=sentiment_confidence,
         )
         logger.info(
             f"BiasDetector: Result — {political_bias} (conf={confidence:.2f}), "

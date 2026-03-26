@@ -22,7 +22,7 @@ NER_MODEL = "dslim/bert-base-NER-uncased"
 EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
 BERT_SCORING_MODEL = "bert-base-uncased"
 NLI_MODEL = "cross-encoder/nli-distilroberta-base"
-QG_MODEL = "mrm8488/t5-base-finetuned-question-generation-ap"
+QG_MODEL = "Salesforce/mixqg-base"
 QA_MODEL = "deepset/roberta-base-squad2"
 GEN_MODEL = "google/flan-t5-base"
 BIAS_POLITICAL_MODEL = "typeform/distilbert-base-uncased-mnli"
@@ -69,7 +69,7 @@ PREPROCESS_MIN_TOKENS = 7
 PHOTO_CREDIT_MAX_LEN = 120
 
 # ── Extraction ────────────────────────────────────────────────────────────────
-SENTENCE_EXTRACT_TOP_K = 10
+SENTENCE_EXTRACT_TOP_K = 15
 
 # =============================================================================
 # SERVICE CONFIG  (requires environment variables — only used by main.py)
@@ -105,6 +105,9 @@ try:
     BIAS_POLITICAL_MODEL = get_env_var(
         "NLP_BIAS_MODEL", str, config_logger, BIAS_POLITICAL_MODEL
     )
+    QG_MODEL = get_env_var("NLP_QG_MODEL", str, config_logger, QG_MODEL)
+    QA_MODEL = get_env_var("NLP_QA_MODEL", str, config_logger, QA_MODEL)
+    GEN_MODEL = get_env_var("NLP_GEN_MODEL", str, config_logger, GEN_MODEL)
 
     # Device selection: CUDA > MPS (Mac) > CPU
     use_gpu = get_env_var("USE_GPU", str, config_logger, "false").lower() == "true"
@@ -134,6 +137,9 @@ try:
         EnvVariable("NER_MODEL", NER_MODEL),
         EnvVariable("EMBEDDING_MODEL", EMBEDDING_MODEL),
         EnvVariable("BIAS_POLITICAL_MODEL", BIAS_POLITICAL_MODEL),
+        EnvVariable("QG_MODEL", QG_MODEL),
+        EnvVariable("QA_MODEL", QA_MODEL),
+        EnvVariable("GEN_MODEL", GEN_MODEL),
         EnvVariable("CLAIM_MIN_CONFIDENCE", CLAIM_MIN_CONFIDENCE),
         EnvVariable("CW_THRESHOLD", CW_THRESHOLD),
         EnvVariable("DUMMY_NLP_MODE", DUMMY_NLP_MODE),

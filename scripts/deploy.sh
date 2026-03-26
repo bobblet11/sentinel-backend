@@ -166,10 +166,10 @@ run_and_log sudo -E docker image prune -f
 
 
 log_warn "Building base Docker image \"light_python_3_11\"..."
-run_and_log sudo -E docker build --pull -t sentinel/python-light:3.11 -f "$PROJECT_ROOT/docker/base/light_python_3_11/Dockerfile" "$PROJECT_ROOT"  
+run_and_log sudo -E docker build --pull=false -t sentinel/python-light:3.11 -f "$PROJECT_ROOT/docker/base/light_python_3_11/Dockerfile" "$PROJECT_ROOT"  
 
 log_warn "Building base Docker image \"light_python_3_12\"..."
-run_and_log sudo -E docker build --pull -t sentinel/python-light:3.12 -f "$PROJECT_ROOT/docker/base/light_python_3_12/Dockerfile" "$PROJECT_ROOT"  
+run_and_log sudo -E docker build --pull=false -t sentinel/python-light:3.12 -f "$PROJECT_ROOT/docker/base/light_python_3_12/Dockerfile" "$PROJECT_ROOT"  
 
 
 

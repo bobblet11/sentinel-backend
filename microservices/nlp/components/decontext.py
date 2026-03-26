@@ -97,6 +97,7 @@ class Decontextualizer(SentenceProcessor):
         self.qg_model = AutoModelForSeq2SeqLM.from_pretrained(
             QG_MODEL,
             torch_dtype=torch.float16 if use_fp16 else torch.float32,
+            low_cpu_mem_usage=False,
         ).to(self.device)
 
         # Extractive QA model (replaces the pipeline, which was removed in transformers >=4.52)
@@ -104,6 +105,7 @@ class Decontextualizer(SentenceProcessor):
         self.qa_model = AutoModelForQuestionAnswering.from_pretrained(
             QA_MODEL,
             torch_dtype=torch.float16 if use_fp16 else torch.float32,
+            low_cpu_mem_usage=False,
         ).to(self.device)
 
         # Generative rewrite model (FLAN-T5)
@@ -111,6 +113,7 @@ class Decontextualizer(SentenceProcessor):
         self.gen_model = AutoModelForSeq2SeqLM.from_pretrained(
             GEN_MODEL,
             torch_dtype=torch.float16 if use_fp16 else torch.float32,
+            low_cpu_mem_usage=False,
         ).to(self.device)
 
         logger.info("Decontextualizer: All models loaded successfully.")
@@ -247,13 +250,20 @@ class Decontextualizer(SentenceProcessor):
     def _bm25_retrieve(self, query: str, doc_sentences: List[str]) -> str:
         """BM25 sparse retrieval over article sentences to find the most relevant evidence."""
         if not doc_sentences:
+            logger.debug(f"Decontextualizer [BM25] No doc_sentences available for query: {query[:60]}")
             return ""
         tokenized_corpus = [s.lower().split() for s in doc_sentences]
         bm25 = BM25Okapi(tokenized_corpus)
         scores = bm25.get_scores(query.lower().split())
         top_k = min(BM25_TOP_K, len(doc_sentences))
         top_indices = scores.argsort()[-top_k:][::-1]
-        return " ".join(doc_sentences[i] for i in sorted(top_indices))
+        top_scores = [scores[i] for i in top_indices]
+        evidence = " ".join(doc_sentences[i] for i in sorted(top_indices))
+        logger.debug(
+            f"Decontextualizer [BM25] Query: {query[:50]}... | "
+            f"Top scores: {top_scores} | Evidence len: {len(evidence)}"
+        )
+        return evidence
 
     def run(
         self,
@@ -295,6 +305,7 @@ class Decontextualizer(SentenceProcessor):
         # ── Phase 2: extract units; build flat QG prompt list ─────────────
         all_qg_prompts: List[str]  = []
         sent_qg_slices: List[tuple] = []   # (start, end) into all_qg_prompts
+        units_per_sent: List[List[str]] = []  # for debugging
 
         for text, doc in zip(texts, docs):
             start = len(all_qg_prompts)
@@ -302,7 +313,14 @@ class Decontextualizer(SentenceProcessor):
                 units = [
                     u for u in self._extract_units(doc) if len(u.split()) < 6
                 ][:DECONTEXT_MAX_UNITS]
+                units_per_sent.append(units)
                 all_qg_prompts.extend(f"answer: {u} context: {text}" for u in units)
+                logger.debug(
+                    f"Decontextualizer [Phase 2] Sentence: {text[:60]}... | "
+                    f"Extracted {len(units)} units: {units}"
+                )
+            else:
+                units_per_sent.append([])
             sent_qg_slices.append((start, len(all_qg_prompts)))
 
         # ── Phase 3: batch Question Generation ────────────────────────────
@@ -347,18 +365,36 @@ class Decontextualizer(SentenceProcessor):
         # ── Phase 6: build QA2D prompt list ───────────────────────────────
         all_qa2d_prompts: List[str]   = []
         sent_qa2d_slices: List[tuple]  = []   # (start, end) into all_qa2d_prompts
+        qa_filtering_stats: List[dict] = []  # for debugging
 
-        for (qg_start, qg_end), (qa_start, qa_end) in zip(
+        for sent_idx, ((qg_start, qg_end), (qa_start, qa_end)) in enumerate(zip(
             sent_qg_slices, sent_qa_slices
-        ):
+        )):
             qa2d_start = len(all_qa2d_prompts)
-            for q, r in zip(
+            passed_count = 0
+            failed_count = 0
+            
+            for u_idx, (q, r) in enumerate(zip(
                 all_questions[qg_start:qg_end], all_qa_results[qa_start:qa_end]
-            ):
+            )):
                 if r["score"] > QA_SCORE_THRESHOLD:
                     all_qa2d_prompts.append(
                         f"Convert to a declarative sentence: Q: {q} A: {r['answer']}"
                     )
+                    passed_count += 1
+                else:
+                    failed_count += 1
+                    logger.debug(
+                        f"Decontextualizer [Phase 6] Sentence {sent_idx} unit {u_idx}: "
+                        f"Q: {q[:50]}... | Score {r['score']:.3f} < threshold {QA_SCORE_THRESHOLD} → FILTERED"
+                    )
+            
+            qa_filtering_stats.append({"passed": passed_count, "failed": failed_count})
+            if passed_count > 0 or failed_count > 0:
+                logger.debug(
+                    f"Decontextualizer [Phase 6] Sentence {sent_idx}: "
+                    f"{passed_count} Q-A pairs passed threshold, {failed_count} filtered"
+                )
             sent_qa2d_slices.append((qa2d_start, len(all_qa2d_prompts)))
 
         # ── Phase 7: batch QA-to-Declarative ──────────────────────────────
@@ -409,6 +445,8 @@ class Decontextualizer(SentenceProcessor):
         logger.info(f"Decontextualizer: Phase 9 done ({time.perf_counter() - t_phase:.1f}s)")
 
         # ── Phase 10: apply results back to SentenceScore objects ──────────
+        rejection_summary = {"empty": 0, "unchanged": 0, "has_question": 0, "too_long": 0, "accepted": 0}
+        
         for i, sent_obj in enumerate(sentences):
             text = texts[i]
             if not text:
@@ -419,19 +457,52 @@ class Decontextualizer(SentenceProcessor):
             if rw_idx is not None:
                 rewritten = all_rewrites[rw_idx]
                 max_len   = int(len(text) * DECONTEXT_REWRITE_RATIO)
+                
                 # Quality gate: reject if empty, unchanged, contains "?", or too long
-                if (
-                    rewritten
-                    and rewritten.lower() != text.lower()
-                    and "?" not in rewritten
-                    and len(rewritten) <= max_len
-                ):
+                rejection_reason = None
+                if not rewritten:
+                    rejection_reason = "empty"
+                    rejection_summary["empty"] += 1
+                elif rewritten.lower() == text.lower():
+                    rejection_reason = "unchanged"
+                    rejection_summary["unchanged"] += 1
+                elif "?" in rewritten:
+                    rejection_reason = "has_question"
+                    rejection_summary["has_question"] += 1
+                elif len(rewritten) > max_len:
+                    rejection_reason = "too_long"
+                    rejection_summary["too_long"] += 1
+                
+                if rejection_reason:
+                    logger.debug(
+                        f"Decontextualizer [Phase 10] Sentence {i}: Rewrite REJECTED ({rejection_reason}) | "
+                        f"Original: {text[:50]}... | "
+                        f"Rewritten: {rewritten[:50]}... | "
+                        f"Len: {len(rewritten)} vs max {max_len}"
+                    )
+                    sent_obj.text = text
+                else:
+                    logger.debug(
+                        f"Decontextualizer [Phase 10] Sentence {i}: Rewrite ACCEPTED | "
+                        f"Original: {text[:50]}... → Rewritten: {rewritten[:50]}..."
+                    )
                     sent_obj.original_text = text
                     sent_obj.text          = rewritten
-                else:
-                    sent_obj.text = text
+                    rejection_summary["accepted"] += 1
             else:
+                logger.debug(
+                    f"Decontextualizer [Phase 10] Sentence {i}: No QA2D results, keeping original"
+                )
                 sent_obj.text = text
+
+        logger.info(
+            f"Decontextualizer [Phase 10 Summary]: "
+            f"Accepted={rejection_summary['accepted']}, "
+            f"Rejected (empty={rejection_summary['empty']}, "
+            f"unchanged={rejection_summary['unchanged']}, "
+            f"has_?={rejection_summary['has_question']}, "
+            f"too_long={rejection_summary['too_long']})"
+        )
 
         logger.info("Decontextualizer: Complete.")
         return sentences

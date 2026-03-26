@@ -48,10 +48,11 @@ class SentenceScore:
 @dataclass
 class BiasProfile:
     """Result of political and emotional bias analysis."""
-    political_bias: str  # e.g., "Left", "Center", "Right"
-    confidence: float
-    scores: Dict[str, float]  # e.g., {"left": 0.1, "right": 0.8}
-    emotional_tone: Optional[str] = None
+    bias_category: str  # e.g., "Left", "Center", "Right"
+    bias_score: float
+    bias_analysis_confidence: float
+    sentiment_category: Optional[str] = None
+    sentiment_analysis_confidence: float = 0.0
 
 @dataclass
 class Claim:

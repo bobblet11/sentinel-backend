@@ -2,8 +2,8 @@ import logging
 from typing import Any, List
 
 # Local imports
-from microservices.nlp.models.base import NLPComponent
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, Claim
+from microservices.nlp.models.base import SentenceProcessor
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, Claim, SentenceScore
 from microservices.nlp.config import (
     CHECKWORTHY_BATCH_SIZE,
     CHECKWORTHY_MODEL,
@@ -12,23 +12,27 @@ from microservices.nlp.config import (
 
 logger = logging.getLogger(__name__)
 
-class CheckWorthinessFilter(NLPComponent):
+class CheckWorthinessFilter(SentenceProcessor):
     """
     Filters sentences to identify factual claims worth checking.
-    Uses Zero-Shot Classification (BART-MNLI) to categorize sentences.
+    Uses text classification (ClaimBuster-DeBERTaV2) to categorize sentences.
+
+    Model: whispAI/ClaimBuster-DeBERTaV2
+    Labels: NFS (Non-Factual) / UFS (Unimportant Factual) / CFS (Check-worthy Factual)
     
-    Model: facebook/bart-large-mnli
-    Candidates: ["factual claim", "opinion", "spam", "question"]
+    Now implements SentenceProcessor: accepts sentences list as parameter,
+    modifies is_checkworthy/claim_type/confidence in-place, stores claims in result,
+    and returns the sentence list.
     """
-    def __init__(self, classifier: Any = None):
+
+    def __init__(self, classifier: Any = None, threshold: float = 0.50):
         """
         Args:
-            classifier: Loaded pipeline("zero-shot-classification")
+            classifier: Loaded pipeline("text-classification")
+            threshold: Minimum CFS score to mark a sentence as check-worthy
         """
         self.classifier = classifier
-        self.candidate_labels = ["fact", "opinion"]
-        # Threshold: Lowered to capture descriptive news reporting
-        self.threshold = 0.50
+        self.threshold = threshold
 
         # Load model if not provided
         if not self.classifier:
@@ -36,15 +40,16 @@ class CheckWorthinessFilter(NLPComponent):
 
             self.classifier = model_manager.get("CHECKWORTHY")
 
-    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
+    def run(self, article: Article, result: NLPResult, options: NLPOptions, sentences: List[SentenceScore]) -> List[SentenceScore]:
         """
-        Classifies each sentence in result.sentences.
-        Adds 'is_checkworthy', 'claim_type', and 'confidence' attributes to the sentence objects.
+        Classifies each sentence in the provided list.
+        Adds 'is_checkworthy', 'claim_type', and 'confidence' attributes to each sentence.
+        Stores check-worthy sentences as claims in result.claims_in_article.
+        Returns the same sentence list (possibly filtered or modified).
         """
-        if not result.sentences:
-            return
+        if not sentences:
+            return sentences
 
-        sentences = result.sentences
         candidate_indices = list(range(len(sentences)))
 
         # Bound expensive zero-shot work by selecting top-central sentences first.
@@ -69,47 +74,41 @@ class CheckWorthinessFilter(NLPComponent):
             # Run Inference (Batch)
             predictions = self.classifier(
                 texts,
-                self.candidate_labels,
-                multi_label=False,
+                truncation=True,
+                max_length=512,
                 batch_size=CHECKWORTHY_BATCH_SIZE,
-                # Removed hypothesis_template to use the default "This example is {}." which is often more robust for simple labels.
             )
 
             count = 0
             claims_discovered = []
             
-            for local_idx, pred in enumerate(predictions):
+            for local_idx, label_scores in enumerate(predictions):
                 i = candidate_indices[local_idx]
-                # pred format: 
-                # {'sequence': '...', 'labels': ['fact', 'opinion'], 'scores': [0.85, 0.15]}
-                
-                top_label = pred['labels'][0]
-                top_score = pred['scores'][0]
+                top_label = max(label_scores, key=lambda x: x["score"])["label"]
+                # Labels may be full strings e.g. "Check-worthy Factual Statement (CFS)"
+                cfs_score = next(
+                    (item["score"] for item in label_scores if "CFS" in item["label"]),
+                    0.0,
+                )
 
-                # Determine checkworthiness
-                is_worthy = (top_label == "fact" and top_score >= self.threshold)
+                is_worthy = cfs_score >= self.threshold
 
-                # Assign attributes to the Sentence object
-                # NOTE: Ensure schemas.py is updated to support these fields (Task B.2)
-                result.sentences[i].is_checkworthy = is_worthy
-                result.sentences[i].claim_type = top_label
-                result.sentences[i].confidence = top_score
+                sentences[i].is_checkworthy = is_worthy
+                sentences[i].claim_type = top_label
+                sentences[i].confidence = cfs_score
 
                 if is_worthy:
                     count += 1
                     
                     # Construct and store the Claim object
                     claim_obj = Claim(
-                        confidence=top_score,
+                        confidence=cfs_score,
                         source_sentence_indices=[i],
-                        contextualised_claim_text=result.sentences[i].text,
-                        decontextualised_claim_text=result.sentences[i].text, # Assuming text is already processed/clean
-                        decontextualised_claim_embedding=result.sentences[i].embedding,
-                        NER_entities=result.sentences[i].entities
+                        decontextualised_claim_text=sentences[i].text,
+                        decontextualised_claim_embedding=sentences[i].embedding,
+                        NER_entities=sentences[i].entities,
                     )
                     claims_discovered.append(claim_obj)
-                    
-                    # logger.debug(f"Claim: {texts[i][:50]}... ({top_score:.2f})")
 
             # Update the result object
             result.claims_in_article = claims_discovered
@@ -118,5 +117,7 @@ class CheckWorthinessFilter(NLPComponent):
         except Exception as e:
             logger.error(f"CheckWorthiness analysis failed: {e}")
             # Fail gracefully: assume nothing is checkworthy so we don't crash
-            for s in result.sentences:
+            for s in sentences:
                 s.is_checkworthy = False
+        
+        return sentences
