@@ -11,16 +11,30 @@ from common.models.api.redis_models import (
     Entity,
     NLPOptions,
     NLPResult,
+    SentenceScore,
     StreamMessage,
 )
 from common.service.service_template import ProcessingError, ServiceConfig, ServiceTemplate
 
-from microservices.nlp.models.base import ArticleProcessor
 from microservices.nlp.components.claimextract import ClaimExtraction
 from microservices.nlp.config import DUMMY_NLP_MODE, model_manager
 
 logger = getLogger("NLP")
 EMBEDDING_DIM = 768
+
+# ClaimExtraction is the sole pipeline orchestrator. It wires all 8 stages:
+#   Stage 1:   Preprocessor         — text → List[SentenceScore]
+#   Stage 2:   EntityRecognizer     — NER → result.entities_in_article
+#   Stage 3:   SentenceExtraction   — BertSum + NLI dedup
+#   Stage 4:   Decontextualizer     — QA-based rewrite to self-contained sentences
+#   Stage 5:   CheckWorthiness      — claim-worthy classification
+#   Stage 5.5: EntityMapping        — link article entities → individual sentences
+#   Stage 6:   Embedder             — dense vector embeddings
+#   Stage 7:   Sentence→Claim       — commit claims to result
+#   Stage 8:   BiasDetector         — article-level bias profile (optional)
+PIPELINE_ORDER = [
+    ("ClaimExtraction", ClaimExtraction, "ArticleProcessor"),
+]
 
 
 def _dummy_embedding(dim: int = EMBEDDING_DIM) -> List[float]:
@@ -46,16 +60,16 @@ def _build_dummy_result() -> NLPResult:
     claim = Claim(
         confidence=0.9,
         source_sentence_indices=[0],
-        contextualised_claim_text=claim_text,
         decontextualised_claim_text=claim_text,
         decontextualised_claim_embedding=_dummy_embedding(),
         NER_entities=entities,
     )
     bias_profile = BiasProfile(
-        political_bias="center",
-        confidence=0.7,
-        scores={"left": 0.2, "center": 0.7, "right": 0.1},
-        emotional_tone="neutral",
+        bias_category="center",
+        bias_score=0.7,
+        bias_analysis_confidence=0.7,
+        sentiment_category="neutral",
+        sentiment_analysis_confidence=0.8,
     )
 
     result = NLPResult()
@@ -75,44 +89,63 @@ class NLPService(ServiceTemplate):
         # Only load models if NOT in dummy mode
         if DUMMY_NLP_MODE:
             logger.info("DUMMY_NLP_MODE enabled - skipping model loading")
-            self.pipeline: List[ArticleProcessor] = []
+            self.pipeline = []
         else:
             # Load all registered models via ModelManager before component init.
             # Sequential on GPU, parallel on CPU.
             model_manager.load_all()
 
-            # ClaimExtraction is the full pipeline orchestrator — it owns all
-            # stages internally (Preprocessor → NER → Extraction → Decontext →
-            # CheckWorthiness → EntityMapping → Embedder → BiasDetector).
-            self.pipeline: List[ArticleProcessor] = [
-                ClaimExtraction(use_gpu=True, model_manager=model_manager),
+            # Flat component pipeline — each component is instantiated independently
+            # and dispatched via typed tags (SentenceGenerator, SentenceProcessor,
+            # SentenceConsumer, ArticleProcessor).
+            self.pipeline = [
+                (name, cls(), ctype) for name, cls, ctype in PIPELINE_ORDER
             ]
             logger.info("Model health: %s", model_manager.health_check())
 
     def _analyze_html_and_update(self, message: StreamMessage) -> StreamMessage:
         """
-        The main orchestrator that passes the article through each pipeline stage.
+        Runs the article through each pipeline component using typed dispatch.
+
+        Dispatch types (matching the test scripts):
+          SentenceGenerator  — run(article, result, options) -> List[SentenceScore]
+          SentenceProcessor  — run(article, result, options, sentences) -> List[SentenceScore]
+          SentenceConsumer   — run(article, result, options, sentences) -> None
+          ArticleProcessor   — run(article, result, options) -> None
         """
         article = Article(text=message.text, title=message.title, link=message.link)
         analysis_result = NLPResult()
+        sentences: List[SentenceScore] = []
 
-        for component in self.pipeline:
+        for name, component, component_type in self.pipeline:
             try:
-                component.run(article, analysis_result, self.options)
+                if component_type == "SentenceGenerator":
+                    sentences = component.run(article, analysis_result, self.options)
+                elif component_type == "SentenceProcessor":
+                    sentences = component.run(
+                        article, analysis_result, self.options, sentences
+                    )
+                elif component_type == "SentenceConsumer":
+                    component.run(article, analysis_result, self.options, sentences)
+                else:  # ArticleProcessor
+                    component.run(article, analysis_result, self.options)
             except torch.cuda.OutOfMemoryError as oom:
                 logger.error(
                     "CUDA OOM in %s: %s. Flushing cache and aborting article.",
-                    component.__class__.__name__,
+                    name,
                     oom,
                 )
                 torch.cuda.empty_cache()
                 raise
             except Exception as e:
-                logger.error(
-                    "Pipeline error in %s: %s", component.__class__.__name__, e
-                )
+                logger.error("Pipeline error in %s: %s", name, e)
                 raise
 
+        # Expose processed sentences for downstream services.
+        # ClaimExtraction sets result.sentences internally; only override
+        # if the dispatch loop produced its own sentence list.
+        if sentences:
+            analysis_result.sentences = sentences
         message.set_nlp_result(analysis_result)
         return message
 

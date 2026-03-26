@@ -95,14 +95,15 @@ class ModelManager:
                 key="CHECKWORTHY",
                 model_name=os.environ.get(
                     "NLP_CHECKWORTHY_MODEL",
-                    "valhalla/distilbart-mnli-12-3",
+                    "whispAI/ClaimBuster-DeBERTaV2",
                 ),
-                task_type="zero_shot_classification",
+                task_type="text_classification",
                 owner_component="CheckWorthinessFilter",
                 loader="transformers_pipeline",
                 device_policy=DevicePolicy.PREFER_GPU,
                 required=True,
-                estimated_memory_mb=600,
+                estimated_memory_mb=750,
+                loader_kwargs={"top_k": None},
             ),
             ModelEntry(
                 key="DECONTEXT_MODEL",
@@ -270,6 +271,9 @@ class ModelManager:
         if entry.task_type == "token_classification":
             return "token-classification"
 
+        if entry.task_type == "text_classification":
+            return "text-classification"
+
         return entry.task_type
 
     def _load_model(self, entry: ModelEntry) -> Any:
@@ -298,7 +302,19 @@ class ModelManager:
         elif entry.loader == "auto_model_seq2seq":
             from transformers import AutoModelForSeq2SeqLM
 
-            model = AutoModelForSeq2SeqLM.from_pretrained(entry.model_name)
+            model = AutoModelForSeq2SeqLM.from_pretrained(
+                entry.model_name, low_cpu_mem_usage=False
+            )
+            if device == "cuda":
+                model = model.to("cuda")
+            return model
+
+        elif entry.loader == "auto_model_qa":
+            from transformers import AutoModelForQuestionAnswering
+
+            model = AutoModelForQuestionAnswering.from_pretrained(
+                entry.model_name, low_cpu_mem_usage=False
+            )
             if device == "cuda":
                 model = model.to("cuda")
             return model

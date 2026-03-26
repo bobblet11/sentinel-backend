@@ -42,12 +42,14 @@ class SentenceExtraction(SentenceProcessor):
 
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(BERT_SCORING_MODEL)
-            self.scoring_model = AutoModel.from_pretrained(BERT_SCORING_MODEL).to(self.device)
+            self.scoring_model = AutoModel.from_pretrained(
+                BERT_SCORING_MODEL, low_cpu_mem_usage=False
+            ).to(self.device)
 
             self.nli_tokenizer = AutoTokenizer.from_pretrained(NLI_MODEL)
             self.nli_model = (
                 AutoModelForSequenceClassification
-                .from_pretrained(NLI_MODEL)
+                .from_pretrained(NLI_MODEL, low_cpu_mem_usage=False)
                 .to(self.device)
             )
 
