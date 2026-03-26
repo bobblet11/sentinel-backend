@@ -73,7 +73,7 @@ _STUB_ENV = {
     "CONSUMER_NAME": "nlp-consumer",
     "NLP_MAX_WORKERS": "1",
     "BATCH_SIZE": "1",
-    "USE_GPU": "false",
+    "USE_GPU": "true",
 }
 for k, v in _STUB_ENV.items():
     os.environ.setdefault(k, v)
@@ -95,6 +95,7 @@ log = logging.getLogger("pipeline_test")
 # ---------------------------------------------------------------------------
 from common.models.api.redis_models import Article, NLPOptions, NLPResult  # noqa: E402
 from microservices.nlp.components.claimextract import ClaimExtraction  # noqa: E402
+from microservices.nlp.components.device import DeviceConfig  # noqa: E402
 from microservices.nlp.config import model_manager  # noqa: E402
 
 # Prime heavy library imports in the main thread before load_all() spawns worker
@@ -124,7 +125,8 @@ def run_pipeline(article: Article, options: NLPOptions) -> Dict[str, Any]:
     stage_timings: Dict[str, float] = {}
     errors: List[str] = []
 
-    claim_extraction = ClaimExtraction(use_gpu=False, model_manager=model_manager)
+    device_config = DeviceConfig.resolve(use_gpu=True)
+    claim_extraction = ClaimExtraction(device_config=device_config, model_manager=model_manager)
 
     t0 = time.monotonic()
     try:

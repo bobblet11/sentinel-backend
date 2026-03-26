@@ -1,4 +1,3 @@
-import platform
 from typing import List
 
 import torch
@@ -109,14 +108,13 @@ try:
     QA_MODEL = get_env_var("NLP_QA_MODEL", str, config_logger, QA_MODEL)
     GEN_MODEL = get_env_var("NLP_GEN_MODEL", str, config_logger, GEN_MODEL)
 
-    # Device selection: CUDA > MPS (Mac) > CPU
+    # Unified device config for all NLP components
     use_gpu = get_env_var("USE_GPU", str, config_logger, "false").lower() == "true"
-    if use_gpu and torch.cuda.is_available():
-        DEVICE = "cuda"
-    elif platform.system() == "Darwin" and torch.backends.mps.is_available():
-        DEVICE = "mps"
-    else:
-        DEVICE = "cpu"
+
+    from microservices.nlp.components.device import DeviceConfig
+
+    DEVICE_CONFIG = DeviceConfig.resolve(use_gpu=use_gpu)
+    DEVICE = DEVICE_CONFIG.device  # backward compat alias for ModelManager
 
     input_streams: List[str] = INPUT_STREAMS
     output_streams: List[str] = [
@@ -151,7 +149,11 @@ except SystemExit:
     # Service env vars not available — running in component/test context.
     # Pipeline constants above are still fully usable.
     DUMMY_NLP_MODE = False
-    DEVICE = "cpu"
+
+    from microservices.nlp.components.device import DeviceConfig
+
+    DEVICE_CONFIG = DeviceConfig.resolve(use_gpu=False)
+    DEVICE = DEVICE_CONFIG.device
 
 from common.model_manager.manager import ModelManager
 

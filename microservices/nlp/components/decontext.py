@@ -2,7 +2,6 @@ import logging
 import re
 import time
 import spacy
-import platform
 import torch
 from typing import List, Optional
 from rank_bm25 import BM25Okapi
@@ -10,6 +9,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForQuest
 
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
+from microservices.nlp.components.device import DeviceConfig
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
 from microservices.nlp.config import (
     QG_MODEL, QA_MODEL, GEN_MODEL,
@@ -66,21 +66,11 @@ class Decontextualizer(SentenceProcessor):
         flags=re.IGNORECASE,
     )
 
-    def __init__(self, use_gpu: bool = True, nlp=None):
-        # Device selection: CUDA > MPS (Mac) > CPU
-        if use_gpu:
-            if torch.cuda.is_available():
-                self.device = "cuda"
-            elif platform.system() == "Darwin" and torch.backends.mps.is_available():
-                self.device = "mps"
-            else:
-                self.device = "cpu"
-        else:
-            self.device = "cpu"
-        self.device_id = 0 if self.device == "cuda" else -1
-        use_fp16       = self.device == "cuda"
+    def __init__(self, device_config: DeviceConfig, nlp=None):
+        self.device = device_config.device
+        self.device_id = device_config.device_id
 
-        logger.info(f"Decontextualizer: Initializing on {self.device} (fp16={use_fp16})...")
+        logger.info(f"Decontextualizer: Initializing on {self.device} (fp16={device_config.use_fp16})...")
 
         if nlp is not None:
             logger.info("Decontextualizer: Using shared spaCy model.")
@@ -92,29 +82,26 @@ class Decontextualizer(SentenceProcessor):
                 logger.error("Decontextualizer: Run: python -m spacy download en_core_web_sm")
                 raise
 
+        _dtype = device_config.dtype
+        _device_map = device_config.device_map
+
         # Question Generation model
         self.qg_tokenizer = AutoTokenizer.from_pretrained(QG_MODEL)
         self.qg_model = AutoModelForSeq2SeqLM.from_pretrained(
-            QG_MODEL,
-            torch_dtype=torch.float16 if use_fp16 else torch.float32,
-            low_cpu_mem_usage=False,
-        ).to(self.device)
+            QG_MODEL, dtype=_dtype, device_map=_device_map,
+        )
 
-        # Extractive QA model (replaces the pipeline, which was removed in transformers >=4.52)
+        # Extractive QA model
         self.qa_tokenizer = AutoTokenizer.from_pretrained(QA_MODEL)
         self.qa_model = AutoModelForQuestionAnswering.from_pretrained(
-            QA_MODEL,
-            torch_dtype=torch.float16 if use_fp16 else torch.float32,
-            low_cpu_mem_usage=False,
-        ).to(self.device)
+            QA_MODEL, dtype=_dtype, device_map=_device_map,
+        )
 
         # Generative rewrite model (FLAN-T5)
         self.gen_tokenizer = AutoTokenizer.from_pretrained(GEN_MODEL)
         self.gen_model = AutoModelForSeq2SeqLM.from_pretrained(
-            GEN_MODEL,
-            torch_dtype=torch.float16 if use_fp16 else torch.float32,
-            low_cpu_mem_usage=False,
-        ).to(self.device)
+            GEN_MODEL, dtype=_dtype, device_map=_device_map,
+        )
 
         logger.info("Decontextualizer: All models loaded successfully.")
 

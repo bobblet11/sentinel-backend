@@ -5,6 +5,7 @@ from typing import List, Dict, Any
 
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
+from microservices.nlp.components.device import DeviceConfig
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, Entity, SentenceScore
 from microservices.nlp.config import NER_MODEL, NER_BATCH_SIZE
 
@@ -18,26 +19,26 @@ class EntityRecognizer(ArticleProcessor):
     into result.entities_in_article.
     """
 
-    def __init__(self):
+    def __init__(self, device_config: DeviceConfig):
         self.model_name = NER_MODEL
-        self.device = 0 if torch.cuda.is_available() else -1
-        use_fp16 = torch.cuda.is_available()
+        self.device_id = device_config.device_id
 
         logger.info(f"EntityRecognizer: Loading '{self.model_name}' "
-                    f"on {'CUDA' if self.device == 0 else 'CPU'} "
-                    f"(fp16={use_fp16})...")
+                    f"on {device_config.device.upper()} "
+                    f"(fp16={device_config.use_fp16})...")
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self.model = AutoModelForTokenClassification.from_pretrained(
                 self.model_name,
-                torch_dtype=torch.float16 if use_fp16 else torch.float32,
+                dtype=device_config.dtype,
+                device_map=device_config.device_map,
             )
             self.nlp_pipeline = pipeline(
                 "ner",
                 model=self.model,
                 tokenizer=self.tokenizer,
                 aggregation_strategy="simple",
-                device=self.device,
+                device=device_config.device_id,
                 batch_size=NER_BATCH_SIZE,
             )
         except Exception as e:

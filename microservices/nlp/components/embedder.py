@@ -1,5 +1,4 @@
 import logging
-import platform
 import torch
 import numpy as np
 from typing import List
@@ -7,6 +6,7 @@ from sentence_transformers import SentenceTransformer
 
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
+from microservices.nlp.components.device import DeviceConfig
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
 from microservices.nlp.config import EMBEDDING_MODEL, EMBEDDER_BATCH_SIZE
 
@@ -42,21 +42,15 @@ class Embedder(SentenceProcessor):
     Does NOT otherwise modify result.
     """
 
-    def __init__(self, model_name: str = EMBEDDING_MODEL):
+    def __init__(self, device_config: DeviceConfig, model_name: str = EMBEDDING_MODEL):
         self.model_name = model_name
-        # Device selection: CUDA > MPS (Mac) > CPU
-        if torch.cuda.is_available():
-            self.device = "cuda"
-        elif platform.system() == "Darwin" and torch.backends.mps.is_available():
-            self.device = "mps"
-        else:
-            self.device = "cpu"
-        use_fp16 = torch.cuda.is_available()
+        self.device = device_config.device
 
-        logger.info(f"Embedder: Loading '{self.model_name}' on {self.device} (fp16={use_fp16})...")
+        logger.info(f"Embedder: Loading '{self.model_name}' on {self.device} "
+                    f"(fp16={device_config.use_fp16})...")
         try:
             self.model = SentenceTransformer(self.model_name, device=self.device)
-            if use_fp16:
+            if device_config.use_fp16:
                 self.model.half()
             logger.info("Embedder: Model loaded successfully.")
         except Exception as e:

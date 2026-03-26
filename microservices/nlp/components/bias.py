@@ -5,6 +5,7 @@ from transformers import pipeline
 
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
+from microservices.nlp.components.device import DeviceConfig
 from common.models.api.redis_models import Article, BiasProfile, NLPOptions, NLPResult
 from microservices.nlp.config import (
     BIAS_POLITICAL_MODEL, BIAS_SENTIMENT_MODEL,
@@ -59,27 +60,24 @@ class BiasDetector(ArticleProcessor):
         "positive": "Positive",
     }
 
-    def __init__(self):
-        device_id = 0 if torch.cuda.is_available() else -1
-        dtype     = torch.float16 if torch.cuda.is_available() else torch.float32
-
+    def __init__(self, device_config: DeviceConfig):
         logger.info(
-            f"BiasDetector: Loading models on {'CUDA' if device_id == 0 else 'CPU'} "
-            f"(fp16={device_id == 0})..."
+            f"BiasDetector: Loading models on {device_config.device.upper()} "
+            f"(fp16={device_config.use_fp16})..."
         )
 
         try:
             self.political_classifier = pipeline(
                 "zero-shot-classification",
                 model=BIAS_POLITICAL_MODEL,
-                device=device_id,
-                torch_dtype=dtype,
+                device=device_config.device_id,
+                torch_dtype=device_config.dtype,
             )
             self.sentiment_analyzer = pipeline(
                 "sentiment-analysis",
                 model=BIAS_SENTIMENT_MODEL,
-                device=device_id,
-                torch_dtype=dtype,
+                device=device_config.device_id,
+                torch_dtype=device_config.dtype,
                 truncation=True,
                 max_length=BIAS_SENTIMENT_MAX_LEN,
             )

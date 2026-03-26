@@ -5,6 +5,7 @@ from typing import List
 
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
+from microservices.nlp.components.device import DeviceConfig
 from common.models.api.redis_models import Article, Claim, NLPOptions, NLPResult, SentenceScore
 
 # Pipeline stage imports
@@ -51,9 +52,12 @@ class ClaimExtraction(ArticleProcessor):
     all models are pre-warmed.
     """
 
-    def __init__(self, use_gpu: bool = True, model_manager=None):
+    def __init__(self, device_config: DeviceConfig = None, model_manager=None):
         logger.info("ClaimExtraction: Initializing all pipeline stages...")
         t_start = time.time()
+
+        if device_config is None:
+            device_config = DeviceConfig.resolve(use_gpu=True)
 
         self.model_manager = model_manager
 
@@ -68,12 +72,12 @@ class ClaimExtraction(ArticleProcessor):
             raise
 
         self.preprocessor = Preprocessor(nlp=nlp_sm)
-        self.entity_recognizer = EntityRecognizer()
-        self.sentence_extractor = SentenceExtraction(use_fp16=use_gpu)
-        self.decontextualizer = Decontextualizer(use_gpu=use_gpu, nlp=nlp_sm)
-        self.checkworthiness = CheckWorthinessFilter()
-        self.embedder = Embedder()
-        self.bias_detector = BiasDetector()
+        self.entity_recognizer = EntityRecognizer(device_config=device_config)
+        self.sentence_extractor = SentenceExtraction(device_config=device_config)
+        self.decontextualizer = Decontextualizer(device_config=device_config, nlp=nlp_sm)
+        self.checkworthiness = CheckWorthinessFilter(device_config=device_config)
+        self.embedder = Embedder(device_config=device_config)
+        self.bias_detector = BiasDetector(device_config=device_config)
 
         logger.info(
             "ClaimExtraction: All models ready in %.2fs.",
