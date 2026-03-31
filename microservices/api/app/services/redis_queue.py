@@ -20,6 +20,10 @@ OUTLET_PATTERNS = {
     r"(cbsnews\.com|www\.cbsnews\.com)": "CBS",
     r"(nbcnews\.com|www\.nbcnews\.com)": "NBC",
     r"(npr\.org|www\.npr\.org)": "NPR",
+    r"(foxnews\.com|www\.foxnews\.com)": "Fox News",
+    r"(reuters\.com|www\.reuters\.com)": "Reuters",
+    r"(apnews\.com|www\.apnews\.com)": "AP News",
+    r"(aljazeera\.com|www\.aljazeera\.com)": "Al Jazeera",
 }
 
 def match_outlet_name(article_url: str) -> Optional[str]:
