@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && apt-get install -y --no-install-recommends \
     python3.12 python3.12-venv python3.12-dev && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 && \
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 
@@ -35,5 +37,7 @@ RUN pip install --no-cache-dir \
     -r requirements.txt \
     -r core-nlp-requirements.txt \
     && rm -rf core-requirements.txt requirements.txt core-nlp-requirements.txt
+
+RUN pip install --no-cache-dir "pip<25"
 
 COPY common/ /app/common/
