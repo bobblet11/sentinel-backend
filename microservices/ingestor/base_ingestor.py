@@ -8,8 +8,30 @@ from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 from common.io.json_updater import JsonHandler
 from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
-from typing import Iterator, Dict, Set, List, Any
+from typing import Iterator, Dict, Set, List, Any, Optional
 from datetime import datetime
+import re
+
+OUTLET_PATTERNS = {
+    r"(bbc\.com|bbc\.co\.uk|www\.bbc\.com)": "BBC",
+    r"(theguardian\.com|www\.theguardian\.com)": "The Guardian",
+    r"(cbc\.ca|www\.cbc\.ca)": "CBC",
+    r"(euronews\.com|www\.euronews\.com)": "Euronews",
+    r"(abcnews\.go\.com|abcnews\.com)": "ABC",
+    r"(cbsnews\.com|www\.cbsnews\.com)": "CBS",
+    r"(nbcnews\.com|www\.nbcnews\.com)": "NBC",
+    r"(npr\.org|www\.npr\.org)": "NPR",
+    r"(foxnews\.com|www\.foxnews\.com)": "Fox News",
+    r"(reuters\.com|www\.reuters\.com)": "Reuters",
+    r"(apnews\.com|www\.apnews\.com)": "AP News",
+    r"(aljazeera\.com|www\.aljazeera\.com)": "Al Jazeera",
+}
+
+def match_outlet_name(article_url: str) -> Optional[str]:
+    for pattern, outlet in OUTLET_PATTERNS.items():
+        if re.search(pattern, article_url):
+            return outlet
+    return None
 
 
 class BaseIngestor:
@@ -109,8 +131,9 @@ class BaseIngestor:
         # Step 4: Publish unseen articles
         messages_to_publish: List[Any] = []
         for article in unseen_articles:
-            # replace the news_outlet using the url -> news_outlet map thing
-            payload = MessagePayload(article_url=article.link, news_outlet=article.source, title=article.title, summary=article.summary)
+            matched_outlet = match_outlet_name(article.link or None)
+            news_outlet = matched_outlet or article.source
+            payload = MessagePayload(article_url=article.link, news_outlet=news_outlet, title=article.title, summary=article.summary)
             job_uid = hashlib.md5(article.link.encode()).hexdigest()[:36]
             message = Message(
                 header=MessageHeader(

@@ -38,13 +38,17 @@ class EuronewsParser(BaseParser):
         
         # 1. Try Meta Tags first (cleanest)
         
-        meta_author = soup.find("meta", {"name": "article:author"})
+        meta_author = soup.find("meta", {"name": "article:author"}) or soup.find("meta", {"property": "article:author"})
+
         if meta_author and meta_author.get("content"):
             author = meta_author["content"]
             
         time_tag = soup.find("time")
         if time_tag:
             published_at = time_tag.get("datetime")
+        
+        if published_at:
+            published_at = published_at.replace(" ", "T", 1)
             
         # 2. Get from DOM
         if not author or not published_at:
