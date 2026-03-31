@@ -4,7 +4,7 @@ WORKDIR /app
 
 # CPU PyTorch (~400MB vs 2GB+ CUDA)
 RUN pip install --no-cache-dir \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    "torch>=2.6.0" "torchvision>=0.21.0" "torchaudio>=2.6.0" --index-url https://download.pytorch.org/whl/cpu
 
 # nlp packages
 COPY docker/base/core-nlp-requirements.txt .

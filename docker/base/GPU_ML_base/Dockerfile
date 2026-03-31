@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common ca-certificates curl gnupg build-essential unzip && \
+    software-properties-common ca-certificates curl gnupg build-essential cmake unzip && \
     add-apt-repository ppa:deadsnakes/ppa -y && \
     apt-get update && apt-get install -y --no-install-recommends \
     python3.12 python3.12-venv python3.12-dev && \
@@ -24,7 +24,7 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && \
 
 # CUDA PyTorch (2.5GB+)
 RUN pip install --no-cache-dir \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+    "torch>=2.6.0" "torchvision>=0.21.0" "torchaudio>=2.6.0" --index-url https://download.pytorch.org/whl/cu121
 
 # Copy/install common + NLP deps (same as CPU base)
 WORKDIR /app
