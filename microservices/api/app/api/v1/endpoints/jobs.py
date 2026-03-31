@@ -5,6 +5,7 @@ from common.redis_client.hash_store import RedisHashStore
 from microservices.api.app.core.config import HASH_STORE_NAMESPACE
 from microservices.api.app.crud.crud_article import create_article, get_article_by_url
 from microservices.api.app.db.session import get_db
+from microservices.api.app.services.news_outlet import get_news_outlet
 from microservices.api.app.dtos.job import JobCreate, JobResponse, JobType
 from microservices.api.app.crud.crud_job import create_job, get_job, get_latest_job_for_article
 from microservices.api.app.models.article import Article
@@ -169,6 +170,7 @@ def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
                 return existing_job
 
         # Start of the "Unit of Work"
+        job_in.news_outlet = get_news_outlet(job_in.article_url)
         new_article: Article = create_article(db=db, job_in=job_in)
         new_job: Job = create_job(db=db, job_in=job_in, article_id=cast(int, new_article.id))
         
