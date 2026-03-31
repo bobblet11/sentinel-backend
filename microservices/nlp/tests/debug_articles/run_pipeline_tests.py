@@ -141,11 +141,8 @@ def run_pipeline(article: Article, options: NLPOptions) -> Dict[str, Any]:
         log.error(f"  [ClaimExtraction] ERROR: {exc}")
         traceback.print_exc()
 
-    sentences = result.sentences or []
-
     return {
         "result": result,
-        "sentences": sentences,
         "stage_timings": stage_timings,
         "errors": errors,
     }
@@ -155,24 +152,12 @@ def run_pipeline(article: Article, options: NLPOptions) -> Dict[str, Any]:
 # Pretty-print NLPResult (no embeddings)
 # ---------------------------------------------------------------------------
 
-def print_result(result: "NLPResult", sentences: List, stage_timings: Dict[str, float], errors: List[str]) -> None:
+def print_result(result: "NLPResult", stage_timings: Dict[str, float], errors: List[str]) -> None:
     sep = "=" * 70
 
     print(f"\n{sep}")
     print("NLP RESULT")
     print(sep)
-
-    # --- Sentences (from local tracking, not from result) ---
-    print(f"\nSENTENCES  ({len(sentences)} total)")
-    print("-" * 70)
-    for s in sentences:
-        entities_str = ", ".join(f"{e.entity_text}[{e.type_of_entity}]" for e in (s.entities or []))
-        worthy_flag = " ★" if s.is_checkworthy else ""
-        print(f"  [{s.index:02d}] score={s.score:.4f}  claim_type={s.claim_type or 'N/A':<10}"
-              f"  conf={s.confidence:.2f}{worthy_flag}")
-        print(f"       {s.text}")
-        if entities_str:
-            print(f"       entities: {entities_str}")
 
     # --- Bias ---
     print(f"\nBIAS PROFILE")
@@ -261,7 +246,7 @@ def main():
     log.info("Running pipeline…")
     run = run_pipeline(article, options)
 
-    print_result(run["result"], run["sentences"], run["stage_timings"], run["errors"])
+    print_result(run["result"], run["stage_timings"], run["errors"])
 
     if run["errors"]:
         sys.exit(1)
