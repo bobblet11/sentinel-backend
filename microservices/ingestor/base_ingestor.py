@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import hashlib
 import logging
 
@@ -34,26 +34,38 @@ class BaseIngestor:
         self.logger: logging.Logger = logging.getLogger("base_ingestor")
         self.stats_json_handler = JsonHandler(filename="stats.json")
 
-    def _log_stats(self, new:int, seen:int, total:int) -> None:
-        file_data = self.stats_json_handler.read_json()
-        
-        current_date = str(datetime.now().date())
-        entry = {
-            "new": new,
-            "seen": seen,
-            "total_processed": total
-        }
-        
-        existing_entry:Dict[str,Any] = file_data.get(current_date, None)
-        if existing_entry:
-            entry["new"] += existing_entry.get("new", 0)
-            entry["seen"] += existing_entry.get("seen", 0)
-            entry["total_processed"] += existing_entry.get("total_processed", 0)
 
-        file_data[current_date] = entry
+    def _log_stats(self, newly_seen_articles:int, non_new_articles:int, total_deduplicated_articles_processed:int) -> None:
+        file_data = self.stats_json_handler.read_json()
+
+        # Step 1: Generate key for our json file
+        today = datetime.now().date().isoformat()
+
+        # Step 2: Either append or create to this date's cycle
+        entry = file_data.setdefault(today, {
+            "newly_added_urls": 0,
+            "already_seen_urls": 0,
+            "total_urls_processed": 0,
+            "cycles" : 0
+        })
+        entry["newly_added_urls"] += newly_seen_articles
+        entry["already_seen_urls"] += non_new_articles
+        entry["total_urls_processed"] += total_deduplicated_articles_processed
+        entry["cycles"] += 1
         
-        self.stats_json_handler.write_json(file_data)
         
+        # Step 3: Prune to last 30 days
+        MAX_DAYS = 30
+        dates = sorted(data.keys())
+        if len(dates) > MAX_DAYS:
+            for old_date in dates[:-MAX_DAYS]:
+                del data[old_date]
+                
+                
+        # Step 4: Persist
+        file_data[today] = entry
+        self.stats_json_handler.write_json(data)
+
     
     def fetch_articles(self) -> Iterator[Article]: 
         """
@@ -79,32 +91,25 @@ class BaseIngestor:
         if len(raw_articles) == 0:
             self.logger.info("--- Ingestion cycle finished. No articles found. ---\n\n")
             return
-        
-        # Step 2: Check if url has already been seen
-        article_urls: List[str] = [a.link for a in raw_articles if a.link]
-        unique_urls: Set[str] = set(article_urls)
-        if not unique_urls:
-            self.logger.info("--- Ingestion cycle finished. No valid URLs found. ---\n\n")
+                
+        # Step 2: Get rid of any duplicates and malformed articles
+        unique_articles: Set[Article] = set([a for a in raw_articles if a.link])
+        if not unique_articles:
+            self.logger.info("--- Ingestion cycle finished. All urls are malformed or all duplicates. ---\n\n")
             return
         
-        # Step 3: Filter out articles that haven't been seen
-        unseen_urls: List[str] = self.duplicate_filter.has_many(list(unique_urls))
+
+        # Step 3: Filter out articles that have been seen
+        unseen_urls: Set[str] = set(self.duplicate_filter.has_many(list([a.link for a in unique_articles])))
         if not unseen_urls:
             self.logger.info("--- Ingestion cycle finished. Seen all articles already. ---\n\n")
             return
-        
-        unseen_urls_set: Set[str] = set(unseen_urls)
-        unseen_articles: List[Article] = []
-        for article in raw_articles:  # Preserve original order
-            if article.link in unseen_urls_set:
-                unseen_articles.append(article)
-                unseen_urls_set.remove(article.link)  # Only first occurrence
-            if not unseen_urls_set:
-                break
-                        
+        unseen_articles: List[Article] = [article for article in unique_articles if article.link in unseen_urls]
+            
         # Step 4: Publish unseen articles
         messages_to_publish: List[Any] = []
         for article in unseen_articles:
+            # replace the news_outlet using the url -> news_outlet map thing
             payload = MessagePayload(article_url=article.link, news_outlet=article.source, title=article.title, summary=article.summary)
             job_uid = hashlib.md5(article.link.encode()).hexdigest()[:36]
             message = Message(
@@ -121,27 +126,28 @@ class BaseIngestor:
             
             message = add_timestamp_to_message(message=message, stage_name=JobStage.INGESTED)
             messages_to_publish.append(message.model_dump())
-
         if len(messages_to_publish) == 0:
-            self.logger.info(
-                "--- Ingestion cycle finished. Cannot publish for some reason. ---\n\n"
-            )
+            self.logger.info("--- Ingestion cycle finished. No messages to publish. ---\n\n")
             return
-
         published_ids:List[str] = self.publisher.publish_many(messages_to_publish)
 
-        # Step 5: Add urls to cache for future cycles
-        self.duplicate_filter.add_many(unseen_urls)
+
+        # Step 5: Add unseen urls to cache for future cycles
+        self.duplicate_filter.add_many(list(unseen_urls))
         
-        new_count = len(unseen_articles)
-        seen_this_cycle = len(unique_urls) - len(unseen_urls)
-        total_fetched = len(raw_articles)
+
+        # Step 6: Update ingestion statistics
+        no_unseen_articles = len(unseen_articles)
+        no_seen_articles = len(unique_articles) - len(unseen_articles)
+        no_raw_articles_fetched = len(raw_articles)
+        no_raw_deduplicated_articles_fetched = len(unique_articles)
+        self._log_stats(no_unseen_articles, no_seen_articles, no_raw_deduplicated_articles_fetched)
         
-        self._log_stats(new_count, seen_this_cycle, total_fetched)
-        
+
+        # Step 7: Log results
         self.logger.info("--- Ingestion cycle finished ---")
-        self.logger.info(f"\tNew this cycle: {new_count}")
-        self.logger.info(f"\tSeen this cycle: {seen_this_cycle}")
-        self.logger.info(f"\tTotal fetched: {total_fetched} (unique URLs: {len(unique_urls)})")
-        self.logger.info(f"\tRedis total cached: {self.duplicate_filter.client.scard(self.duplicate_filter.key_name)}")
+        self.logger.info(f"\tNew articles encountered: {no_unseen_articles}")
+        self.logger.info(f"\tPreviously seen articles encountered: {no_seen_articles}")
+        self.logger.info(f"\tTotal fetched: {no_raw_articles_fetched} (deduplicated count: {no_raw_deduplicated_articles_fetched})")
+        self.logger.info(f"\tCachce size after: {self.duplicate_filter.client.scard(self.duplicate_filter.key_name)}")
         self.logger.info("-" * 10)
