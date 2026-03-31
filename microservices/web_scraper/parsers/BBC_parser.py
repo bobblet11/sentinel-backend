@@ -36,9 +36,13 @@ class BBCParser(BaseParser):
 
         # Author (BBC often doesn't list individual authors, just 'BBC News')
         author = None
-        meta_author = soup.find("meta", {"property": "article:author"}) or soup.find("meta", {"name": "author"})
+        meta_author = soup.find("meta", {"property": "cXenseParse:author"}) or soup.find("meta", {"property": "article:author"}) or soup.find("meta", {"name": "author"})
         if meta_author and meta_author.get("content"):
-            author = meta_author["content"]
+            content = meta_author["content"]
+            if content.startswith("http"):
+                author = None  # skip social media URLs, let fallback handle it
+            else:
+                author = content
 
         # Date
         published_at = None

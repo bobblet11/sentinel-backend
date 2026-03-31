@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from microservices.web_scraper.managers.parser_registry_manager import ParserRegistryManager
 from microservices.web_scraper.parsers.base_parser import BaseParser
 from dataclasses import asdict, dataclass
+from datetime import datetime
 
 @dataclass
 class ParseResult:
@@ -113,6 +114,8 @@ class ParseManager:
     def _strategy_trafilatura(self, raw_html:str)  -> Optional[ParseResult]:
         self.logger.debug(f"[level 2] Attempting parsing with trafilatura")
         
+        metadata = trafilatura.extract_metadata(raw_html)
+
         dirty_text: Optional[str] = self._extract_text_with_trafilatura(raw_html)
         
         if not dirty_text:
@@ -122,7 +125,10 @@ class ParseManager:
         
         if not clean_text:
             return None
-        return ParseResult(clean_text, None, None, None)
+        
+        author = metadata.author if metadata else None
+        published_at = metadata.date if metadata else None
+        return ParseResult(clean_text, None, author, published_at)
     
     
     def _strategy_fallback(self, soup: BeautifulSoup) -> Optional[ParseResult]:
@@ -134,6 +140,20 @@ class ParseManager:
     def _is_sufficient(self, result: ParseResult) -> bool:
         return result and result.text and len(result.text.strip()) > 100
     
+    def _normalise_date(self, raw: str) -> Optional[str]:
+        if not raw:
+            return None
+        # Already ISO with T
+        if "T" in raw:
+            return raw
+        # Handle "2026-03-27 21:24:16 +01:00" format
+        try:
+            dt = datetime.fromisoformat(raw)
+            return dt.isoformat()
+        except Exception:
+            pass
+        return raw
+    
     def _hydrate_missing_fields(self, result:ParseResult, soup:BeautifulSoup) -> ParseResult:
         if not result.title:
             result.title = self._extract_title(soup)
@@ -143,6 +163,9 @@ class ParseManager:
             
         if not result.published_at:
             result.published_at = self._extract_date(soup)
+        
+        if result.published_at:
+            result.published_at = self._normalise_date(result.published_at)
             
         return result
     
