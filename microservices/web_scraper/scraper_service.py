@@ -16,7 +16,7 @@ from microservices.web_scraper.config import (
 from microservices.web_scraper.managers.fetch_manager_selenium import fetch_manager
 from microservices.web_scraper.managers.parse_manager import parse_manager, ParseResult
 import traceback
-
+import re
 class FailedToFetch(Exception):
     def __init__(self, message):
         self.message = message
@@ -26,6 +26,28 @@ class FailedToParse(Exception):
         self.message = message
         super().__init__(self.message)
 
+
+
+OUTLET_PATTERNS = {
+    r"(bbc\.com|bbc\.co\.uk|www\.bbc\.com)": "BBC",
+    r"(theguardian\.com|www\.theguardian\.com)": "The Guardian",
+    r"(cbc\.ca|www\.cbc\.ca)": "CBC",
+    r"(euronews\.com|www\.euronews\.com)": "Euronews",
+    r"(abcnews\.go\.com|abcnews\.com)": "ABC",
+    r"(cbsnews\.com|www\.cbsnews\.com)": "CBS",
+    r"(nbcnews\.com|www\.nbcnews\.com)": "NBC",
+    r"(npr\.org|www\.npr\.org)": "NPR",
+    r"(foxnews\.com|www\.foxnews\.com)": "Fox News",
+    r"(reuters\.com|www\.reuters\.com)": "Reuters",
+    r"(apnews\.com|www\.apnews\.com)": "AP News",
+    r"(aljazeera\.com|www\.aljazeera\.com)": "Al Jazeera",
+}
+
+def match_outlet_name(article_url: str) -> Optional[str]:
+    for pattern, outlet in OUTLET_PATTERNS.items():
+        if re.search(pattern, article_url):
+            return outlet
+    return None
 class ScraperService(ServiceTemplate):
     """Concurrently scrapes, parses, and publishes messages"""
 
@@ -199,6 +221,17 @@ class ScraperService(ServiceTemplate):
                 )
             
             self._log_stats(fetch_time, parse_time)
+            
+            matched_outlet = match_outlet_name(message.link or "")
+            if matched_outlet:
+                message.data.payload.news_outlet = matched_outlet
+
+            self.logger.info(
+                "Outlet=%s Author=%s PublishDate=%s",
+                message.data.payload.news_outlet,
+                message.data.payload.author,
+                message.data.payload.publish_date,
+            )
             return message
         
         except FailedToFetch as e:
