@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.4.1-cudnn9-devel-ubuntu22.04
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -24,7 +24,7 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && \
 
 # CUDA PyTorch (2.5GB+)
 RUN pip install --no-cache-dir \
-    "torch>=2.6.0" "torchvision>=0.21.0" "torchaudio>=2.6.0" --index-url https://download.pytorch.org/whl/cu124
+    "torch==2.5.1" "torchvision==0.20.1" "torchaudio==2.5.1" --index-url https://download.pytorch.org/whl/cu121
 
 # Copy/install common + NLP deps (same as CPU base)
 WORKDIR /app
