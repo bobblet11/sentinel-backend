@@ -198,6 +198,8 @@ log_info "Building service images for '$CONFIG_NAME' configuration..."
 run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" build  || true
 
 log_info "Deploying services with the '$CONFIG_NAME' configuration..."
+log_warn "Ensuring external Docker network 'sentinel-net' exists..."
+sudo docker network create --driver bridge sentinel-net 2>/dev/null || true
 run_and_log sudo -E docker-compose "${DOCKER_COMPOSE_ARGS[@]}" up --force-recreate --renew-anon-volumes -d  
 
 echo -e "\n${GREEN}✅ Deployment complete! Configuration '$CONFIG_NAME' is running.${NC}\n"

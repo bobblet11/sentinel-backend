@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir \
     -r core-nlp-requirements.txt \
     && rm -rf core-nlp-requirements.txt
 
-RUN python -m spacy download en_core_web_sm
+RUN pip install --no-cache-dir "pip<25"
 
 # common packages
 COPY common/requirements.txt .

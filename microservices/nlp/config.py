@@ -150,9 +150,11 @@ except SystemExit:
     # Pipeline constants above are still fully usable.
     DUMMY_NLP_MODE = False
 
+    import os
     from microservices.nlp.components.device import DeviceConfig
 
-    DEVICE_CONFIG = DeviceConfig.resolve(use_gpu=False)
+    _use_gpu_fallback = os.environ.get("USE_GPU", "false").lower() == "true"
+    DEVICE_CONFIG = DeviceConfig.resolve(use_gpu=_use_gpu_fallback)
     DEVICE = DEVICE_CONFIG.device
 
 from common.model_manager.manager import ModelManager
