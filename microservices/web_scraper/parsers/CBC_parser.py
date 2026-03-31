@@ -42,24 +42,54 @@ class CBCParser(BaseParser):
         # DOM
         if not author or not published_at:
             byline_div = soup.find("div", class_="byline") or soup.find("div", class_="bylineDetails") or soup.find("div", class_="story-credits")
-            
+
             if byline_div:
                 # Author
                 if not author:
-                    author_spans = byline_div.find_all("span", class_="authorText") or byline_div.find_all("a", href=re.compile("author"))
-                    if author_spans:
-                        author = ", ".join([a.get_text(strip=True) for a in author_spans]) 
+                    # Try all <a> links first, fallback to text
+                    links = byline_div.find_all("a")
+                    if links:
+                        author = ", ".join([
+                            a.get_text(strip=True)
+                            for a in links
+                            if a.get_text(strip=True)
+                        ])
+                    else:
+                        author_text = byline_div.get_text(" ", strip=True)
+
+                        # remove 'By' prefix
+                        if author_text.lower().startswith("by "):
+                            author_text = author_text[3:].strip()
+
+                        # remove everything after separator like "·"
+                        if "·" in author_text:
+                            author_text = author_text.split("·")[0].strip()
+
+                        # remove "Posted:" or similar noise
+                        author_text = re.sub(r"Posted:.*", "", author_text).strip()
+
+                        if author_text:
+                            # remove "Posted..." part if present
+                            author_text = re.split(r"·|Posted:", author_text)[0].strip()
+
+                            # remove leading "By"
+                            author_text = re.sub(r"^By\s+", "", author_text, flags=re.IGNORECASE)
+
+                            author = author_text if author_text else None
 
                 # Date Fallback
                 if not published_at:
-                    full_text = byline_div.get_text(" ", strip=True)
-                    # Safe check before index
-                    if "Posted:" in full_text:
-                        try:
-                            # Split by "Posted:" and take the part after it
-                            published_at = full_text.split("Posted:", 1)[1].strip()
-                        except IndexError:
-                            pass
+                    # Try <time datetime=""> first
+                    time_tag = byline_div.find("time")
+                    if time_tag and time_tag.get("datetime"):
+                        published_at = time_tag["datetime"]
+                    else:
+                        # regex fallback
+                        full_text = byline_div.get_text(" ", strip=True)
+                        date_pattern = r"(\w+ \d{1,2}, \d{4})"  # e.g., March 30, 2026
+                        match = re.search(date_pattern, full_text)
+                        if match:
+                            published_at = match.group(1)
         if not title or not author or not published_at:
             print(f"[HARDCODED PARSE ERROR] something is not correct for {article_url}\n\t:text{text}\n\ttitle:{title}\n\tauthor:{author}\n\tpublished:{published_at}") 
 

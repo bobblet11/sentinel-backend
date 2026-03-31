@@ -1,21 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from psycopg2 import IntegrityError
+from sqlalchemy.exc import IntegrityError
 from common.models.api.dtos.job import JobStatus
 from common.redis_client.hash_store import RedisHashStore
 from microservices.api.app.core.config import HASH_STORE_NAMESPACE
-from microservices.api.app.crud.crud_article import create_article
+from microservices.api.app.crud.crud_article import create_article, get_article_by_url
 from microservices.api.app.db.session import get_db
-from microservices.api.app.dtos.job import JobCreate, JobResponse
-from microservices.api.app.crud.crud_job import create_job, get_job
+from microservices.api.app.services.news_outlet import get_news_outlet
+from microservices.api.app.dtos.job import JobCreate, JobResponse, JobType
+from microservices.api.app.crud.crud_job import create_job, get_job, get_latest_job_for_article
 from microservices.api.app.models.article import Article
 from microservices.api.app.models.job import Job
 from microservices.api.app.services.redis_queue import publish_job
 from sqlalchemy.orm import Session
 from uuid import UUID
 import asyncio
-import json
-from common.redis_client.connection import RedisConnection
-from typing import Dict, Any, List
+from typing import Dict, Any, List, cast
 import logging
 
 router = APIRouter()
@@ -90,15 +89,16 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
             "keyClaims": [...]
         }
     """
-    article_content = article.text or ""
-    article_content = article_content[:1800] if article_content else ""
+    article_text = cast(str | None, article.text)
+    article_content = (article_text or "")[:1800]
+    published_at = cast(Any, article.publishedAt)
     
     article_section = {
         "title": article.title or "",
         "url": article.url,
         "content": article_content,
         "source": article.outlet.name if article.outlet else "Unknown",
-        "publishedAt": article.publishedAt.isoformat() if article.publishedAt else "",
+        "publishedAt": published_at.isoformat() if published_at is not None else "",
     }
     
     # Transform matches into keyClaims
@@ -150,9 +150,29 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
 @router.post("/", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
     try:
+        requested_job_type = JobType.BACKGROUND.value if job_in.is_background else JobType.USER.value
+
+        # Seen article fast path: reuse most recent job for this URL and skip republishing.
+        existing_article = get_article_by_url(db=db, article_url=job_in.article_url)
+        if existing_article:
+            existing_job = get_latest_job_for_article(
+                db=db,
+                article_id=cast(int, existing_article.id),
+                job_type=requested_job_type,
+            )
+            if existing_job:
+                logger.info(
+                    "Seen article detected. Reusing existing job id=%s uid=%s for url=%s",
+                    existing_job.id,
+                    existing_job.uid,
+                    existing_article.url,
+                )
+                return existing_job
+
         # Start of the "Unit of Work"
+        job_in.news_outlet = get_news_outlet(job_in.article_url)
         new_article: Article = create_article(db=db, job_in=job_in)
-        new_job: Job = create_job(db=db, job_in=job_in, article_id=new_article.id)
+        new_job: Job = create_job(db=db, job_in=job_in, article_id=cast(int, new_article.id))
         
         # Only publish to Redis if the database commit was successful.
         publish_job(new_job, new_article, job_in)
@@ -166,7 +186,7 @@ def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Resource already exists. Error: {e.orig}"
+            detail=f"Resource already exists. Error: {str(e)}"
         )
     except Exception as e:
         # For any other unexpected error, rollback the entire transaction

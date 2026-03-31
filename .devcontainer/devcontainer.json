@@ -24,5 +24,7 @@
         "remoteUser": "vscode",
         "remoteEnv": {
                 "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
-        }
+        },
+        "runArgs": ["--network=sentinel-net"]
+
 }

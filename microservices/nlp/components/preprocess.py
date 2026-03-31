@@ -48,12 +48,25 @@ class Preprocessor(SentenceProcessor):
 
         lines = raw_text.split('\n')
         cleaned_lines = []
+        seen_lines = set()
         
         # Stop processing entirely when these markers appear
         footer_cutoff_pattern = re.compile(r'(?i)^('
             r'more from (the )?bbc|related (content|stories|topics)|up next|most popular|'
             r'have you read\?|more on geographies|license and republishing|content index|'
-            r'bbc\.com help|privacy policy|about us|follow .* on|sign up for'
+            r'bbc\.com help|privacy policy|about us|follow .* on|sign up for|'
+            r'explore more on these topics|most viewed|reuse this content|'
+            r'back to top|all topics|all writers|newsletters|digital newspaper archive|'
+            r'advertise with us|work with us|accessibility settings|'
+            r'understanding what is happening in the middle east is more important than ever|'
+            r'we rely on the generosity of our readers|'
+            r'choosing to back us on a monthly basis makes the most impact|'
+            r'our standards: the thomson reuters trust principles|'
+            r'suggested topics:|read next|site index|about reuters|stay informed|'
+            r'follow us|lseg products|workspace|data catalogue|world-check|'
+            r'information you can trust|all quotes delayed a minimum of 15 minutes|'
+            r'copyright|terms & conditions|privacy|manage cookies|'
+            r'reuters, the news and media division of thomson reuters'
         r')')
         
         # Filter patterns for metadata and UI elements
@@ -78,6 +91,10 @@ class Preprocessor(SentenceProcessor):
             r'skip to.*|'
             r'share|save|follow|subscribe|'
             r'menu|home|news|sport|weather|'
+            r'support (the )?guardian|support us|continue|remind me in .*|'
+            r'view image in fullscreen|prefer the guardian on google|'
+            r'report ad|loading ad|advertisement.*|'
+            r'exclusive news, data and analytics for financial market professionals|'
             r'listen to .* read this article|'
             r'loading\.\.\.|'
             r'create a free account|'
@@ -90,6 +107,30 @@ class Preprocessor(SentenceProcessor):
             r'writer,.*'
         r')')
 
+        # Catch encoded/debug fragments and broken telemetry tails.
+        junk_pattern = re.compile(r'(?i)^('
+            r'in/[a-z0-9/_-]{6,}|'
+            r'more data|summary reportdiagnosisdensity|'
+            r'\d{1,4}\s+\d{1,4}\s+n/?a|'
+            r'\[\d+/\d+\].*|item\s+\d+\s+of\s+\d+.*|'
+            r'\d+\s+seconds\s+of\s+\d+\s+seconds.*volume\s*\d+%'
+        r')')
+
+        # Reuters metadata and utility lines that are not article body.
+        reuters_meta_pattern = re.compile(r'(?i)^('
+            r'march\s+\d{1,2},\s+\d{4}.*(gmt|est|edt|utc|am|pm).*(updated|ago)?|'
+            r'reporting by .*; writing by .*; editing by .*|'
+            r'purchase licensing rights|'
+            r'thomson reuters|'
+            r'category|'
+            r'opens new tab|'
+            r'download the app \(ios\)|download the app \(android\)|'
+            r'reuters leadership|reuters fact check|reuters diversity report|'
+            r'media center|advertise with us|reuters news agency|'
+            r'brand attribution guidelines|reuters and ai|'
+            r'data disclosure and sources|site feedback'
+        r')')
+
         # Matches photo/image attribution lines of the form
         # "Name/Agency/Agency." or "Agency/Getty Images." — these are
         # not sentences; they are short, slash-separated, and contain
@@ -98,19 +139,37 @@ class Preprocessor(SentenceProcessor):
 
         for line in lines:
             line = line.strip()
-            if not line: 
-                continue 
-            if len(line) < 4: 
+            line = re.sub(r'\s+', ' ', line)
+
+            # Basic Filtering
+            if not line:
                 continue
-            
-            if footer_cutoff_pattern.search(line): 
+            if len(line) < 4:
+                continue # Catches very short noise like "EPA."
+
+            # Skip exact duplicates which are common in scraped nav blocks.
+            lowered = line.lower()
+            if lowered in seen_lines:
+                continue
+            seen_lines.add(lowered)
+
+            # --- PHASE 2: CUTOFF CHECK ---
+            if footer_cutoff_pattern.search(line):
+                # Stop processing the rest of the file
                 break
-            
-            if ui_pattern.search(line): 
+
+            # --- PHASE 3: REGEX FILTERING ---
+            if ui_pattern.search(line):
                 continue
-            if time_meta_pattern.search(line): 
+            if time_meta_pattern.search(line):
                 continue
-            if credits_pattern.search(line): 
+            if credits_pattern.search(line):
+                continue
+            if byline_pattern.search(line) and len(line) < 50:
+                continue
+            if junk_pattern.search(line):
+                continue
+            if reuters_meta_pattern.search(line):
                 continue
 
             # Drop short slash-separated photo attribution lines
@@ -122,12 +181,20 @@ class Preprocessor(SentenceProcessor):
                 has_verb = any(t.pos_ in ("VERB", "AUX") for t in self.nlp(line))
                 if not has_verb:
                     continue
-            
-            # Filter bylines unless they are unusually long (potential sentences)
-            if byline_pattern.search(line) and len(line) < 50: 
+
+            # Reuters often inserts newsletter and summary/companies utility blocks.
+            if line.lower() in {"summary", "companies", "latest", "archive", "browse", "videos", "pictures", "graphics", "podcasts", "authors", "home"}:
                 continue
-            
-            # Repair missing sentence endings
+
+            # Drop pure section menus and taxonomy lists (e.g., "Business", "Economics").
+            if re.fullmatch(r"[A-Za-z& ]{3,30}", line):
+                token_count = len(line.split())
+                if token_count <= 3:
+                    continue
+
+            # --- PHASE 4: STRUCTURAL REPAIR ---
+            # If a line is a header/claim (no punctuation), force a period.
+            # This ensures Spacy splits it from the next line.
             if line[-1] not in ".?!:;\"'":
                 line += "."
             

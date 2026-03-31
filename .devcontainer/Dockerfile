@@ -18,6 +18,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     gnupg \
     lsb-release \
     redis-tools \
+    redis-server \
     postgresql-client \
     jq \
     expect

@@ -38,7 +38,7 @@ class NPRParser(BaseParser):
         
         # 1. Try Meta Tags first (cleanest)
         
-        meta_author = soup.find("meta", {"property": "cXenseParse:author"})
+        meta_author = soup.find("meta", {"name": "cXenseParse:author"})
         if meta_author and meta_author.get("content"):
             author = meta_author["content"]
             

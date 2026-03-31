@@ -84,8 +84,12 @@ class NLPService(ServiceTemplate):
     def __init__(self, config: ServiceConfig, options: NLPOptions) -> None:
         super().__init__(config)
 
-        self.options = options or NLPOptions()
+        if torch.cuda.is_available():
+            self.logger.info("GPU DETECTED")
+        else:
+            self.logger.info("GPU NOT DETECTED")
 
+        self.options = options or NLPOptions()
         # Only load models if NOT in dummy mode
         if DUMMY_NLP_MODE:
             logger.info("DUMMY_NLP_MODE enabled - skipping model loading")

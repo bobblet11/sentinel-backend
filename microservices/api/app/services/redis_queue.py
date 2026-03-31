@@ -8,6 +8,9 @@ from microservices.api.app.core.config import OUTPUT_STREAM
 from microservices.api.app.dtos.job import JobCreate, JobResponse, JobType
 from microservices.api.app.models.article import Article
 from microservices.api.app.models.job import Job
+from typing import Optional
+
+
 
 
 routing_map = {JobType.USER.value: OUTPUT_STREAM, JobType.BACKGROUND.value: OUTPUT_STREAM}
@@ -18,9 +21,7 @@ publisher = RedisPublisherRouter(
 
 def publish_job(job: Job, article: Article, job_dto: JobCreate)->None:
 	try:	
-         
 		payload = MessagePayload(article_url=article.url, raw_html=job_dto.article_html, parsed_text=job_dto.article_text, news_outlet=job_dto.news_outlet, title=job_dto.article_title, summary=job_dto.article_summary)
-		
 		message = Message(
 			header=MessageHeader(
 				id=job.id,

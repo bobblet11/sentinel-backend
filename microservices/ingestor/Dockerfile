@@ -6,6 +6,7 @@ WORKDIR /app
 COPY microservices/ingestor/requirements.txt .
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cron dos2unix \
+    && pip install --no-cache-dir -r requirements.txt \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # copy code
