@@ -9,10 +9,18 @@ from microservices.web_scraper.parsers.base_parser import BaseParser, ParseResul
 class TheGuardianParser(BaseParser):
     def extract(self, soup: BeautifulSoup, article_url: str) -> Optional[ParseResult]:
         # Guardian usually puts content in div[data-gu-name='body'] or main
-        container = soup.find("div", {"data-gu-name": "body"}) or soup.find("main") or soup
+        container = (
+            soup.find("div", {"data-gu-name": "body"}) or
+            soup.find("article") or
+            soup.find("main") or
+            soup
+        )
         self._remove_unwanted(container)
 
         paragraphs = container.find_all("p")
+        # also look inside divs if no paragraphs found
+        if not paragraphs:
+            paragraphs = container.find_all("div")
         text = self._clean_paragraphs(paragraphs)
         if not text:
             return None
@@ -33,10 +41,19 @@ class TheGuardianParser(BaseParser):
         author = None
         published_at = None
         
-        # Guardian Meta tags are excellent
-        meta_author = soup.find("meta", {"name": "author"})
+        
+        meta_author = soup.find("meta", {"name": "author"}) or soup.find("meta", {"property": "article:author"})
         if meta_author and meta_author.get("content"):
-            author = meta_author["content"]
+            content = meta_author["content"]
+            if content.startswith("http"):
+                slug = content.split("/")[-1]
+                author = " ".join(word.capitalize() for word in slug.split("-"))
+
+            else:
+                author = content
+
+        # if meta_author and meta_author.get("content"):
+        #     author = meta_author["content"]
 
         meta_date = soup.find("meta", {"property": "article:published_time"})
         if meta_date and meta_date.get("content"):

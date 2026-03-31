@@ -25,3 +25,8 @@ claude_docs
 GEMINI.md
 AGENTS.md
 .opencode
+
+*.zip
+.zip
+backups.zip
+node_modules/
