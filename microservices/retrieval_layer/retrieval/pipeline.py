@@ -6,7 +6,7 @@ from microservices.retrieval_layer.retrieval.nli import classify_claim_relation
 
 MAX_CANDIDATES_BEFORE_EMBEDDING = 100
 MAX_CANDIDATES_BEFORE_NLI = 10
-MIN_SIMILARITY = 0
+MIN_SIMILARITY = 0.25
 
 
 def retrieve_candidate_claims(
