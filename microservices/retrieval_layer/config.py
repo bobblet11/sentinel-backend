@@ -60,7 +60,7 @@ DUMMY_SEED_MODE: bool = get_env_var(
 )
 
 HASH_STORE_NAMESPACE: str = get_env_var("HASH_STORE_NAMESPACE",str, config_logger)
-TEST_MODE: bool = True
+TEST_MODE: bool = False
 
 env_variables: List[EnvVariable] = [
     EnvVariable("POSTGRES_HOST", POSTGRES_HOST),

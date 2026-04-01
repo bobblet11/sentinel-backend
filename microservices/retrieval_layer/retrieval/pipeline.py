@@ -1,12 +1,12 @@
 from sqlalchemy.orm import Session
-from microservices.retrieval_layer.retrieval.entity_filter import filter_by_entities
-from microservices.retrieval_layer.retrieval.keyword_filter import filter_by_keywords
+from microservices.retrieval_layer.retrieval.entity_filter import find_evidence_by_entity_match
+from microservices.retrieval_layer.retrieval.keyword_filter import find_evidence_by_tfidf
 from microservices.retrieval_layer.retrieval.embedding_retriever import retrieve_by_embedding
 from microservices.retrieval_layer.retrieval.nli import classify_claim_relation
 
 MAX_CANDIDATES_BEFORE_EMBEDDING = 100
 MAX_CANDIDATES_BEFORE_NLI = 10
-MIN_SIMILARITY = 0.25
+MIN_SIMILARITY = 0
 
 
 def retrieve_candidate_claims(
@@ -30,11 +30,10 @@ def retrieve_candidate_claims(
     # ---------- 1. Symbolic filtering ----------
     candidates = {}
 
-    for c in filter_by_entities(db, entities):
+    for c in find_evidence_by_entity_match(db, entities):
         candidates[c.id] = c
 
-    keywords = claim_text.split()
-    for c in filter_by_keywords(db, keywords):
+    for c in find_evidence_by_tfidf(db, claim_text, limit=50):
         candidates[c.id] = c
 
     candidate_list = list(candidates.values())
@@ -44,7 +43,16 @@ def retrieve_candidate_claims(
     # print("Candidates after symbolic:", len(candidate_list))
 
     if not candidate_list:
-        return []
+        # fallback to embedding-only search
+        ranked = retrieve_by_embedding(
+            db=db,
+            query_embedding=claim_embedding,
+            candidate_claim_ids=[],  # means full scan inside function if handled
+            top_k=top_k,
+            exclude_claim_id=exclude_claim_id,
+            # exclude_article_id=exclude_article_id
+        )
+        return ranked
 
     # Hard cap before embedding search
     candidate_list = candidate_list[:MAX_CANDIDATES_BEFORE_EMBEDDING]
@@ -53,7 +61,7 @@ def retrieve_candidate_claims(
     ranked = retrieve_by_embedding(
         db=db,
         query_embedding=claim_embedding,
-        candidate_claim_ids=[c.id for c in candidate_list],
+        candidate_claim_ids=[c.id for c in candidate_list] if candidate_list else None,
         top_k=top_k,
         exclude_claim_id=exclude_claim_id,
     )
@@ -78,19 +86,19 @@ def retrieve_candidate_claims(
 
     ranked_with_nli = []
 
-    for claim, score in ranked:
+    for claim_dict, score in ranked:
         try:
             label, confidence = classify_claim_relation(
                 claim_text,
-                claim["decontextualised_claim"]
+                claim_dict["decontextualised_claim"]
             )
         except Exception as e:
-            print(f"Error during NLI for claim ID {claim['id']}:")
+            print(f"Error during NLI for claim ID {claim_dict['id']}:")
             print(e)
             label, confidence = "irrelevant", 0.0
 
         ranked_with_nli.append(
-            (claim, score, label, confidence)
+            (claim_dict, score, label, confidence)
         )
 
     return ranked_with_nli
