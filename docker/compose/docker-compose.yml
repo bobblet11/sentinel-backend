@@ -276,7 +276,7 @@ services:
     image: sentinel/nlp-service:latest
     build:
       args:
-        BASE_IMAGE: sentinel/python-ml-gpu:3.12-cuda121
+        BASE_IMAGE: sentinel/python-ml-gpu:3.12-cuda124
       context: ../../
       dockerfile: ./microservices/nlp/Dockerfile
     shm_size: '${NLP_SHM_SIZE:-4gb}'

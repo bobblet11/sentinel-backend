@@ -188,7 +188,7 @@ run_and_log sudo -E docker build --pull=false -t sentinel/python-ml-cpu:3.12 -f 
 ARCH=$(uname -m)
 if [ "$ARCH" = "x86_64" ]; then
     log_warn "Building base Docker image \"GPU_ML_base\"..."
-    run_and_log sudo -E docker build --pull -t sentinel/python-ml-gpu:3.12-cuda121 -f "$PROJECT_ROOT/docker/base/GPU_ML_base/Dockerfile" "$PROJECT_ROOT"
+    run_and_log sudo -E docker build --pull -t sentinel/python-ml-gpu:3.12-cuda124 -f "$PROJECT_ROOT/docker/base/GPU_ML_base/Dockerfile" "$PROJECT_ROOT"
 else
     log_warn "Skipping GPU_ML_base build on unsupported architecture: $ARCH"
 fi

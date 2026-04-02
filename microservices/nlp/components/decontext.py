@@ -83,25 +83,27 @@ class Decontextualizer(SentenceProcessor):
                 raise
 
         _dtype = device_config.dtype
-        _device_map = device_config.device_map
+        # Disable low_cpu_mem_usage to prevent accelerate from initialising
+        # weights on the meta device (which breaks .to() and .generate()).
+        _load_kw = dict(dtype=_dtype, low_cpu_mem_usage=False)
 
         # Question Generation model
         self.qg_tokenizer = AutoTokenizer.from_pretrained(QG_MODEL)
         self.qg_model = AutoModelForSeq2SeqLM.from_pretrained(
-            QG_MODEL, dtype=_dtype, device_map=_device_map,
-        )
+            QG_MODEL, **_load_kw,
+        ).to(self.device)
 
         # Extractive QA model
         self.qa_tokenizer = AutoTokenizer.from_pretrained(QA_MODEL)
         self.qa_model = AutoModelForQuestionAnswering.from_pretrained(
-            QA_MODEL, dtype=_dtype, device_map=_device_map,
-        )
+            QA_MODEL, **_load_kw,
+        ).to(self.device)
 
         # Generative rewrite model (FLAN-T5)
         self.gen_tokenizer = AutoTokenizer.from_pretrained(GEN_MODEL)
         self.gen_model = AutoModelForSeq2SeqLM.from_pretrained(
-            GEN_MODEL, dtype=_dtype, device_map=_device_map,
-        )
+            GEN_MODEL, **_load_kw,
+        ).to(self.device)
 
         logger.info("Decontextualizer: All models loaded successfully.")
 
