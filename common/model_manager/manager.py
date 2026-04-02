@@ -1,7 +1,9 @@
+import json
 import logging
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from common.model_manager.exceptions import (
@@ -81,13 +83,13 @@ class ModelManager:
                 key="NER",
                 model_name=os.environ.get(
                     "NLP_NER_MODEL",
-                    "dslim/bert-base-NER",
+                    "dslim/bert-base-NER-uncased",
                 ),
                 task_type="token_classification",
                 owner_component="EntityRecognizer",
                 loader="transformers_pipeline",
                 device_policy=DevicePolicy.PREFER_GPU,
-                loader_kwargs={"aggregation_strategy": "simple"},
+                loader_kwargs={"aggregation_strategy": "simple", "batch_size": 16},
                 required=True,
                 estimated_memory_mb=420,
             ),
@@ -256,6 +258,86 @@ class ModelManager:
         # PREFER_GPU and GPU_REQUIRED both defer to the instance device.
         return self._device
 
+    def _validate_hf_cache(self, model_name: str) -> None:
+        """
+        Check the HuggingFace cache for corrupted files (e.g. empty JSON from
+        interrupted downloads) and remove them so ``from_pretrained`` will
+        re-download cleanly.
+        """
+        ModelManager.validate_hf_cache(model_name)
+
+    @staticmethod
+    def validate_hf_cache(model_name: str) -> None:
+        """
+        Check the HuggingFace cache for corrupted files (e.g. empty JSON from
+        interrupted downloads) and remove them so ``from_pretrained`` will
+        re-download cleanly.
+
+        Can be called as a standalone utility without a ModelManager instance:
+            ``ModelManager.validate_hf_cache("dslim/bert-base-NER-uncased")``
+        """
+        hf_home = os.environ.get("HF_HOME") or os.environ.get(
+            "TRANSFORMERS_CACHE",
+            os.path.join(os.path.expanduser("~"), ".cache", "huggingface"),
+        )
+        hub_cache = Path(hf_home) / "hub"
+        if not hub_cache.is_dir():
+            return
+
+        # HF cache stores models under models--<org>--<name>
+        safe_name = model_name.replace("/", "--")
+        model_dir = hub_cache / f"models--{safe_name}"
+        if not model_dir.is_dir():
+            return
+
+        # Walk snapshot directories looking for corrupt JSON/config files.
+        corrupt_found = False
+        for json_file in model_dir.rglob("*.json"):
+            if json_file.stat().st_size == 0:
+                logger.warning(
+                    "ModelManager: Removing empty cache file %s (corrupted download).",
+                    json_file,
+                )
+                json_file.unlink()
+                corrupt_found = True
+                continue
+            # Validate that JSON files are parseable.
+            try:
+                with open(json_file, "r") as f:
+                    json.load(f)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                logger.warning(
+                    "ModelManager: Removing corrupt cache file %s.",
+                    json_file,
+                )
+                json_file.unlink()
+                corrupt_found = True
+
+        if corrupt_found:
+            # Also remove the corresponding blob files that reference the
+            # deleted snapshots, if any refs point to missing files.
+            refs_dir = model_dir / "refs"
+            if refs_dir.is_dir():
+                for ref_file in refs_dir.iterdir():
+                    if ref_file.is_file():
+                        ref_hash = ref_file.read_text().strip()
+                        snapshot_dir = model_dir / "snapshots" / ref_hash
+                        if snapshot_dir.is_dir():
+                            # Check if this snapshot has broken symlinks
+                            for f in snapshot_dir.iterdir():
+                                if f.is_symlink() and not f.exists():
+                                    logger.warning(
+                                        "ModelManager: Removing broken symlink %s.",
+                                        f,
+                                    )
+                                    f.unlink()
+
+            logger.info(
+                "ModelManager: Cleaned corrupted cache for '%s'. "
+                "Model will be re-downloaded on next load.",
+                model_name,
+            )
+
     def _resolve_hf_task(self, entry: ModelEntry) -> str:
         """Map a ModelEntry's task_type to the HuggingFace pipeline task string."""
         if entry.key == "BIAS":
@@ -278,6 +360,10 @@ class ModelManager:
 
     def _load_model(self, entry: ModelEntry) -> Any:
         """Dispatch to the appropriate loader based on entry.loader."""
+        # Validate HF cache before loading to detect corrupted downloads.
+        if entry.loader != "spacy":
+            self._validate_hf_cache(entry.model_name)
+
         device = self._resolve_device(entry.device_policy)
 
         if entry.loader == "spacy":

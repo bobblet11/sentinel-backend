@@ -239,6 +239,7 @@ services:
 
     volumes:
       - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
+      - nlp-hf-cache:/opt/sentinel/models/huggingface
 
     restart: unless-stopped
     networks:
@@ -290,6 +291,7 @@ services:
 
     volumes:
       - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
+      - nlp-hf-cache:/opt/sentinel/models/huggingface
 
     restart: unless-stopped
     networks:
@@ -388,3 +390,6 @@ services:
 networks:
   sentinel-net:
     external: true
+
+volumes:
+  nlp-hf-cache:
