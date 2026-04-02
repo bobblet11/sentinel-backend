@@ -170,7 +170,7 @@ def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
                 return existing_job
 
         # Start of the "Unit of Work"
-        job_in.news_outlet = get_news_outlet(job_in.article_url)
+        job_in.news_outlet = get_news_outlet(job_in)
         new_article: Article = create_article(db=db, job_in=job_in)
         new_job: Job = create_job(db=db, job_in=job_in, article_id=cast(int, new_article.id))
         
@@ -191,6 +191,12 @@ def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
     except Exception as e:
         # For any other unexpected error, rollback the entire transaction
         db.rollback()
+        logger.error(
+            "Failed to submit job for url=%s: %s",
+            job_in.article_url,
+            e,
+            exc_info=(type(e), e, e.__traceback__),
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {e}"
@@ -280,6 +286,12 @@ async def get_retrieval_result(job_uid: UUID, timeout: int = Query(30, ge=5, le=
         raise
     
     except Exception as e:
+        logger.error(
+            "Failed to retrieve result for job_uid=%s: %s",
+            job_uid,
+            e,
+            exc_info=(type(e), e, e.__traceback__),
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving result: {str(e)}"
