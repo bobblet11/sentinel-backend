@@ -434,8 +434,17 @@ class Decontextualizer(SentenceProcessor):
         logger.info(f"Decontextualizer: Phase 9 done ({time.perf_counter() - t_phase:.1f}s)")
 
         # ── Phase 10: apply results back to SentenceScore objects ──────────
-        rejection_summary = {"empty": 0, "unchanged": 0, "has_question": 0, "too_long": 0, "accepted": 0}
-        
+        _AMBIGUOUS_PRONOUNS = {"he", "she", "they", "it", "his", "her", "their", "its", "him", "them"}
+
+        def _has_unresolved_pronouns(original: str, rewrite: str) -> bool:
+            """Return True if the rewrite still contains a pronoun that was present in the original."""
+            orig_words = set(original.lower().split())
+            rw_words = set(rewrite.lower().split())
+            orig_pronouns = orig_words & _AMBIGUOUS_PRONOUNS
+            return bool(orig_pronouns & rw_words)
+
+        rejection_summary = {"empty": 0, "unchanged": 0, "has_question": 0, "too_long": 0, "has_pronoun": 0, "accepted": 0}
+
         for i, sent_obj in enumerate(sentences):
             text = texts[i]
             if not text:
@@ -446,8 +455,8 @@ class Decontextualizer(SentenceProcessor):
             if rw_idx is not None:
                 rewritten = all_rewrites[rw_idx]
                 max_len   = int(len(text) * DECONTEXT_REWRITE_RATIO)
-                
-                # Quality gate: reject if empty, unchanged, contains "?", or too long
+
+                # Quality gate: reject if empty, unchanged, contains "?", too long, or pronouns unresolved
                 rejection_reason = None
                 if not rewritten:
                     rejection_reason = "empty"
@@ -461,7 +470,10 @@ class Decontextualizer(SentenceProcessor):
                 elif len(rewritten) > max_len:
                     rejection_reason = "too_long"
                     rejection_summary["too_long"] += 1
-                
+                elif _has_unresolved_pronouns(text, rewritten):
+                    rejection_reason = "has_pronoun"
+                    rejection_summary["has_pronoun"] += 1
+
                 if rejection_reason:
                     logger.debug(
                         f"Decontextualizer [Phase 10] Sentence {i}: Rewrite REJECTED ({rejection_reason}) | "
@@ -490,7 +502,8 @@ class Decontextualizer(SentenceProcessor):
             f"Rejected (empty={rejection_summary['empty']}, "
             f"unchanged={rejection_summary['unchanged']}, "
             f"has_?={rejection_summary['has_question']}, "
-            f"too_long={rejection_summary['too_long']})"
+            f"too_long={rejection_summary['too_long']}, "
+            f"has_pronoun={rejection_summary['has_pronoun']})"
         )
 
         logger.info("Decontextualizer: Complete.")
