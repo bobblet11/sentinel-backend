@@ -8,8 +8,8 @@ pydantic-settings==2.2.1
 requests>=2.31.0
 
 # === Core Data Handling ===
-numpy==1.26.4
-pandas==2.2.2
+numpy==2.4.3
+pandas==3.0.1
 
 # === Performance & Dependency Management ===
 setuptools 

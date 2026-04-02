@@ -71,13 +71,13 @@ class BiasDetector(ArticleProcessor):
                 "zero-shot-classification",
                 model=BIAS_POLITICAL_MODEL,
                 device=device_config.device_id,
-                torch_dtype=device_config.dtype,
+                dtype=device_config.dtype,
             )
             self.sentiment_analyzer = pipeline(
                 "sentiment-analysis",
                 model=BIAS_SENTIMENT_MODEL,
                 device=device_config.device_id,
-                torch_dtype=device_config.dtype,
+                dtype=device_config.dtype,
                 truncation=True,
                 max_length=BIAS_SENTIMENT_MAX_LEN,
             )

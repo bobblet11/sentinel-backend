@@ -38,7 +38,6 @@ class EntityRecognizer(ArticleProcessor):
                 model=self.model,
                 tokenizer=self.tokenizer,
                 aggregation_strategy="simple",
-                device=device_config.device_id,
                 batch_size=NER_BATCH_SIZE,
             )
         except Exception as e:
