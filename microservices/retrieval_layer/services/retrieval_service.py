@@ -1,7 +1,7 @@
 from asyncio import as_completed
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Tuple
-
+from datetime import datetime, timedelta
 from requests import Session
 
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
@@ -9,7 +9,6 @@ from common.redis_client.hash_store import RedisHashStore
 from common.service.service_template import ServiceTemplate
 from common.models.api.redis_models import BiasProfile, Claim, Message, RetrievalResult, StreamMessage
 from common.redis_client.publisher import RedisPublisher
-from microservices.retrieval_layer.retrieval.common_words import STOP_WORDS
 from microservices.retrieval_layer.retrieval.embedding_retriever import retrieve_by_embedding
 from microservices.retrieval_layer.retrieval.entity_filter import find_evidence_by_entity_match
 from microservices.retrieval_layer.retrieval.keyword_filter import find_evidence_by_keyword_match
@@ -90,12 +89,12 @@ class RetrievalService(ServiceTemplate):
             verdict = "true"
         elif net_support >= 0.1:
             verdict = "mostly-true"
-        elif net_support <= -0.5:
-            verdict = "false"
-        elif net_support <= 0.1:
+        elif net_support > -0.1:
+            verdict = "mixed"
+        elif net_support > -0.5:
             verdict = "mostly-false"
         else:
-            verdict = "mixed"
+            verdict = "false"
         
         # Calculate confidence (0-100) based on:
         avg_quality = sum(m["similarity"] * m["confidence"] for m in relevant) / len(relevant)
@@ -131,7 +130,7 @@ class RetrievalService(ServiceTemplate):
         
         bias_profile = message.bias_profile
         
-        article_dto = CreateOrModifyArticle(message.link, message.title, message.text, message.html, message.publish_date)
+        article_dto = CreateOrModifyArticle(message.link, message.title, message.text, message.html, message.publish_date, message.data.payload.author)
         sentiment_dto = CreateOrModifySentiment(bias_profile.bias_category, bias_profile.bias_score, bias_profile.bias_analysis_confidence, bias_profile.sentiment_category, bias_profile.sentiment_analysis_confidence)
         outlet_dto = CreateOrModifyOutlet(message.news_outlet_name)
         
@@ -175,26 +174,36 @@ class RetrievalService(ServiceTemplate):
             "all_claim_ids_added" : [x.id for x in all_claims_added]
         }
         
-    def _retrieve_evidence_for_claim(self, db: Session, claim: Claim, original_article_id: int) -> Dict[str, Any]:
+    def _retrieve_evidence_for_claim(self, db: Session, claim: Claim, original_article_id: int, publish_date: str | None = None) -> Dict[str, Any]:
         self.logger.debug("=== FINDING EVIDENCE ===\n")
         input_claim_text = claim.decontextualised_claim_text or ""
         claim_candidates = set()
         
         def filter_step() -> List[int | str]:
             self.logger.debug("FILTERING")
-            # for now, improve it with TD-IDF or whatever. this is just every word, not really keywords
-            key_words_to_match = [
-                x.strip(" .,;:'")
-                for x in input_claim_text.split(" ")
-                if x.strip(" .,;:'").lower() not in STOP_WORDS
-            ]        
+            # Parse article publish date for ±30 day window
+            published_after = None
+            published_before = None
+            
+            if publish_date:
+                try:
+                    article_date = datetime.fromisoformat(
+                        publish_date.replace("Z", "+00:00")
+                    )
+                    published_after = article_date - timedelta(days=30)
+                    published_before = article_date + timedelta(days=30)
+                except Exception:
+                    pass
+
             # low limit because the matches are going to be low.
             self.logger.debug("FILTERING BY KEYWORD")
             keyword_candidates = find_evidence_by_keyword_match(
                 db,
-                key_words_to_match,
-                20,
+                input_claim_text,
+                limit=20,
                 exclude_article_id=original_article_id,
+                published_after=published_after,
+                published_before=published_before,
             )
             claim_candidates.update(keyword_candidates)
             entities_in_claim = [entity.entity_text for entity in claim.NER_entities]
@@ -205,6 +214,8 @@ class RetrievalService(ServiceTemplate):
                 entities_in_claim,
                 50,
                 exclude_article_id=original_article_id,
+                published_after=published_after,
+                published_before=published_before,
             )
             claim_candidates.update(entity_candidates)
         
@@ -275,11 +286,11 @@ class RetrievalService(ServiceTemplate):
                 "source_url": claim_dict.get("source_url"),
                 "source_excerpt": claim_dict.get("source_excerpt"),
                 "similarity": float(similarity),
-                "relation": classifcation_label,
+                "relation": classification_label,
                 "confidence": confidence,
                 "query_claim": input_claim_text,
             }
-            for claim_dict, similarity, classifcation_label, confidence in classification_step(similarity_step(filter_step()))
+            for claim_dict, similarity, classification_label, confidence in classification_step(similarity_step(filter_step()))
             if claim_dict.get("article_id") != original_article_id
         ]
         
@@ -308,6 +319,7 @@ class RetrievalService(ServiceTemplate):
                 db=db,
                 claim=input_claim,
                 original_article_id=original_article_id,
+                publish_date=message.publish_date,
             )
             self.logger.debug("EVIDENCE RETRIEVED")
 
@@ -471,14 +483,7 @@ class RetrievalService(ServiceTemplate):
             claim_evidence_matches, related_articles = self._retrieve_evidence(db, message, original_article_id)
             save_job_result = self._save_job_into_postgres(db, message)
             
-            # message.set_retrieval_result(
-            #     RetrievalResult(
-            #         save_data_result,
-            #         save_job_result,
-            #         claim_evidence_matches,
-            #         related_articles
-            #     )
-            # )
+
             retrieval_result = RetrievalResult(
             save_data_result,
             save_job_result,

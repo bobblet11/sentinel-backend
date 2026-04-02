@@ -95,9 +95,9 @@ services:
 
     profiles:
       - api
-      # volumes:
-      # Note: On Docker Desktop for Mac, uncomment below and add /workspaces to Docker -> Preferences -> Resources -> File Sharing
-      # - ${HOST_LOG_ROOT}/api:/app/logs
+
+    volumes:
+      - ${HOST_LOG_ROOT}/api:/app/logs
 
     ports:
       - ${API_SERVICE_PORT:-8001}:8001

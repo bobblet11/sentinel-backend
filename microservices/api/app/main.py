@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy.orm import Session
+from microservices.api.app.core.logger import logger
 from microservices.api.app.core.config import API_SERVICE_PORT
 from microservices.api.app.api.v1.api import api_router
 
@@ -69,9 +70,13 @@ async def sqlalchemy_exception_handler(request: Request, exc: Exception):
 
     # You can add more isinstance checks for other specific SQLAlchemy errors
 
-    # Log the original exception for debugging purposes
-    # import logging
-    # logging.getLogger(__name__).error(f"Unhandled exception: {exc}", exc_info=True)
+    logger.error(
+        "Unhandled exception on %s %s: %s",
+        request.method,
+        request.url.path,
+        exc,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
 
     return JSONResponse(
         status_code=status_code,
