@@ -31,7 +31,12 @@ def retrieve_by_embedding(
         return []
     
     if not candidate_claim_ids:
-        return []
+        return retrieve_by_embedding_full_scan(
+            db=db,
+            query_embedding=query_embedding,
+            top_k=top_k,
+            exclude_claim_id=exclude_claim_id,
+        )
 
     
     query_vec = query_embedding
@@ -47,7 +52,6 @@ def retrieve_by_embedding(
         .join(Article, Article.id == Claim.article_id)
         .where(Claim.decontextualised_embedding.is_not(None))
         .where(Claim.id.in_(candidate_claim_ids))
-        .order_by(distance_expr)
     )
         
     if exclude_claim_id:
@@ -84,7 +88,7 @@ def retrieve_by_embedding_full_scan(
     if not is_valid_embedding(query_embedding):
         return []
     
-    query_vec = Vector(query_embedding)
+    query_vec = query_embedding
     stmt = (
         select(
             Claim.id,

@@ -117,6 +117,10 @@ ADD COLUMN IF NOT EXISTS publishedat TIMESTAMP WITH TIME ZONE,
 ADD COLUMN IF NOT EXISTS sentiment_id INTEGER,
 ADD COLUMN IF NOT EXISTS outlet_id INTEGER;
 
+ALTER TABLE article ADD COLUMN IF NOT EXISTS author_id INTEGER;
+ALTER TABLE article ADD CONSTRAINT fk_article_author 
+FOREIGN KEY (author_id) REFERENCES author(id) ON DELETE SET NULL;
+
 ALTER TABLE article
 ADD CONSTRAINT fk_article_outlet
 FOREIGN KEY (outlet_id) REFERENCES news_outlet(id)
@@ -150,10 +154,10 @@ CREATE TABLE IF NOT EXISTS claim (
         ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_claim_embedding_ivfflat
+CREATE INDEX IF NOT EXISTS idx_claim_embedding_hnsw
 ON claim
-USING ivfflat (decontextualised_embedding vector_cosine_ops)
-WITH (lists = 100);
+USING hnsw (decontextualised_embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
 
 CREATE TABLE IF NOT EXISTS claim_to_entity (
     claim_id INTEGER NOT NULL,
@@ -171,7 +175,8 @@ CREATE TABLE IF NOT EXISTS claim_to_entity (
         REFERENCES entity(id)
         ON DELETE CASCADE
 );
-
+CREATE INDEX IF NOT EXISTS idx_claim_to_entity_entity_id ON claim_to_entity (entity_id);
+CREATE INDEX IF NOT EXISTS idx_claim_to_entity_claim_id ON claim_to_entity (claim_id);
 
 
 COMMIT;

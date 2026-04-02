@@ -11,6 +11,7 @@ class CreateOrModifyArticle:
     article_text: Optional[str] = None
     article_html: Optional[str] = None
     publish_date: Optional[str] = None
+    author: Optional[str] = None 
 
 @dataclass
 class CreateOrModifyOutlet:

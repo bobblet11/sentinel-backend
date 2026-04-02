@@ -86,6 +86,11 @@ def get_or_create_article(db: Session, article_dto: CreateOrModifyArticle, senti
         
     sentiment_entry = create_sentiment(db, sentiment_dto)
     
+    author_entry = None
+    if article_dto.author:
+        author_entry = get_or_create_author(db, article_dto.author)
+    
+    
     if existing:
         # Always overwrite all fields, even if they were already set
         existing.html = article_dto.article_html
@@ -95,6 +100,8 @@ def get_or_create_article(db: Session, article_dto: CreateOrModifyArticle, senti
 
         existing.outlet_id = outlet_entry.id if outlet_entry else None
         existing.sentiment_id = sentiment_entry.id if sentiment_entry else None
+        existing.author_id = author_entry.id if author_entry else None  # ADD
+
         db.flush()
         return existing
     
@@ -106,6 +113,8 @@ def get_or_create_article(db: Session, article_dto: CreateOrModifyArticle, senti
         publishedAt=article_dto.publish_date,
         outlet_id=outlet_entry.id if outlet_entry else None,
         sentiment_id=sentiment_entry.id if sentiment_entry else None,
+        author_id=author_entry.id if author_entry else None,  # ADD
+
     )
     
     db.add(new_article_entry)

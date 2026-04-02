@@ -60,7 +60,8 @@ class Article(Base):
     publishedAt = Column('publishedat', DateTime(timezone=True), nullable=True)
     sentiment_id = Column(Integer, ForeignKey("sentiment_analysis.id"), nullable=True)
     outlet_id = Column(Integer, ForeignKey("news_outlet.id"), nullable=True)
-
+    author_id = Column(Integer, ForeignKey("author.id"), nullable=True)
+    author = relationship("Author", backref="articles")
     sentiment = relationship("SentimentAnalysis", back_populates="article")
     outlet = relationship("NewsOutlet", back_populates="articles")
     claims = relationship("Claim", back_populates="article")
