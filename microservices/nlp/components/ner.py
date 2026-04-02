@@ -1,7 +1,7 @@
 import logging
 import torch
 from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
@@ -19,7 +19,7 @@ class EntityRecognizer(ArticleProcessor):
     into result.entities_in_article.
     """
 
-    def __init__(self, device_config: DeviceConfig):
+    def __init__(self, device_config: DeviceConfig, model_manager: Optional[Any] = None):
         self.model_name = NER_MODEL
         self.device_id = device_config.device_id
 
@@ -27,6 +27,21 @@ class EntityRecognizer(ArticleProcessor):
                     f"on {device_config.device.upper()} "
                     f"(fp16={device_config.use_fp16})...")
         try:
+            if model_manager is not None:
+                from common.model_manager.registry import ModelState
+
+                ner_state = model_manager.get_state("NER")
+                if ner_state == ModelState.READY:
+                    self.nlp_pipeline = model_manager.get("NER")
+                    logger.info("EntityRecognizer: Using pipeline from ModelManager.")
+                    return
+                else:
+                    logger.warning(
+                        "EntityRecognizer: ModelManager NER state is %s, "
+                        "falling back to direct load.",
+                        ner_state.value,
+                    )
+
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self.model = AutoModelForTokenClassification.from_pretrained(
                 self.model_name,
