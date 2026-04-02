@@ -34,7 +34,7 @@ CW_THRESHOLD = 0.45
 CW_NLI_WEIGHT = 0.40
 CW_HEURISTIC_WEIGHT = 0.60
 NLI_ENTAILMENT_THRESHOLD = 0.70
-QA_SCORE_THRESHOLD = 0.35
+QA_SCORE_THRESHOLD = 0.20
 
 # ── CheckWorthiness (kept for backward compatibility with CheckWorthinessFilter)
 CHECKWORTHY_MODEL = "whispAI/ClaimBuster-DeBERTaV2"
