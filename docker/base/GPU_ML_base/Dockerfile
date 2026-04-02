@@ -24,7 +24,7 @@ RUN curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py && \
 
 # CUDA PyTorch (2.5GB+)
 RUN pip install --no-cache-dir \
-    "torch==2.6.0" "torchvision==0.21.0" "torchaudio==2.6.0" --index-url https://download.pytorch.org/whl/cu121
+    "torch==2.6.0" "torchvision==0.21.0" "torchaudio==2.6.0" --index-url https://download.pytorch.org/whl/cu124
 
 # Copy/install common + NLP deps (same as CPU base)
 WORKDIR /app
