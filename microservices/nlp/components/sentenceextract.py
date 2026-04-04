@@ -38,16 +38,20 @@ class SentenceExtraction(SentenceProcessor):
             self.tokenizer = AutoTokenizer.from_pretrained(BERT_SCORING_MODEL)
             self.scoring_model = AutoModel.from_pretrained(
                 BERT_SCORING_MODEL,
-                dtype=device_config.dtype,
-                device_map=device_config.device_map,
+                torch_dtype=device_config.dtype,
+                low_cpu_mem_usage=False,
             )
+            self.scoring_model.to(self.device)
+            self.scoring_model.eval()
 
             self.nli_tokenizer = AutoTokenizer.from_pretrained(NLI_MODEL)
             self.nli_model = AutoModelForSequenceClassification.from_pretrained(
                 NLI_MODEL,
-                dtype=device_config.dtype,
-                device_map=device_config.device_map,
+                torch_dtype=device_config.dtype,
+                low_cpu_mem_usage=False,
             )
+            self.nli_model.to(self.device)
+            self.nli_model.eval()
         except Exception as e:
             logger.error(f"SentenceExtraction: Failed to load models: {e}")
             raise

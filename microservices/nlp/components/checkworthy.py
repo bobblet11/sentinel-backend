@@ -45,8 +45,15 @@ class CheckWorthinessFilter(SentenceProcessor):
         # Load model if not provided
         if not self.classifier:
             from microservices.nlp.config import model_manager
-
-            self.classifier = model_manager.get("CHECKWORTHY")
+            try:
+                self.classifier = model_manager.get("CHECKWORTHY")
+            except Exception as e:
+                self.classifier = None
+                logger.warning(
+                    "CheckWorthiness: CHECKWORTHY model unavailable (%s). "
+                    "Continuing in degraded mode.",
+                    e,
+                )
 
     def run(self, article: Article, result: NLPResult, options: NLPOptions, sentences: List[SentenceScore]) -> List[SentenceScore]:
         """
@@ -77,6 +84,15 @@ class CheckWorthinessFilter(SentenceProcessor):
 
         # Run model only on selected candidates.
         texts = [sentences[i].text for i in candidate_indices]
+
+        if self.classifier is None:
+            logger.warning(
+                "CheckWorthiness: classifier unavailable; marking all sentences as not checkworthy."
+            )
+            for s in sentences:
+                s.is_checkworthy = False
+                s.confidence = 0.0
+            return sentences
 
         try:
             # Run Inference (Batch)

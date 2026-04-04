@@ -17,7 +17,12 @@ from common.models.api.redis_models import (
 from common.service.service_template import ProcessingError, ServiceConfig, ServiceTemplate
 
 from microservices.nlp.components.claimextract import ClaimExtraction
-from microservices.nlp.config import DUMMY_NLP_MODE, model_manager, DEVICE_CONFIG
+from microservices.nlp.config import (
+    DEVICE_CONFIG,
+    DUMMY_NLP_MODE,
+    ENABLE_DECONTEXTUALIZATION,
+    model_manager,
+)
 
 logger = getLogger("NLP")
 EMBEDDING_DIM = 768
@@ -89,7 +94,9 @@ class NLPService(ServiceTemplate):
         else:
             self.logger.info("GPU NOT DETECTED")
 
-        self.options = options or NLPOptions()
+        self.options = options or NLPOptions(
+            enable_decontextualization=ENABLE_DECONTEXTUALIZATION
+        )
         # Only load models if NOT in dummy mode
         if DUMMY_NLP_MODE:
             logger.info("DUMMY_NLP_MODE enabled - skipping model loading")

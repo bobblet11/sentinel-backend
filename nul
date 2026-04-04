@@ -1,0 +1,84 @@
+[
+    {
+        "Name": "sentinel-net",
+        "Id": "6573e257334cf157889b235e051e5e3f41f199e89452273bae64e5ea393b3c02",
+        "Created": "2026-03-31T13:33:19.28479063Z",
+        "Scope": "local",
+        "Driver": "bridge",
+        "EnableIPv4": true,
+        "EnableIPv6": false,
+        "IPAM": {
+            "Driver": "default",
+            "Options": {},
+            "Config": [
+                {
+                    "Subnet": "172.18.0.0/16",
+                    "Gateway": "172.18.0.1"
+                }
+            ]
+        },
+        "Internal": false,
+        "Attachable": false,
+        "Ingress": false,
+        "ConfigFrom": {
+            "Network": ""
+        },
+        "ConfigOnly": false,
+        "Containers": {
+            "336c25b626392a244c3ad8c164739a2fb6c4cc790b0be2bbdb24769adde7e8e9": {
+                "Name": "sentinel-postgres-container",
+                "EndpointID": "7396a118f9144bb147ee3553a482708a53d2a939a37f43b29dd7f5d5d888eee1",
+                "MacAddress": "0a:d1:83:59:91:a1",
+                "IPv4Address": "172.18.0.5/16",
+                "IPv6Address": ""
+            },
+            "8bfa5fe59423266af82eaed13da14cb0c6d5c1d0dbc6da3623c43ee125712d96": {
+                "Name": "sentinel-api-service-container",
+                "EndpointID": "67679310c7c723880850788671adc6ce4a98bcaa9091cde19953aad720e9047e",
+                "MacAddress": "fe:28:7b:74:1f:8a",
+                "IPv4Address": "172.18.0.8/16",
+                "IPv6Address": ""
+            },
+            "c0a570f7e5d2b71aea87842025aaf8b7adef9c510fbe72f177fad0179468ec47": {
+                "Name": "sentinel-ingestor-service-container",
+                "EndpointID": "25dc27207c1c506c463473b85a8ea47cffa533c9cc76278000efff9deb0abfd0",
+                "MacAddress": "06:e1:ad:88:78:37",
+                "IPv4Address": "172.18.0.3/16",
+                "IPv6Address": ""
+            },
+            "d4642db01a8e89f0bd9c3ee3686a5000445375d1b1071fab82329ccdb6bc646f": {
+                "Name": "sentinel-retrieval-layer-service-container",
+                "EndpointID": "8e4556bfcc5a1e9b6ed0688a237d725ca7fc3eb3975d40579453be905d4eb76b",
+                "MacAddress": "3e:25:cb:d2:d7:99",
+                "IPv4Address": "172.18.0.7/16",
+                "IPv6Address": ""
+            },
+            "db5b9fb459149d203587ded9ce63389b989dca41e64da6ba97fae94a874994c7": {
+                "Name": "sentinel-nlp-CPU-service-container",
+                "EndpointID": "739b7ca4be11afbdf543c21c42fecdf1be9dbdab48d226f9f0199fd5bba6aca6",
+                "MacAddress": "de:4f:c2:c1:b0:92",
+                "IPv4Address": "172.18.0.4/16",
+                "IPv6Address": ""
+            },
+            "ea203ec991c5d913a6a846f965e75971e9c4827a4c6cfab606c460a492ac2ee5": {
+                "Name": "sentinel-web-scraper-service-container",
+                "EndpointID": "9053d49fd48ca2f67aa748070ea3b2540cdc0936d6bb4e218d4dbdcd5d3f1848",
+                "MacAddress": "8e:cb:9e:3b:87:5d",
+                "IPv4Address": "172.18.0.6/16",
+                "IPv6Address": ""
+            },
+            "fa4ecbc79fec0d1bca7670d8b86fca229e99ebc85df875f3d5049621aadba87a": {
+                "Name": "sentinel-redis-container",
+                "EndpointID": "e601c843215522a798968b67233cf97a702303163a9d4c593f7bf8f761bd9014",
+                "MacAddress": "6a:8a:6d:3d:93:24",
+                "IPv4Address": "172.18.0.2/16",
+                "IPv6Address": ""
+            }
+        },
+        "Options": {
+            "com.docker.network.enable_ipv4": "true",
+            "com.docker.network.enable_ipv6": "false"
+        },
+        "Labels": {}
+    }
+]

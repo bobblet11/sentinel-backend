@@ -16,6 +16,7 @@ from microservices.nlp.components.decontext import Decontextualizer
 from microservices.nlp.components.checkworthy import CheckWorthinessFilter
 from microservices.nlp.components.embedder import Embedder
 from microservices.nlp.components.bias import BiasDetector
+from microservices.nlp.config import ENABLE_DECONTEXTUALIZATION
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,11 @@ class ClaimExtraction(ArticleProcessor):
         self.preprocessor = Preprocessor(nlp=nlp_sm)
         self.entity_recognizer = EntityRecognizer(device_config=device_config, model_manager=model_manager)
         self.sentence_extractor = SentenceExtraction(device_config=device_config)
-        self.decontextualizer = Decontextualizer(device_config=device_config, nlp=nlp_sm)
+        self.decontextualizer = None
+        if ENABLE_DECONTEXTUALIZATION:
+            self.decontextualizer = Decontextualizer(device_config=device_config, nlp=nlp_sm)
+        else:
+            logger.info("ClaimExtraction: Decontextualizer disabled via service configuration.")
         self.checkworthiness = CheckWorthinessFilter(device_config=device_config)
         self.embedder = Embedder(device_config=device_config)
         self.bias_detector = BiasDetector(device_config=device_config)
@@ -160,7 +165,7 @@ class ClaimExtraction(ArticleProcessor):
 
         # ── Stage 4 — Decontextualization ────────────────────────────────────
         t = time.time()
-        if options.enable_decontextualization:
+        if options.enable_decontextualization and self.decontextualizer is not None:
             try:
                 sentences = self.decontextualizer.run(
                     article, result, options, sentences
@@ -173,6 +178,8 @@ class ClaimExtraction(ArticleProcessor):
             logger.info(
                 "[Stage 4 | Decontextualizer] complete in %.2fs", time.time() - t
             )
+        elif options.enable_decontextualization:
+            logger.info("[Stage 4 | Decontextualizer] skipped (disabled by service config)")
         else:
             logger.info("[Stage 4 | Decontextualizer] skipped (disabled in options)")
 
