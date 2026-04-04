@@ -107,27 +107,40 @@ class ModelManager:
                 estimated_memory_mb=750,
                 loader_kwargs={"top_k": None},
             ),
-            ModelEntry(
-                key="DECONTEXT_MODEL",
-                model_name="google/flan-t5-base",
-                task_type="seq2seq_generation",
-                owner_component="Decontextualizer",
-                loader="auto_model_seq2seq",
-                device_policy=DevicePolicy.PREFER_GPU,
-                required=False,
-                estimated_memory_mb=950,
-            ),
-            ModelEntry(
-                key="DECONTEXT_TOKENIZER",
-                model_name="google/flan-t5-base",
-                task_type="tokenizer",
-                owner_component="Decontextualizer",
-                loader="auto_tokenizer",
-                device_policy=DevicePolicy.CPU_ONLY,
-                required=False,
-                estimated_memory_mb=10,
-            ),
         ]
+
+        enable_decontextualization = os.environ.get(
+            "ENABLE_DECONTEXTUALIZATION", "true"
+        ).lower() in {"1", "true", "yes", "y"}
+        if enable_decontextualization:
+            defaults.extend(
+                [
+                    ModelEntry(
+                        key="DECONTEXT_MODEL",
+                        model_name="google/flan-t5-base",
+                        task_type="seq2seq_generation",
+                        owner_component="Decontextualizer",
+                        loader="auto_model_seq2seq",
+                        device_policy=DevicePolicy.PREFER_GPU,
+                        required=False,
+                        estimated_memory_mb=950,
+                    ),
+                    ModelEntry(
+                        key="DECONTEXT_TOKENIZER",
+                        model_name="google/flan-t5-base",
+                        task_type="tokenizer",
+                        owner_component="Decontextualizer",
+                        loader="auto_tokenizer",
+                        device_policy=DevicePolicy.CPU_ONLY,
+                        required=False,
+                        estimated_memory_mb=10,
+                    ),
+                ]
+            )
+        else:
+            logger.info(
+                "ModelManager: skipping decontext model registration because ENABLE_DECONTEXTUALIZATION is false."
+            )
         for entry in defaults:
             self.register(entry)
 
@@ -388,19 +401,38 @@ class ModelManager:
         elif entry.loader == "auto_model_seq2seq":
             from transformers import AutoModelForSeq2SeqLM
 
+            torch_dtype = None
+            if device == "cuda":
+                # fp16 is only safe/beneficial on CUDA in this project.
+                import torch
+
+                torch_dtype = torch.float16
+
             model = AutoModelForSeq2SeqLM.from_pretrained(
                 entry.model_name,
-                device_map={"": device},
+                torch_dtype=torch_dtype,
+                low_cpu_mem_usage=False,
             )
+            model.to(device)
+            model.eval()
             return model
 
         elif entry.loader == "auto_model_qa":
             from transformers import AutoModelForQuestionAnswering
 
+            torch_dtype = None
+            if device == "cuda":
+                import torch
+
+                torch_dtype = torch.float16
+
             model = AutoModelForQuestionAnswering.from_pretrained(
                 entry.model_name,
-                device_map={"": device},
+                torch_dtype=torch_dtype,
+                low_cpu_mem_usage=False,
             )
+            model.to(device)
+            model.eval()
             return model
 
         elif entry.loader == "auto_tokenizer":

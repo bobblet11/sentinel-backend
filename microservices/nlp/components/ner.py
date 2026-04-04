@@ -22,6 +22,7 @@ class EntityRecognizer(ArticleProcessor):
     def __init__(self, device_config: DeviceConfig, model_manager: Optional[Any] = None):
         self.model_name = NER_MODEL
         self.device_id = device_config.device_id
+        self.device = device_config.device
 
         logger.info(f"EntityRecognizer: Loading '{self.model_name}' "
                     f"on {device_config.device.upper()} "
@@ -45,9 +46,14 @@ class EntityRecognizer(ArticleProcessor):
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self.model = AutoModelForTokenClassification.from_pretrained(
                 self.model_name,
-                dtype=device_config.dtype,
-                device_map=device_config.device_map,
+                torch_dtype=device_config.dtype,
+                # Prevent Accelerate/transformers from initializing weights on the
+                # `meta` device (common when device_map is used or memory-saver
+                # paths are enabled), which breaks CPU execution.
+                low_cpu_mem_usage=False,
             )
+            self.model.to(self.device)
+            self.model.eval()
             self.nlp_pipeline = pipeline(
                 "ner",
                 model=self.model,
