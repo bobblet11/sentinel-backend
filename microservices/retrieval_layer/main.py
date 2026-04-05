@@ -13,7 +13,9 @@ from microservices.retrieval_layer.config import (
     GROUP_NAME,
     CONSUMER_NAME,
     BATCH_SIZE,
+    RETRY_FAILURE_MODE,
 )
+from microservices.retrieval_layer.db.session import ensure_schema_compatibility
 
 SERVICE_NAME = "retrieval"
 CONTAINER_NAME = "retrieval-layer"
@@ -30,17 +32,18 @@ if __name__ == "__main__":
         
         routing_key=["header","type"],     
         router_key_values=[JobType.USER.value, JobType.BACKGROUND.value],
-        block_prioritisation_level=BlockPrioritisationLevel.LINEAR,
+        block_prioritisation_level=BlockPrioritisationLevel.EXPONENTIAL,
         group_name=GROUP_NAME,
         consumer_name=CONSUMER_NAME,
         
         is_concurrent=False,
         max_workers=1,                 
         batch_size=BATCH_SIZE,
-        retry_failure_mode=True
+        retry_failure_mode=RETRY_FAILURE_MODE
         
     )
 
+    ensure_schema_compatibility()
     retrieval_service = RetrievalService(config)
 
     signal.signal(signal.SIGINT, retrieval_service.shutdown)

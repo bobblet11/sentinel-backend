@@ -97,6 +97,12 @@ try:
         config_logger,
         default=False,
     )
+    ENABLE_DECONTEXTUALIZATION: bool = get_env_var(
+        "ENABLE_DECONTEXTUALIZATION",
+        lambda x: str(x).lower() in {"1", "true", "yes", "y"},
+        config_logger,
+        default=True,
+    )
 
     # Allow model overrides via env without touching code
     NER_MODEL = get_env_var("NLP_NER_MODEL", str, config_logger, NER_MODEL)
@@ -141,6 +147,7 @@ try:
         EnvVariable("CLAIM_MIN_CONFIDENCE", CLAIM_MIN_CONFIDENCE),
         EnvVariable("CW_THRESHOLD", CW_THRESHOLD),
         EnvVariable("DUMMY_NLP_MODE", DUMMY_NLP_MODE),
+        EnvVariable("ENABLE_DECONTEXTUALIZATION", ENABLE_DECONTEXTUALIZATION),
     ]
 
     print_env(Config(env_variables, input_streams, output_streams), config_logger)
@@ -153,6 +160,9 @@ except SystemExit:
     import os
     from microservices.nlp.components.device import DeviceConfig
 
+    ENABLE_DECONTEXTUALIZATION = os.environ.get(
+        "ENABLE_DECONTEXTUALIZATION", "true"
+    ).lower() in {"1", "true", "yes", "y"}
     _use_gpu_fallback = os.environ.get("USE_GPU", "false").lower() == "true"
     DEVICE_CONFIG = DeviceConfig.resolve(use_gpu=_use_gpu_fallback)
     DEVICE = DEVICE_CONFIG.device
