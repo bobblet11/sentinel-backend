@@ -1,9 +1,9 @@
-from microservices.retrieval_layer.db.models import Base
-from microservices.retrieval_layer.db.session import engine
+from microservices.retrieval_layer.db.session import ensure_schema_compatibility
+
 
 def main():
-    print("Creating tables in DB (if missing)...")
-    Base.metadata.create_all(engine)
+    print("Ensuring retrieval tables and compatibility columns exist...")
+    ensure_schema_compatibility()
     print("Done.")
 
 if __name__ == "__main__":

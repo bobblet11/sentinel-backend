@@ -25,7 +25,11 @@
         "remoteEnv": {
                 "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
         },
+<<<<<<< HEAD
         "initializeCommand": "docker network inspect sentinel-net > nul 2>&1 || docker network create sentinel-net",
+=======
+        "initializeCommand": "docker network inspect sentinel-net >/dev/null 2>&1 || docker network create sentinel-net",
+>>>>>>> refs/remotes/origin/newretrieval-fixes
         "runArgs": ["--network=sentinel-net"]
 
 }
