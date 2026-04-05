@@ -6,8 +6,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import torch
-
 from common.model_manager.exceptions import (
     ModelLoadError,
     ModelNotFoundError,
@@ -121,70 +119,6 @@ class ModelManager:
                 estimated_memory_mb=750,
                 loader_kwargs={"top_k": None},
             ),
-<<<<<<< HEAD
-            # ── Decontextualizer (3 model+tokenizer pairs) ────────────────
-            ModelEntry(
-                key="DECONTEXT_QG_MODEL",
-                model_name=os.environ.get("NLP_QG_MODEL", "Salesforce/mixqg-base"),
-                task_type="seq2seq_generation",
-                owner_component="Decontextualizer",
-                loader="auto_model_seq2seq",
-                device_policy=DevicePolicy.PREFER_GPU,
-                required=False,
-                estimated_memory_mb=900,
-            ),
-            ModelEntry(
-                key="DECONTEXT_QG_TOKENIZER",
-                model_name=os.environ.get("NLP_QG_MODEL", "Salesforce/mixqg-base"),
-                task_type="tokenizer",
-                owner_component="Decontextualizer",
-                loader="auto_tokenizer",
-                device_policy=DevicePolicy.CPU_ONLY,
-                required=False,
-                estimated_memory_mb=10,
-            ),
-            ModelEntry(
-                key="DECONTEXT_QA_MODEL",
-                model_name=os.environ.get("NLP_QA_MODEL", "deepset/roberta-base-squad2"),
-                task_type="question_answering",
-                owner_component="Decontextualizer",
-                loader="auto_model_qa",
-                device_policy=DevicePolicy.PREFER_GPU,
-                required=False,
-                estimated_memory_mb=500,
-            ),
-            ModelEntry(
-                key="DECONTEXT_QA_TOKENIZER",
-                model_name=os.environ.get("NLP_QA_MODEL", "deepset/roberta-base-squad2"),
-                task_type="tokenizer",
-                owner_component="Decontextualizer",
-                loader="auto_tokenizer",
-                device_policy=DevicePolicy.CPU_ONLY,
-                required=False,
-                estimated_memory_mb=10,
-            ),
-            ModelEntry(
-                key="DECONTEXT_MODEL",
-                model_name=os.environ.get("NLP_GEN_MODEL", "google/flan-t5-base"),
-                task_type="seq2seq_generation",
-                owner_component="Decontextualizer",
-                loader="auto_model_seq2seq",
-                device_policy=DevicePolicy.PREFER_GPU,
-                required=False,
-                estimated_memory_mb=950,
-            ),
-            ModelEntry(
-                key="DECONTEXT_TOKENIZER",
-                model_name=os.environ.get("NLP_GEN_MODEL", "google/flan-t5-base"),
-                task_type="tokenizer",
-                owner_component="Decontextualizer",
-                loader="auto_tokenizer",
-                device_policy=DevicePolicy.CPU_ONLY,
-                required=False,
-                estimated_memory_mb=10,
-            ),
-=======
->>>>>>> refs/remotes/origin/newretrieval-fixes
         ]
 
         enable_decontextualization = os.environ.get(
@@ -483,14 +417,6 @@ class ModelManager:
             import torch as _torch
             from transformers import AutoModelForSeq2SeqLM
 
-<<<<<<< HEAD
-            _dtype = _torch.float16 if device == "cuda" else _torch.float32
-            model = AutoModelForSeq2SeqLM.from_pretrained(
-                entry.model_name,
-                dtype=_dtype,
-                low_cpu_mem_usage=False,
-            ).to(device)
-=======
             torch_dtype = None
             if device == "cuda":
                 # fp16 is only safe/beneficial on CUDA in this project.
@@ -505,21 +431,12 @@ class ModelManager:
             )
             model.to(device)
             model.eval()
->>>>>>> refs/remotes/origin/newretrieval-fixes
             return model
 
         elif entry.loader == "auto_model_qa":
             import torch as _torch
             from transformers import AutoModelForQuestionAnswering
 
-<<<<<<< HEAD
-            _dtype = _torch.float16 if device == "cuda" else _torch.float32
-            model = AutoModelForQuestionAnswering.from_pretrained(
-                entry.model_name,
-                dtype=_dtype,
-                low_cpu_mem_usage=False,
-            ).to(device)
-=======
             torch_dtype = None
             if device == "cuda":
                 import torch
@@ -533,7 +450,6 @@ class ModelManager:
             )
             model.to(device)
             model.eval()
->>>>>>> refs/remotes/origin/newretrieval-fixes
             return model
 
         elif entry.loader == "auto_tokenizer":
