@@ -1,6 +1,6 @@
 import logging
 import torch
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from transformers import pipeline
 
 # Local imports
@@ -60,13 +60,31 @@ class BiasDetector(ArticleProcessor):
         "positive": "Positive",
     }
 
-    def __init__(self, device_config: DeviceConfig):
+    def __init__(self, device_config: DeviceConfig, model_manager: Optional[Any] = None):
         logger.info(
             f"BiasDetector: Loading models on {device_config.device.upper()} "
             f"(fp16={device_config.use_fp16})..."
         )
 
         try:
+            if model_manager is not None:
+                from common.model_manager.registry import ModelState
+
+                pol_ok = model_manager.get_state("BIAS_POLITICAL") == ModelState.READY
+                sent_ok = model_manager.get_state("BIAS_SENTIMENT") == ModelState.READY
+                if pol_ok and sent_ok:
+                    self.political_classifier = model_manager.get("BIAS_POLITICAL")
+                    self.sentiment_analyzer = model_manager.get("BIAS_SENTIMENT")
+                    logger.info("BiasDetector: Using pipelines from ModelManager.")
+                    return
+                else:
+                    logger.warning(
+                        "BiasDetector: ModelManager states — political=%s, sentiment=%s. "
+                        "Falling back to direct load.",
+                        model_manager.get_state("BIAS_POLITICAL").value,
+                        model_manager.get_state("BIAS_SENTIMENT").value,
+                    )
+
             self.political_classifier = pipeline(
                 "zero-shot-classification",
                 model=BIAS_POLITICAL_MODEL,

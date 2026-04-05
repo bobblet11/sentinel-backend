@@ -74,10 +74,10 @@ class ClaimExtraction(ArticleProcessor):
         self.preprocessor = Preprocessor(nlp=nlp_sm)
         self.entity_recognizer = EntityRecognizer(device_config=device_config, model_manager=model_manager)
         self.sentence_extractor = SentenceExtraction(device_config=device_config)
-        self.decontextualizer = Decontextualizer(device_config=device_config, nlp=nlp_sm)
+        self.decontextualizer = Decontextualizer(device_config=device_config, nlp=nlp_sm, model_manager=model_manager)
         self.checkworthiness = CheckWorthinessFilter(device_config=device_config)
-        self.embedder = Embedder(device_config=device_config)
-        self.bias_detector = BiasDetector(device_config=device_config)
+        self.embedder = Embedder(device_config=device_config, model_manager=model_manager)
+        self.bias_detector = BiasDetector(device_config=device_config, model_manager=model_manager)
 
         logger.info(
             "ClaimExtraction: All models ready in %.2fs.",

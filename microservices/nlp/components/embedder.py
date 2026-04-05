@@ -1,7 +1,7 @@
 import logging
 import torch
 import numpy as np
-from typing import List
+from typing import Any, List, Optional
 from sentence_transformers import SentenceTransformer
 
 # Local imports
@@ -42,13 +42,27 @@ class Embedder(SentenceProcessor):
     Does NOT otherwise modify result.
     """
 
-    def __init__(self, device_config: DeviceConfig, model_name: str = EMBEDDING_MODEL):
+    def __init__(self, device_config: DeviceConfig, model_name: str = EMBEDDING_MODEL, model_manager: Optional[Any] = None):
         self.model_name = model_name
         self.device = device_config.device
 
         logger.info(f"Embedder: Loading '{self.model_name}' on {self.device} "
                     f"(fp16={device_config.use_fp16})...")
         try:
+            if model_manager is not None:
+                from common.model_manager.registry import ModelState
+
+                if model_manager.get_state("EMBEDDING") == ModelState.READY:
+                    self.model = model_manager.get("EMBEDDING")
+                    logger.info("Embedder: Using model from ModelManager.")
+                    return
+                else:
+                    logger.warning(
+                        "Embedder: ModelManager EMBEDDING state is %s, "
+                        "falling back to direct load.",
+                        model_manager.get_state("EMBEDDING").value,
+                    )
+
             self.model = SentenceTransformer(self.model_name, device=self.device)
             if device_config.use_fp16:
                 self.model.half()
