@@ -14,6 +14,8 @@ RUN pip install --no-cache-dir \
 
 RUN pip install --no-cache-dir "pip<25"
 
+RUN python -m spacy download en_core_web_sm
+
 # common packages
 COPY common/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \

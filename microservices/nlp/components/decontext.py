@@ -3,7 +3,7 @@ import re
 import time
 import spacy
 import torch
-from typing import List, Optional
+from typing import Any, List, Optional
 from rank_bm25 import BM25Okapi
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForQuestionAnswering
 
@@ -66,7 +66,7 @@ class Decontextualizer(SentenceProcessor):
         flags=re.IGNORECASE,
     )
 
-    def __init__(self, device_config: DeviceConfig, nlp=None):
+    def __init__(self, device_config: DeviceConfig, nlp=None, model_manager: Optional[Any] = None):
         self.device = device_config.device
         self.device_id = device_config.device_id
 
@@ -81,6 +81,35 @@ class Decontextualizer(SentenceProcessor):
             except OSError:
                 logger.error("Decontextualizer: Run: python -m spacy download en_core_web_sm")
                 raise
+
+        # Try to pull all 6 model/tokenizer objects from ModelManager first.
+        if model_manager is not None:
+            from common.model_manager.registry import ModelState
+
+            keys = [
+                "DECONTEXT_QG_MODEL", "DECONTEXT_QG_TOKENIZER",
+                "DECONTEXT_QA_MODEL", "DECONTEXT_QA_TOKENIZER",
+                "DECONTEXT_MODEL", "DECONTEXT_TOKENIZER",
+            ]
+            states = {k: model_manager.get_state(k) for k in keys}
+            all_ready = all(s == ModelState.READY for s in states.values())
+
+            if all_ready:
+                self.qg_model = model_manager.get("DECONTEXT_QG_MODEL")
+                self.qg_tokenizer = model_manager.get("DECONTEXT_QG_TOKENIZER")
+                self.qa_model = model_manager.get("DECONTEXT_QA_MODEL")
+                self.qa_tokenizer = model_manager.get("DECONTEXT_QA_TOKENIZER")
+                self.gen_model = model_manager.get("DECONTEXT_MODEL")
+                self.gen_tokenizer = model_manager.get("DECONTEXT_TOKENIZER")
+                logger.info("Decontextualizer: All models loaded from ModelManager.")
+                return
+            else:
+                not_ready = {k: v.value for k, v in states.items() if v != ModelState.READY}
+                logger.warning(
+                    "Decontextualizer: ModelManager states not all ready: %s. "
+                    "Falling back to direct load.",
+                    not_ready,
+                )
 
         _dtype = device_config.dtype
         # Disable low_cpu_mem_usage to prevent accelerate from initialising

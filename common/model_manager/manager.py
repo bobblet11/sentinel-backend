@@ -6,6 +6,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import torch
+
 from common.model_manager.exceptions import (
     ModelLoadError,
     ModelNotFoundError,
@@ -40,7 +42,7 @@ class ModelManager:
         self._events[entry.key] = threading.Event()
 
     def register_defaults(self) -> None:
-        """Register all 7 default NLP models."""
+        """Register all default NLP models."""
         defaults = [
             ModelEntry(
                 key="SPACY_SENT",
@@ -57,27 +59,39 @@ class ModelManager:
                 key="EMBEDDING",
                 model_name=os.environ.get(
                     "NLP_EMBEDDING_MODEL",
-                    "sentence-transformers/all-MiniLM-L6-v2",
+                    "sentence-transformers/all-mpnet-base-v2",
                 ),
                 task_type="sentence_embedding",
                 owner_component="Embedder",
                 loader="sentence_transformer",
                 device_policy=DevicePolicy.PREFER_GPU,
                 required=True,
-                estimated_memory_mb=90,
+                estimated_memory_mb=400,
             ),
+            # ── Bias Detection (two models) ───────────────────────────────
             ModelEntry(
-                key="BIAS",
+                key="BIAS_POLITICAL",
                 model_name=os.environ.get(
                     "NLP_BIAS_MODEL",
-                    "facebook/bart-large-mnli",
+                    "typeform/distilbert-base-uncased-mnli",
                 ),
-                task_type="zero_shot_or_text_classification",
+                task_type="zero_shot_classification",
                 owner_component="BiasDetector",
                 loader="transformers_pipeline",
                 device_policy=DevicePolicy.PREFER_GPU,
                 required=False,
-                estimated_memory_mb=1600,
+                estimated_memory_mb=260,
+            ),
+            ModelEntry(
+                key="BIAS_SENTIMENT",
+                model_name="cardiffnlp/twitter-roberta-base-sentiment-latest",
+                task_type="sentiment_analysis",
+                owner_component="BiasDetector",
+                loader="transformers_pipeline",
+                device_policy=DevicePolicy.PREFER_GPU,
+                loader_kwargs={"truncation": True, "max_length": 128},
+                required=False,
+                estimated_memory_mb=500,
             ),
             ModelEntry(
                 key="NER",
@@ -107,9 +121,50 @@ class ModelManager:
                 estimated_memory_mb=750,
                 loader_kwargs={"top_k": None},
             ),
+            # ── Decontextualizer (3 model+tokenizer pairs) ────────────────
+            ModelEntry(
+                key="DECONTEXT_QG_MODEL",
+                model_name=os.environ.get("NLP_QG_MODEL", "Salesforce/mixqg-base"),
+                task_type="seq2seq_generation",
+                owner_component="Decontextualizer",
+                loader="auto_model_seq2seq",
+                device_policy=DevicePolicy.PREFER_GPU,
+                required=False,
+                estimated_memory_mb=900,
+            ),
+            ModelEntry(
+                key="DECONTEXT_QG_TOKENIZER",
+                model_name=os.environ.get("NLP_QG_MODEL", "Salesforce/mixqg-base"),
+                task_type="tokenizer",
+                owner_component="Decontextualizer",
+                loader="auto_tokenizer",
+                device_policy=DevicePolicy.CPU_ONLY,
+                required=False,
+                estimated_memory_mb=10,
+            ),
+            ModelEntry(
+                key="DECONTEXT_QA_MODEL",
+                model_name=os.environ.get("NLP_QA_MODEL", "deepset/roberta-base-squad2"),
+                task_type="question_answering",
+                owner_component="Decontextualizer",
+                loader="auto_model_qa",
+                device_policy=DevicePolicy.PREFER_GPU,
+                required=False,
+                estimated_memory_mb=500,
+            ),
+            ModelEntry(
+                key="DECONTEXT_QA_TOKENIZER",
+                model_name=os.environ.get("NLP_QA_MODEL", "deepset/roberta-base-squad2"),
+                task_type="tokenizer",
+                owner_component="Decontextualizer",
+                loader="auto_tokenizer",
+                device_policy=DevicePolicy.CPU_ONLY,
+                required=False,
+                estimated_memory_mb=10,
+            ),
             ModelEntry(
                 key="DECONTEXT_MODEL",
-                model_name="google/flan-t5-base",
+                model_name=os.environ.get("NLP_GEN_MODEL", "google/flan-t5-base"),
                 task_type="seq2seq_generation",
                 owner_component="Decontextualizer",
                 loader="auto_model_seq2seq",
@@ -119,7 +174,7 @@ class ModelManager:
             ),
             ModelEntry(
                 key="DECONTEXT_TOKENIZER",
-                model_name="google/flan-t5-base",
+                model_name=os.environ.get("NLP_GEN_MODEL", "google/flan-t5-base"),
                 task_type="tokenizer",
                 owner_component="Decontextualizer",
                 loader="auto_tokenizer",
@@ -340,23 +395,20 @@ class ModelManager:
 
     def _resolve_hf_task(self, entry: ModelEntry) -> str:
         """Map a ModelEntry's task_type to the HuggingFace pipeline task string."""
-        if entry.key == "BIAS":
+        if entry.key in ("BIAS", "BIAS_POLITICAL"):
             if "mnli" in entry.model_name.lower():
                 return "zero-shot-classification"
             else:
                 entry.loader_kwargs["return_all_scores"] = True
                 return "text-classification"
 
-        if entry.task_type == "zero_shot_classification":
-            return "zero-shot-classification"
-
-        if entry.task_type == "token_classification":
-            return "token-classification"
-
-        if entry.task_type == "text_classification":
-            return "text-classification"
-
-        return entry.task_type
+        _TASK_MAP = {
+            "zero_shot_classification": "zero-shot-classification",
+            "token_classification": "token-classification",
+            "text_classification": "text-classification",
+            "sentiment_analysis": "sentiment-analysis",
+        }
+        return _TASK_MAP.get(entry.task_type, entry.task_type)
 
     def _load_model(self, entry: ModelEntry) -> Any:
         """Dispatch to the appropriate loader based on entry.loader."""
@@ -374,33 +426,45 @@ class ModelManager:
         elif entry.loader == "sentence_transformer":
             from sentence_transformers import SentenceTransformer
 
-            return SentenceTransformer(entry.model_name, device=device)
+            model = SentenceTransformer(entry.model_name, device=device)
+            if device == "cuda":
+                model.half()
+            return model
 
         elif entry.loader == "transformers_pipeline":
+            import torch as _torch
             from transformers import pipeline
 
             hf_device = 0 if device == "cuda" else -1
+            _dtype = _torch.float16 if device == "cuda" else _torch.float32
             task = self._resolve_hf_task(entry)
             return pipeline(
-                task, model=entry.model_name, device=hf_device, **entry.loader_kwargs
+                task, model=entry.model_name, device=hf_device,
+                dtype=_dtype, **entry.loader_kwargs,
             )
 
         elif entry.loader == "auto_model_seq2seq":
+            import torch as _torch
             from transformers import AutoModelForSeq2SeqLM
 
+            _dtype = _torch.float16 if device == "cuda" else _torch.float32
             model = AutoModelForSeq2SeqLM.from_pretrained(
                 entry.model_name,
-                device_map={"": device},
-            )
+                dtype=_dtype,
+                low_cpu_mem_usage=False,
+            ).to(device)
             return model
 
         elif entry.loader == "auto_model_qa":
+            import torch as _torch
             from transformers import AutoModelForQuestionAnswering
 
+            _dtype = _torch.float16 if device == "cuda" else _torch.float32
             model = AutoModelForQuestionAnswering.from_pretrained(
                 entry.model_name,
-                device_map={"": device},
-            )
+                dtype=_dtype,
+                low_cpu_mem_usage=False,
+            ).to(device)
             return model
 
         elif entry.loader == "auto_tokenizer":
