@@ -78,15 +78,15 @@ class BaseIngestor:
         
         # Step 3: Prune to last 30 days
         MAX_DAYS = 30
-        dates = sorted(data.keys())
+        dates = sorted(file_data.keys())
         if len(dates) > MAX_DAYS:
             for old_date in dates[:-MAX_DAYS]:
-                del data[old_date]
-                
-                
+                del file_data[old_date]
+
+
         # Step 4: Persist
         file_data[today] = entry
-        self.stats_json_handler.write_json(data)
+        self.stats_json_handler.write_json(file_data)
 
     
     def fetch_articles(self) -> Iterator[Article]: 
