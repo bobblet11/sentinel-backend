@@ -4,12 +4,13 @@ import re
 from typing import List
 
 # Local imports
-from microservices.nlp.models.base import NLPComponent
+from microservices.nlp.models.base import SentenceProcessor
 from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
+from microservices.nlp.config import PREPROCESS_MIN_TOKENS, PHOTO_CREDIT_MAX_LEN
 
 logger = logging.getLogger(__name__)
 
-class Preprocessor(NLPComponent):
+class Preprocessor(SentenceProcessor):
     """
     "Universal Janitor" Preprocessor.
     
@@ -18,30 +19,38 @@ class Preprocessor(NLPComponent):
     2. Footer Cutoff: Stops processing the text entirely once footer keywords are detected.
     3. Linguistic Filtering: Uses Spacy's POS tagger to remove short lines (< 7 tokens) 
        that look like sentences but lack verbs (e.g., "Politics", "Frank Gardner").
+
+    Returns sentences via a local list; does NOT write to result.sentences.
     """
-    def __init__(self):
-        logger.info("Preprocessor: Loading Spacy 'en_core_web_sm' model...")
-        try:
-            # CRITICAL CHANGE: We REMOVED 'tagger' and 'attribute_ruler' from the disable list.
-            # We need them enabled so Spacy can identify Verbs vs Nouns.
-            self.nlp = spacy.load("en_core_web_sm", disable=["ner", "lemmatizer"])
-        except OSError:
-            logger.error("Spacy model not found. Run: python -m spacy download en_core_web_sm")
-            raise
+    def __init__(self, nlp=None):
+        if nlp is not None:
+            logger.info("Preprocessor: Using shared spaCy model.")
+            self.nlp = nlp
+        else:
+            logger.info("Preprocessor: Loading Spacy 'en_core_web_sm' model...")
+            try:
+                # We disable NER and Lemmatizer as they are handled by specialized downstream components
+                self.nlp = spacy.load("en_core_web_sm", disable=["ner", "lemmatizer"])
+            except OSError:
+                logger.error("Spacy model not found. Run: python -m spacy download en_core_web_sm")
+                raise
+
+        # Compiled once at init; used by both line-level and sentence-level filters.
+        self._photo_credit_re = re.compile(
+            r'(?i)\b(getty|reuters|afp|ntb|epa|ugc|ap|bbc|pool|handout|'
+            r'shutterstock|alamy|corbis|zuma|sipa|nurphoto|xinhua|'
+            r'press association|pa images|sky news|itv|abc news)\b'
+        )
 
     def _clean_and_repair_structure(self, raw_text: str) -> str:
-        """
-        Phase 1: Regex Cleaning (The Janitor)
-        Removes obvious garbage (UI, Dates, Footers) before Spacy sees it.
-        """
-        if not raw_text: return ""
+        if not raw_text: 
+            return ""
 
         lines = raw_text.split('\n')
         cleaned_lines = []
         seen_lines = set()
         
-        # --- STOP PATTERNS (The Footer Cutoff) ---
-        # If we see these, the article is likely over. Stop reading immediately.
+        # Stop processing entirely when these markers appear
         footer_cutoff_pattern = re.compile(r'(?i)^('
             r'more from (the )?bbc|related (content|stories|topics)|up next|most popular|'
             r'have you read\?|more on geographies|license and republishing|content index|'
@@ -60,8 +69,7 @@ class Preprocessor(NLPComponent):
             r'reuters, the news and media division of thomson reuters'
         r')')
         
-        # --- KILL LISTS (Regex Filters) ---
-        # 1. Time & Meta: Matches "10 hrs ago", "Updated 1 min ago", "7 MIN READ"
+        # Filter patterns for metadata and UI elements
         time_meta_pattern = re.compile(r'(?i)^('
             r'\d+\s+(hour|minute|day|second|hr|min)s?\s+ago|'
             r'updated\s+.*|'
@@ -69,7 +77,6 @@ class Preprocessor(NLPComponent):
             r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2},?\s+\d{4}'
         r')')
 
-        # 2. Credits & Sources: Matches "Getty Images", "Analysis by", "Image: ..."
         credits_pattern = re.compile(r'(?i)^('
             r'(image|photo|source|graphic|credits?):|'
             r'(left|right|top|bottom):|'
@@ -79,7 +86,6 @@ class Preprocessor(NLPComponent):
             r'getty images|epa|afp|ugc|reuters|ap|copyright|davidoff studios'
         r')')
 
-        # 3. UI Elements: Matches "Sign In", "Share", "Menu"
         ui_pattern = re.compile(r'(?i)^('
             r'register|sign in|log in|'
             r'skip to.*|'
@@ -95,6 +101,12 @@ class Preprocessor(NLPComponent):
             r'terms of use'
         r')')
 
+        byline_pattern = re.compile(r'(?i)^('
+            r'by\s+[A-Z][a-z]+\s+[A-Z][a-z]+|'
+            r'.*correspondent.*|'
+            r'writer,.*'
+        r')')
+
         # Catch encoded/debug fragments and broken telemetry tails.
         junk_pattern = re.compile(r'(?i)^('
             r'in/[a-z0-9/_-]{6,}|'
@@ -102,13 +114,6 @@ class Preprocessor(NLPComponent):
             r'\d{1,4}\s+\d{1,4}\s+n/?a|'
             r'\[\d+/\d+\].*|item\s+\d+\s+of\s+\d+.*|'
             r'\d+\s+seconds\s+of\s+\d+\s+seconds.*volume\s*\d+%'
-        r')')
-
-        # 4. Bylines: Matches "By [Name]" or "Correspondent"
-        byline_pattern = re.compile(r'(?i)^('
-            r'by\s+[A-Z][a-z]+\s+[A-Z][a-z]+|'
-            r'.*correspondent.*|'
-            r'writer,.*'
         r')')
 
         # Reuters metadata and utility lines that are not article body.
@@ -126,10 +131,16 @@ class Preprocessor(NLPComponent):
             r'data disclosure and sources|site feedback'
         r')')
 
+        # Matches photo/image attribution lines of the form
+        # "Name/Agency/Agency." or "Agency/Getty Images." — these are
+        # not sentences; they are short, slash-separated, and contain
+        # at least one known media/photo agency token.
+        photo_credit_pattern = self._photo_credit_re
+
         for line in lines:
             line = line.strip()
             line = re.sub(r'\s+', ' ', line)
-            
+
             # Basic Filtering
             if not line:
                 continue
@@ -141,19 +152,35 @@ class Preprocessor(NLPComponent):
             if lowered in seen_lines:
                 continue
             seen_lines.add(lowered)
-            
+
             # --- PHASE 2: CUTOFF CHECK ---
             if footer_cutoff_pattern.search(line):
                 # Stop processing the rest of the file
                 break
 
             # --- PHASE 3: REGEX FILTERING ---
-            if ui_pattern.search(line): continue
-            if time_meta_pattern.search(line): continue
-            if credits_pattern.search(line): continue
-            if byline_pattern.search(line) and len(line) < 50: continue
-            if junk_pattern.search(line): continue
-            if reuters_meta_pattern.search(line): continue
+            if ui_pattern.search(line):
+                continue
+            if time_meta_pattern.search(line):
+                continue
+            if credits_pattern.search(line):
+                continue
+            if byline_pattern.search(line) and len(line) < 50:
+                continue
+            if junk_pattern.search(line):
+                continue
+            if reuters_meta_pattern.search(line):
+                continue
+
+            # Drop short slash-separated photo attribution lines
+            # e.g. "Jeff Overs/BBC/Reuters." or "Ole Berg-Rusten/NTB/AFP/Getty Images."
+            # Guard: only drop if the line also contains NO verb — real claims that
+            # mention these agencies inline (e.g. "Reuters reported that...") always
+            # have at least one VERB/AUX token and are preserved.
+            if '/' in line and len(line) < PHOTO_CREDIT_MAX_LEN and photo_credit_pattern.search(line):
+                has_verb = any(t.pos_ in ("VERB", "AUX") for t in self.nlp(line))
+                if not has_verb:
+                    continue
 
             # Reuters often inserts newsletter and summary/companies utility blocks.
             if line.lower() in {"summary", "companies", "latest", "archive", "browse", "videos", "pictures", "graphics", "podcasts", "authors", "home"}:
@@ -170,53 +197,55 @@ class Preprocessor(NLPComponent):
             # This ensures Spacy splits it from the next line.
             if line[-1] not in ".?!:;\"'":
                 line += "."
-                
+            
             cleaned_lines.append(line)
             
         return " ".join(cleaned_lines)
 
-    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
-        # 1. Regex Cleaning
+    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> List[SentenceScore]:
+        """
+        Cleans and tokenizes the article text into local SentenceScore objects.
+        """
         raw_text = getattr(article, 'text', getattr(article, 'content', ""))
         clean_text = self._clean_and_repair_structure(raw_text)
         
         if not clean_text:
             logger.warning("Preprocessor: Text was empty after cleaning.")
-            result.sentences = []
-            return
+            return []
 
-        # 2. Spacy Analysis (Tokenization + POS Tagging)
         doc = self.nlp(clean_text)
         
         sentence_objects = []
         for idx, span in enumerate(doc.sents):
             text_segment = span.text.strip()
-            
-            # --- PHASE 5: LINGUISTIC FILTER ---
-            # If a sentence is short (< 7 tokens), we strictly check its grammar.
             token_count = len(span)
             
-            if token_count < 7:
-                # Rule A: Keep Questions (e.g. "What next?") even if they lack verbs
+            # Linguistic filtering for short fragments
+            if token_count < PREPROCESS_MIN_TOKENS:
                 if "?" in text_segment:
-                    pass 
-                
-                # Rule B: If it's not a question, it MUST have a Verb (VERB) or Auxiliary Verb (AUX)
-                # This kills: "Pablo Uchoa." (PROPN), "Geographies in Depth." (NOUN)
-                # This keeps: "He died." (VERB), "It was chaos." (AUX)
+                    pass # Questions are often valid claims/segments
                 else:
+                    # Drop short lines that lack a verb (likely labels or titles)
                     has_verb = any(token.pos_ in ["VERB", "AUX"] for token in span)
                     if not has_verb:
-                        continue # Skip this sentence
+                        continue
 
-            # Create sentence object
+            # Sentence-level photo credit guard (catches credits not separated
+            # by newlines in the raw article, which the line-level filter misses).
+            # Same rule: slash-separated, agency token present, no verb.
+            if ('/' in text_segment
+                    and len(text_segment) < PHOTO_CREDIT_MAX_LEN
+                    and self._photo_credit_re.search(text_segment)
+                    and not any(tok.pos_ in ("VERB", "AUX") for tok in span)):
+                continue
+
             s_obj = SentenceScore(
-                index=idx, 
-                text=text_segment, 
-                score=0.0, 
+                index=idx,
+                text=text_segment,
+                score=0.0,
                 embedding=None
             )
             sentence_objects.append(s_obj)
 
-        result.sentences = sentence_objects
         logger.info(f"Preprocessor: Cleaned & Split. Result: {len(sentence_objects)} sentences.")
+        return sentence_objects
