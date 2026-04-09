@@ -55,7 +55,7 @@ services:
     container_name: sentinel-postgres-container
     image: pgvector/pgvector:pg15
     ports:
-      - ${POSTGRES_PORT}:5432
+      - ${POSTGRES_EXTERNAL_PORT:-${POSTGRES_PORT:-5432}}:5432
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -95,9 +95,9 @@ services:
 
     profiles:
       - api
-      # volumes:
-      # Note: On Docker Desktop for Mac, uncomment below and add /workspaces to Docker -> Preferences -> Resources -> File Sharing
-      # - ${HOST_LOG_ROOT}/api:/app/logs
+
+    volumes:
+      - ${HOST_LOG_ROOT}/api:/app/logs
 
     ports:
       - ${API_SERVICE_PORT:-8001}:8001
@@ -223,7 +223,7 @@ services:
   nlp-service-cpu:
     container_name: sentinel-nlp-CPU-service-container
     image: sentinel/nlp-service:latest
-    build: 
+    build:
       args:
         BASE_IMAGE: sentinel/python-ml-cpu:3.12
       context: ../../
@@ -239,6 +239,7 @@ services:
 
     volumes:
       - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
+      - nlp-hf-cache:/opt/sentinel/models/huggingface
 
     restart: unless-stopped
     networks:
@@ -260,6 +261,7 @@ services:
       - NLP_EMBEDDING_MODEL=${NLP_EMBEDDING_MODEL}
       - NLP_NER_MODEL=${NLP_NER_MODEL}
       - NLP_BIAS_MODEL=${NLP_BIAS_MODEL}
+      - ENABLE_DECONTEXTUALIZATION=${NLP_CPU_ENABLE_DECONTEXTUALIZATION:-false}
       - USE_GPU=false
 
     deploy:
@@ -274,9 +276,9 @@ services:
   nlp-service-gpu:
     container_name: sentinel-nlp-GPU-service-container
     image: sentinel/nlp-service:latest
-    build: 
+    build:
       args:
-        BASE_IMAGE: sentinel/python-ml-gpu:3.12-cuda121
+        BASE_IMAGE: sentinel/python-ml-gpu:3.12-cuda124
       context: ../../
       dockerfile: ./microservices/nlp/Dockerfile
     shm_size: '${NLP_SHM_SIZE:-4gb}'
@@ -290,6 +292,7 @@ services:
 
     volumes:
       - ${HOST_LOG_ROOT}/nlp/logs:/app/logs
+      - nlp-hf-cache:/opt/sentinel/models/huggingface
 
     restart: unless-stopped
     networks:
@@ -311,10 +314,11 @@ services:
       - NLP_EMBEDDING_MODEL=${NLP_EMBEDDING_MODEL}
       - NLP_NER_MODEL=${NLP_NER_MODEL}
       - NLP_BIAS_MODEL=${NLP_BIAS_MODEL}
+      - ENABLE_DECONTEXTUALIZATION=${NLP_GPU_ENABLE_DECONTEXTUALIZATION:-true}
       - USE_GPU=true
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-    gpus: all
+
     deploy:
       resources:
         limits:
@@ -323,6 +327,10 @@ services:
         reservations:
           cpus: '${NLP_CPU_RESERVATION:-0.5}'
           memory: '${NLP_MEMORY_RESERVATION:-1G}'
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   retrieval-layer-service:
     container_name: sentinel-retrieval-layer-service-container
@@ -384,3 +392,6 @@ services:
 networks:
   sentinel-net:
     external: true
+
+volumes:
+  nlp-hf-cache:

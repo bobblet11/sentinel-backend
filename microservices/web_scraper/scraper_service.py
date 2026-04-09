@@ -212,7 +212,7 @@ class ScraperService(ServiceTemplate):
                 self.logger.debug(
                     "Scraper has processed one message\n\turl=%s\n\toutlet=%s\n\ttitle=%s\n\tpublish_date=%s\n\ttext_len=%s\n\thtml_len=%s\n\ttext_preview=%s",
                     message.link,
-                    message.news_outlet,
+                    message.news_outlet_name,
                     message.title,
                     message.data.payload.publish_date,
                     len(message.text or ""),

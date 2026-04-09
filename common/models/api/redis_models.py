@@ -40,10 +40,11 @@ class NLPOptions:
     enable_ner: bool = True
     enable_centrality: bool = True
     enable_claim_extraction: bool = True
+    enable_decontextualization: bool = True
     max_claims: int = 10
-    min_confidence: float = 0.75 # Updated default to match CheckWorthinessFilter
+    min_confidence: float = 0.50  # Matches CheckWorthinessFilter threshold in checkworthy.py
     # If True, include high-dimensional embeddings in the final response
-    return_embeddings: bool = True 
+    return_embeddings: bool = True
     
 @dataclass(frozen=True)
 class Article:
@@ -137,8 +138,7 @@ class Claim:
     """
     confidence: float
     source_sentence_indices: List[int] # which sentences are used to form the claim
-    contextualised_claim_text: str
-    decontextualised_claim_text: Optional[str] = None
+    decontextualised_claim_text: str
     decontextualised_claim_embedding: Optional[List[float]] = None
     NER_entities: List[Entity] = field(default_factory=list)
 
@@ -156,7 +156,6 @@ class BiasProfile:
 @dataclass
 class NLPResult:
     """The aggregate object containing all insights produced by the pipeline."""
-    sentences: List[SentenceScore] = field(default_factory=list)
     claims_in_article: List[Claim] = field(default_factory=list)
     entities_in_article: List[Entity] = field(default_factory=list)
     bias_profile: Optional[BiasProfile] = None

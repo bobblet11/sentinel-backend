@@ -45,6 +45,13 @@ BATCH_SIZE: int = get_env_var(
     default=10
 )
 
+RETRY_FAILURE_MODE: bool = get_env_var(
+    "RETRIEVAL_RETRY_FAILURE_MODE",
+    lambda x: str(x).lower() in {"1", "true", "yes", "y"},
+    config_logger,
+    default=False,
+)
+
 DUMMY_NLP_MODE: bool = get_env_var(
     "DUMMY_NLP_MODE",
     lambda x: str(x).lower() in {"1", "true", "yes", "y"},
@@ -60,7 +67,7 @@ DUMMY_SEED_MODE: bool = get_env_var(
 )
 
 HASH_STORE_NAMESPACE: str = get_env_var("HASH_STORE_NAMESPACE",str, config_logger)
-TEST_MODE: bool = True
+TEST_MODE: bool = False
 
 env_variables: List[EnvVariable] = [
     EnvVariable("POSTGRES_HOST", POSTGRES_HOST),
@@ -76,6 +83,7 @@ env_variables: List[EnvVariable] = [
     EnvVariable("HASH_STORE_NAMESPACE", HASH_STORE_NAMESPACE),
     
     EnvVariable("BATCH_SIZE", BATCH_SIZE),
+    EnvVariable("RETRIEVAL_RETRY_FAILURE_MODE", RETRY_FAILURE_MODE),
     
     EnvVariable("DUMMY_NLP_MODE", DUMMY_NLP_MODE),
     EnvVariable("DUMMY_SEED_MODE", DUMMY_SEED_MODE),

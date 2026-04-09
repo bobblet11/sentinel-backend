@@ -1,289 +1,185 @@
 import logging
-from typing import Any, Dict, List
+import torch
+from typing import Any, Dict, Optional
+from transformers import pipeline
 
-from microservices.nlp.models.base import NLPComponent
+# Local imports
+from microservices.nlp.models.base import ArticleProcessor
+from microservices.nlp.components.device import DeviceConfig
 from common.models.api.redis_models import Article, BiasProfile, NLPOptions, NLPResult
 from microservices.nlp.config import (
-    BIAS_MODEL,
-    BIAS_MAX_ARTICLE_TEXT_CHARS,
-    BIAS_MAX_SENTENCES_TO_CLASSIFY,
-    BIAS_MAX_SENTENCE_TEXT_CHARS,
+    BIAS_POLITICAL_MODEL, BIAS_SENTIMENT_MODEL,
+    BIAS_MAX_CHARS, BIAS_SENTIMENT_MAX_LEN,
 )
 
 logger = logging.getLogger(__name__)
 
-class BiasDetector(NLPComponent):
+
+class BiasDetector(ArticleProcessor):
     """
-    Detects political bias and sentiment using zero-shot classification.
+    MODULAR BIAS DETECTION LAYER
 
-    Outputs:
-    - result.bias_profile (article-level summary)
-    - sentence.metadata["bias"] (sentence-level category/confidence)
+    Performs article-level political bias classification and emotional tone
+    analysis using two lightweight NLI/sentiment transformer pipelines.
 
-    Note: We never overwrite sentence.score because that field is used by
-    centrality ranking and downstream claim selection.
+    Strategies Applied:
+    1.  Political Bias via Zero-Shot NLI (typeform/distilbert-base-uncased-mnli):
+        The article text (truncated to POLITICAL_MAX_CHARS characters) is classified
+        against three mutually exclusive hypothesis labels:
+        ["left-leaning", "centrist", "right-leaning"].
+        The model operates via soft-NLI entailment — no political fine-tuning is
+        required, making it robust to domain shift across news publishers.
+        Scores are normalised across labels using the model's own softmax
+        (hypothesis_template='This text has a {} political perspective.').
+    2.  Emotional Tone via Sentiment Analysis (cardiffnlp/twitter-roberta-base-sentiment-latest):
+        The same truncated text is scored for emotional polarity.
+        The top label from {negative, neutral, positive} is mapped to
+        a human-readable tone string ("Negative", "Neutral", "Positive") and
+        stored in BiasProfile.emotional_tone.
+    3.  Text Truncation: Analysis is bounded to the first POLITICAL_MAX_CHARS
+        (default 2000) characters of the article body. This keeps inference
+        fast (< 1 s on CPU for most articles) while capturing the lede and early
+        paragraphs that typically set the article's framing.
+    4.  FP16: Both pipelines use float16 on CUDA to reduce memory usage.
+    5.  Graceful Degradation: On any inference failure, a neutral / zero-confidence
+        BiasProfile is stored and the error is logged — the pipeline is never blocked.
+
+    Writes to result.bias_profile only; does NOT modify sentences.
     """
-    POLITICAL_LABELS: List[str] = ["left", "center", "right"]
-    SENTIMENT_LABELS: List[str] = ["positive", "neutral", "negative"]
-    MAX_ARTICLE_TEXT_CHARS: int = max(500, BIAS_MAX_ARTICLE_TEXT_CHARS)
-    MAX_SENTENCES_TO_CLASSIFY: int = max(0, BIAS_MAX_SENTENCES_TO_CLASSIFY)
-    MAX_SENTENCE_TEXT_CHARS: int = max(80, BIAS_MAX_SENTENCE_TEXT_CHARS)
-    TEXT_CLASSIFICATION_MAX_CHARS: int = 2000
 
-    def __init__(self, model: Any = None):
-        """
-        Args:
-            model: Optional injected zero-shot classification pipeline.
-        """
-        self.model = model
-        self.model_mode = "unknown"
+    POLITICAL_LABELS = ["left-leaning", "centrist", "right-leaning"]
+    # Map classifier output labels to the canonical BiasProfile string format
+    _LABEL_MAP = {
+        "left-leaning":  "Left",
+        "centrist":      "Center",
+        "right-leaning": "Right",
+    }
+    _TONE_MAP = {
+        "negative": "Negative",
+        "neutral":  "Neutral",
+        "positive": "Positive",
+    }
 
-        if self.model is None:
-            logger.info("BiasDetector: Loading model '%s'...", BIAS_MODEL)
-            try:
-                torch_module = __import__("torch")
-                transformers_module = __import__("transformers", fromlist=["pipeline"])
-                hf_pipeline = getattr(transformers_module, "pipeline")
+    def __init__(self, device_config: DeviceConfig, model_manager: Optional[Any] = None):
+        logger.info(
+            f"BiasDetector: Loading models on {device_config.device.upper()} "
+            f"(fp16={device_config.use_fp16})..."
+        )
 
-                device = 0 if torch_module.cuda.is_available() else -1
-                model_name = str(BIAS_MODEL).lower()
+        try:
+            if model_manager is not None:
+                from common.model_manager.registry import ModelState
 
-                # For non-MNLI models (e.g. toxic-bert), use text-classification.
-                if "mnli" in model_name:
-                    self.model = hf_pipeline(
-                        "zero-shot-classification",
-                        model=BIAS_MODEL,
-                        device=device,
-                    )
-                    self.model_mode = "zero-shot"
+                pol_ok = model_manager.get_state("BIAS_POLITICAL") == ModelState.READY
+                sent_ok = model_manager.get_state("BIAS_SENTIMENT") == ModelState.READY
+                if pol_ok and sent_ok:
+                    self.political_classifier = model_manager.get("BIAS_POLITICAL")
+                    self.sentiment_analyzer = model_manager.get("BIAS_SENTIMENT")
+                    logger.info("BiasDetector: Using pipelines from ModelManager.")
+                    return
                 else:
-                    self.model = hf_pipeline(
-                        "text-classification",
-                        model=BIAS_MODEL,
-                        device=device,
-                        return_all_scores=True,
+                    logger.warning(
+                        "BiasDetector: ModelManager states — political=%s, sentiment=%s. "
+                        "Falling back to direct load.",
+                        model_manager.get_state("BIAS_POLITICAL").value,
+                        model_manager.get_state("BIAS_SENTIMENT").value,
                     )
-                    self.model_mode = "text-classification"
 
-                logger.info("BiasDetector: Loaded on %s.", "GPU" if device == 0 else "CPU")
-            except Exception as exc:
-                logger.error("BiasDetector: Failed to load model: %s", exc)
-                self.model = None
-                self.model_mode = "unknown"
-        else:
-            # Default assumption for injected models in current pipeline/tests.
-            self.model_mode = "zero-shot"
+            self.political_classifier = pipeline(
+                "zero-shot-classification",
+                model=BIAS_POLITICAL_MODEL,
+                device=device_config.device_id,
+                dtype=device_config.dtype,
+            )
+            self.sentiment_analyzer = pipeline(
+                "sentiment-analysis",
+                model=BIAS_SENTIMENT_MODEL,
+                device=device_config.device_id,
+                dtype=device_config.dtype,
+                truncation=True,
+                max_length=BIAS_SENTIMENT_MAX_LEN,
+            )
+            logger.info("BiasDetector: Models loaded successfully.")
+        except Exception as e:
+            logger.error(f"BiasDetector: Failed to load models: {e}")
+            raise
 
     def _neutral_profile(self) -> BiasProfile:
+        """Returns a zero-confidence neutral bias profile for graceful degradation."""
         return BiasProfile(
-            bias_category="center",
+            bias_category="Center",
             bias_score=0.0,
             bias_analysis_confidence=0.0,
-            sentiment_category="neutral",
+            sentiment_category="Neutral",
             sentiment_analysis_confidence=0.0,
         )
 
-    def _classify(self, text: str, labels: List[str], hypothesis_template: str) -> Dict[str, float]:
-        if not self.model or self.model_mode != "zero-shot":
-            return {}
-
-        pred = self.model(
-            text,
-            labels,
-            multi_label=False,
-            hypothesis_template=hypothesis_template,
-        )
-
-        # Normalize output into a label->score mapping.
-        return {
-            str(label).lower(): float(score)
-            for label, score in zip(pred.get("labels", []), pred.get("scores", []))
-        }
-
-    def _classify_toxicity(self, text: str) -> Dict[str, float]:
-        if not self.model or self.model_mode != "text-classification":
-            return {}
-
-        safe_text = text[: self.TEXT_CLASSIFICATION_MAX_CHARS]
-        raw = self.model(safe_text)
-
-        # text-classification with return_all_scores=True returns [[{label,score}, ...]].
-        rows = raw[0] if raw and isinstance(raw[0], list) else raw
-        if not rows:
-            return {}
-
-        scores: Dict[str, float] = {}
-        for row in rows:
-            label = str(row.get("label", "")).strip().lower()
-            score = float(row.get("score", 0.0))
-            if not label:
-                continue
-            scores[label] = score
-
-        return scores
-
-    def _resolve_toxic_score(self, scores: Dict[str, float]) -> float:
-        if not scores:
-            return 0.0
-
-        for label, value in scores.items():
-            if "toxic" in label and "non" not in label:
-                return float(value)
-
-        # Common binary classifier fallback: LABEL_1 is typically positive class.
-        if "label_1" in scores:
-            return float(scores["label_1"])
-
-        top_label = max(scores, key=lambda name: scores[name])
-        return float(scores[top_label])
-
-    def _article_text(self, article: Article, result: NLPResult) -> str:
-        text = (article.text or "").strip()
-        if text:
-            return text[: self.MAX_ARTICLE_TEXT_CHARS]
-
-        if result.sentences:
-            joined = " ".join(s.text for s in result.sentences if s.text)
-            return joined[: self.MAX_ARTICLE_TEXT_CHARS]
-
-        return ""
-
-    def _annotate_sentences(self, sentences) -> None:
-        if not sentences or not self.model or self.MAX_SENTENCES_TO_CLASSIFY <= 0:
-            return
-
-        ranked = sorted(
-            sentences,
-            key=lambda s: s.score if s.score is not None else 0.0,
-            reverse=True,
-        )
-        selected = ranked[: self.MAX_SENTENCES_TO_CLASSIFY]
-
-        for sentence in selected:
-            text = (sentence.text or "").strip()[: self.MAX_SENTENCE_TEXT_CHARS]
-            if not text:
-                continue
-
-            try:
-                if self.model_mode == "zero-shot":
-                    bias_scores = self._classify(
-                        text,
-                        self.POLITICAL_LABELS,
-                        "The political perspective of this sentence is {}.",
-                    )
-
-                    if not bias_scores:
-                        continue
-
-                    category = max(bias_scores, key=lambda label: bias_scores[label])
-                    sentence.metadata["bias"] = {
-                        "category": category,
-                        "confidence": float(bias_scores[category]),
-                        "scores": bias_scores,
-                    }
-                elif self.model_mode == "text-classification":
-                    scores = self._classify_toxicity(text)
-                    if not scores:
-                        continue
-
-                    toxic_score = self._resolve_toxic_score(scores)
-                    category = "biased" if toxic_score >= 0.5 else "center"
-                    sentence.metadata["bias"] = {
-                        "category": category,
-                        "confidence": float(toxic_score),
-                        "scores": scores,
-                    }
-            except Exception as exc:
-                logger.debug("BiasDetector: Sentence annotation failed: %s", exc)
-
     def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
         """
-        Populates result.bias_profile with article-level political bias + sentiment.
+        Classifies the article's political lean and emotional tone.
+        Writes the result to result.bias_profile.
+        Does NOT return a value.
         """
-        if not options.enable_bias_detection:
-            return
-
-        text = self._article_text(article, result)
+        text = (article.text or article.summary or "").strip()
         if not text:
-            logger.warning("BiasDetector: No text available for bias analysis.")
+            logger.warning("BiasDetector: No text available — using neutral profile.")
             result.bias_profile = self._neutral_profile()
             return
 
-        if not self.model:
-            logger.warning("BiasDetector: Model unavailable; using neutral fallback.")
-            result.bias_profile = self._neutral_profile()
-            return
+        analysis_text = text[:BIAS_MAX_CHARS]
 
+        # ── Political Bias ──────────────────────────────────────────────────────
         try:
-            if self.model_mode == "zero-shot":
-                combined_scores = self._classify(
-                    text,
-                    self.POLITICAL_LABELS + self.SENTIMENT_LABELS,
-                    "This text is {}.",
-                )
-
-                political_scores = {
-                    label: score
-                    for label, score in combined_scores.items()
-                    if label in self.POLITICAL_LABELS
-                }
-                sentiment_scores = {
-                    label: score
-                    for label, score in combined_scores.items()
-                    if label in self.SENTIMENT_LABELS
-                }
-
-                if not political_scores or not sentiment_scores:
-                    result.bias_profile = self._neutral_profile()
-                    return
-
-                bias_category = max(political_scores, key=lambda label: political_scores[label])
-                sentiment_category = max(sentiment_scores, key=lambda label: sentiment_scores[label])
-
-                # Bias strength, independent of left/right direction.
-                bias_strength = 1.0 - political_scores.get("center", 0.0)
-
-                result.bias_profile = BiasProfile(
-                    bias_category=bias_category,
-                    bias_score=float(max(0.0, min(1.0, bias_strength))),
-                    bias_analysis_confidence=float(political_scores[bias_category]),
-                    sentiment_category=sentiment_category,
-                    sentiment_analysis_confidence=float(sentiment_scores[sentiment_category]),
-                )
-            elif self.model_mode == "text-classification":
-                toxicity_scores = self._classify_toxicity(text)
-                if not toxicity_scores:
-                    result.bias_profile = self._neutral_profile()
-                    return
-
-                toxic_score = float(max(0.0, min(1.0, self._resolve_toxic_score(toxicity_scores))))
-                sentiment_category = "negative" if toxic_score >= 0.6 else "neutral"
-
-                # Toxicity models do not provide left/center/right direction.
-                result.bias_profile = BiasProfile(
-                    bias_category="center",
-                    bias_score=toxic_score,
-                    bias_analysis_confidence=toxic_score,
-                    sentiment_category=sentiment_category,
-                    sentiment_analysis_confidence=toxic_score,
-                )
-            else:
-                result.bias_profile = self._neutral_profile()
-                return
-
-            self._annotate_sentences(result.sentences)
-
-            if self.MAX_SENTENCES_TO_CLASSIFY <= 0:
-                logger.debug("BiasDetector: sentence-level bias annotation disabled for fast mode.")
-
-            logger.info(
-                "BiasDetector: bias=%s (conf=%.3f) sentiment=%s (conf=%.3f)",
-                result.bias_profile.bias_category,
-                result.bias_profile.bias_analysis_confidence,
-                result.bias_profile.sentiment_category,
-                result.bias_profile.sentiment_analysis_confidence,
+            bias_out = self.political_classifier(
+                analysis_text,
+                self.POLITICAL_LABELS,  # class-level label list; unchanged
+                multi_label=False,
+                hypothesis_template="This text has a {} political perspective.",
             )
+            raw_label  = bias_out["labels"][0]          # e.g. "left-leaning"
+            confidence = float(bias_out["scores"][0])
 
-        except Exception as exc:
-            logger.error("BiasDetector failed: %s", exc)
+            # Build canonical scores dict using BiasProfile keys
+            scores: Dict[str, float] = {
+                self._LABEL_MAP[lbl]: float(sc)
+                for lbl, sc in zip(bias_out["labels"], bias_out["scores"])
+            }
+            political_bias = self._LABEL_MAP.get(raw_label, "Center")
+
+        except Exception as e:
+            logger.error(f"BiasDetector: Political bias classification failed: {e}")
             result.bias_profile = self._neutral_profile()
+            return
+
+        # ── Emotional Tone ──────────────────────────────────────────────────────
+        emotional_tone: Optional[str] = None
+        tone_out = None
+        try:
+            tone_out   = self.sentiment_analyzer(analysis_text[:512])
+            raw_tone   = tone_out[0]["label"].lower() if tone_out else "neutral"
+            emotional_tone = self._TONE_MAP.get(raw_tone, raw_tone.capitalize())
+        except Exception as e:
+            logger.warning(f"BiasDetector: Tone analysis failed (non-critical): {e}")
+            emotional_tone = "Neutral"
+
+        # ── Commit Results ──────────────────────────────────────────────────────
+        # Pick the top score from the political bias scores dict as bias_score
+        bias_score = max(scores.values()) if scores else 0.0
+        sentiment_confidence = 0.0
+        try:
+            if tone_out:
+                sentiment_confidence = float(tone_out[0]["score"])
+        except (KeyError, IndexError, TypeError):
+            pass
+
+        result.bias_profile = BiasProfile(
+            bias_category=political_bias,
+            bias_score=bias_score,
+            bias_analysis_confidence=confidence,
+            sentiment_category=emotional_tone,
+            sentiment_analysis_confidence=sentiment_confidence,
+        )
+        logger.info(
+            f"BiasDetector: Result — {political_bias} (conf={confidence:.2f}), "
+            f"tone={emotional_tone}."
+        )
