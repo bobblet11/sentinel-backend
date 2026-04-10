@@ -17,7 +17,7 @@
                                 "ms-python.python",
                                 "ms-python.vscode-pylance",
                                 "ms-azuretools.vscode-docker",
-   rying                              "eamodio.gitlens"
+                                "eamodio.gitlens"
                         ]
                 }
         },
@@ -25,7 +25,10 @@
         "remoteEnv": {
                 "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
         },
-        "initializeCommand": ["powershell", "-Command", "docker network inspect sentinel-net 2>$null; if ($LASTEXITCODE -ne 0) { docker network create sentinel-net }"],
-        "runArgs": ["--network=sentinel-net"]
+        "initializeCommand": [
+  "sh",
+  "-c",
+  "docker network inspect sentinel-net >/dev/null 2>&1 || docker network create sentinel-net"],
+    "postCreateCommand": "docker network connect sentinel-net \"$(docker inspect -f '{{.Id}}' $(hostname))\""
 
 }
