@@ -280,7 +280,10 @@ all_jobs = sort_jobs_by_created_at(all_jobs)
 assert len(all_jobs) == len(article_urls_seen)
 print(f"[INFO] Writing {len(all_jobs)} jobs and {len(article_urls_seen)} URLs to merged Redis...")
 for job in all_jobs:
-    merged.xadd(MERGED_STREAM_KEY, {"payload": json.dumps(job.data.model_dump())})
+	payload: Message = job.data.model_dump()
+	payload: Dict[str, Any] =  {"payload": json.dumps(payload)}
+	merged.xadd(MERGED_STREAM_KEY, payload, approximate=True)
+ 
 print(f"[INFO] Stream write complete")
 merged.sadd(MERGED_SET_KEY, *article_urls_seen or [])
 print(f"[INFO] Set write complete")
