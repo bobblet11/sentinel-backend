@@ -41,6 +41,9 @@ services:
       --dbfilename "dump.rdb" 
       --dir /data
 
+    profiles:
+      - redis
+
     <<: *common-env
     deploy:
       resources:
@@ -71,6 +74,9 @@ services:
     networks:
       - sentinel-net
 
+    profiles:
+      - postgres
+      
     command: postgres -c shared_preload_libraries=vector
     deploy:
       resources:
@@ -89,9 +95,9 @@ services:
       context: ../../
       dockerfile: ./microservices/api/Dockerfile
 
-    depends_on:
-      - postgres
-      - redis
+    # depends_on:
+    #   - postgres
+    #   - redis
 
     profiles:
       - api
@@ -134,9 +140,9 @@ services:
       context: ../../
       dockerfile: ./microservices/ingestor/Dockerfile
 
-    depends_on:
-      - postgres
-      - redis
+    # depends_on:
+    #   - postgres
+    #   - redis
 
     volumes:
       - ${HOST_LOG_ROOT}/ingestor:/app/logs
@@ -175,9 +181,9 @@ services:
     shm_size: '${WEB_SCRAPER_SHM_SIZE:-4gb}'
     ipc: host
 
-    depends_on:
-      - postgres
-      - redis
+    # depends_on:
+    #   - postgres
+    #   - redis
 
     profiles:
       - scraper
@@ -230,9 +236,9 @@ services:
       dockerfile: ./microservices/nlp/Dockerfile
     shm_size: '${NLP_SHM_SIZE:-4gb}'
 
-    depends_on:
-      - postgres
-      - redis
+    # depends_on:
+    #   - postgres
+    #   - redis
 
     profiles:
       - nlp-cpu
@@ -283,9 +289,9 @@ services:
       dockerfile: ./microservices/nlp/Dockerfile
     shm_size: '${NLP_SHM_SIZE:-4gb}'
 
-    depends_on:
-      - postgres
-      - redis
+    # depends_on:
+    #   - postgres
+    #   - redis
 
     profiles:
       - nlp-gpu
@@ -342,9 +348,9 @@ services:
       context: ../../
       dockerfile: ./microservices/retrieval_layer/Dockerfile
 
-    depends_on:
-      - postgres
-      - redis
+    # depends_on:
+    #   - postgres
+    #   - redis
 
     profiles:
       - retrieval
