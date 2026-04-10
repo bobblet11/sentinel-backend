@@ -25,10 +25,8 @@
         "remoteEnv": {
                 "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
         },
-        "initializeCommand": [
-  "sh",
-  "-c",
-  "docker network inspect sentinel-net >/dev/null 2>&1 || docker network create sentinel-net"],
-    "postCreateCommand": "docker network connect sentinel-net \"$(docker inspect -f '{{.Id}}' $(hostname))\""
+        "initializeCommand": "docker network inspect sentinel-net >/dev/null 2>&1 || docker network create sentinel-net",
+        "postCreateCommand": "docker network connect sentinel-net \"$(docker inspect -f '{{.Id}}' $(hostname))\" || true",
+        "runArgs": ["--network=sentinel-net"]
 
 }
