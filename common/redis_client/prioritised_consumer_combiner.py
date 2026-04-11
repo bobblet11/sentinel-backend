@@ -183,28 +183,32 @@ class PrioritisedRedisConsumerCombiner:
         """
         Consumes messages that are pending for this specific consumer.
         This should be called on startup to recover from a previous crash.
+
+        Redis cluster mode does not allow multi-stream XREADGROUP calls when the
+        stream keys live in different hash slots, so we read pending entries one
+        stream at a time in priority order.
         """
 
         try:
-            streams = self.stream_to_priority_map.keys()
-            pending_streams:Dict[str,str]  = {stream: "0-0" for stream in streams}
             all_messages: List[Dict[str, Any]] = []
 
-            response = self.client.xreadgroup(
-                self.group_name,
-                self.consumer_name,
-                streams=pending_streams,
-            )
+            for stream_name in sorted(self.stream_to_priority_map, key=self.stream_to_priority_map.get):
+                response = self.client.xreadgroup(
+                    self.group_name,
+                    self.consumer_name,
+                    streams={stream_name: "0-0"},
+                )
 
-            if not response:
-                return all_messages
+                if not response:
+                    continue
 
-            for stream_name, messages in response:
+                _, messages = response[0]
                 for redis_message_id, fields in messages:
                     message_dict:Dict[str, Any] = self._decode_one_message(
-                                                stream_name, redis_message_id, fields
-                                            )
+                        stream_name, redis_message_id, fields
+                    )
                     all_messages.append(message_dict)
+
             return all_messages
 
         except Exception as e:
