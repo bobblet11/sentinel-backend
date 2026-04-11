@@ -1,6 +1,7 @@
 import json
 from logging import Logger, getLogger
 import re
+from unittest import result
 import trafilatura
 import threading 
 
@@ -138,7 +139,11 @@ class ParseManager:
         return ParseResult(text, None, None, None)
     
     def _is_sufficient(self, result: ParseResult) -> bool:
-        return result and result.text and len(result.text.strip()) > 100
+        return (
+            result
+            and result.text
+            and len(result.text.strip()) > 200
+        )
     
     def _normalise_date(self, raw: str) -> Optional[str]:
         if not raw:
@@ -158,7 +163,9 @@ class ParseManager:
         if not result.title:
             result.title = self._extract_title(soup)
             
-        if not result.author:
+        if result.author:
+            result.author = re.sub(r"^By\s+", "", result.author, flags=re.I).strip()
+        else:
             result.author = self._extract_author(soup)
             
         if not result.published_at:
@@ -183,21 +190,25 @@ class ParseManager:
         soup = BeautifulSoup(raw_html, "lxml")
         
         strategies: List[Callable] = [
-            lambda: self._strategy_metadata(article_metadata),
             lambda: self._strategy_hardcoded(article_url, soup),
             lambda: self._strategy_trafilatura(raw_html),
+            lambda: self._strategy_metadata(article_metadata),
             lambda: self._strategy_fallback(soup)
         ]
         
         for strategy in strategies:
             result: ParseResult = strategy()
             
+            if result:
+                self.logger.debug(f"Strategy {strategy.__name__} returned result")
+
             if result and self._is_sufficient(result):
+                self.logger.debug(f"Using strategy: {strategy.__name__}")
                 self._hydrate_missing_fields(result, soup) 
                 return result
                 
         fallback_result: ParseResult = self._strategy_fallback(soup)
-        self._hydrate_missing_fields(result, soup) 
+        self._hydrate_missing_fields(fallback_result, soup)
         return fallback_result
 
     def _extract_text_with_trafilatura(self, raw_html: str) -> Optional[str]:
@@ -266,7 +277,7 @@ class ParseManager:
 
         return None
 
-    def _extract_author(self,  soup:BeautifulSoup) -> Optional[str]:
+    def _extract_author(self, soup: BeautifulSoup) -> Optional[str]:
         patterns = [
             {"name": "meta", "attrs": {"name": "author"}},
             {"name": "meta", "attrs": {"property": "article:author"}},
@@ -275,20 +286,26 @@ class ParseManager:
 
         for pattern in patterns:
             tag = soup.find(pattern["name"], pattern["attrs"])
-
             if tag and tag.get("content"):
-                return tag["content"]
+                content = tag["content"].strip()
+                if content and not re.match(r"^https?://", content, re.I):
+                    return content
 
         jsonld_author = self._extract_jsonld_property("author", soup)
         if jsonld_author:
             if isinstance(jsonld_author, dict):
-                return jsonld_author.get("name")
-            elif isinstance(jsonld_author, str):
+                name = jsonld_author.get("name")
+                if name and not re.match(r"^https?://", name, re.I):
+                    return name
+            elif isinstance(jsonld_author, str) and not re.match(r"^https?://", jsonld_author, re.I):
                 return jsonld_author
 
         byline = soup.find(class_=re.compile(r"(author|byline)", re.I))
         if byline:
-            return byline.get_text(strip=True)
+            text = byline.get_text(" ", strip=True)
+            if text and not re.match(r"^https?://", text, re.I):
+                return text
+
         return None
 
     def _extract_date(self, soup:BeautifulSoup) -> Optional[str]:
@@ -304,7 +321,10 @@ class ParseManager:
             if tag and tag.get("content"):
                 return tag["content"]
 
-        jsonld_date:str = self._extract_jsonld_property("datePublished", soup)
+        jsonld_date = (
+            self._extract_jsonld_property("datePublished", soup)
+            or self._extract_jsonld_property("dateCreated", soup)
+        )
         if jsonld_date:
             return jsonld_date
 

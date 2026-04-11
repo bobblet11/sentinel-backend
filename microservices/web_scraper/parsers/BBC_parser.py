@@ -1,7 +1,7 @@
 # nyt_scraper.py
+import json
 import re
 from typing import Dict, Optional
-from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from microservices.web_scraper.parsers.base_parser import BaseParser, ParseResult
@@ -34,24 +34,86 @@ class BBCParser(BaseParser):
         if not title and soup.title:
             title = soup.title.string    
 
-        # Author (BBC often doesn't list individual authors, just 'BBC News')
+        # Author
         author = None
-        meta_author = soup.find("meta", {"property": "cXenseParse:author"}) or soup.find("meta", {"property": "article:author"}) or soup.find("meta", {"name": "author"})
-        if meta_author and meta_author.get("content"):
-            content = meta_author["content"]
-            if content.startswith("http"):
-                author = None  # skip social media URLs, let fallback handle it
-            else:
-                author = content
+
+        # BBC meta / JSON-LD / byline fallbacks
+        meta_author_candidates = [
+            soup.find("meta", {"property": "cXenseParse:author"}),
+            soup.find("meta", {"name": "author"}),
+            soup.find("meta", {"property": "article:author"}),
+            soup.find("meta", {"property": "og:author"}),
+        ]
+
+        for tag in meta_author_candidates:
+            if tag and tag.get("content"):
+                content = tag["content"].strip()
+                if content and not content.startswith("http"):
+                    author = content
+                    break
+
+        if not author:
+            # Common BBC byline patterns
+            byline_candidates = [
+                soup.select_one('[data-testid*="byline"]'),
+                soup.select_one('[class*="byline"]'),
+                soup.select_one('[class*="Contributor"]'),
+            ]
+            for node in byline_candidates:
+                if node:
+                    text = node.get_text(" ", strip=True)
+                    if text and not text.startswith("http"):
+                        text = re.sub(r"^By\s+", "", text, flags=re.I).strip()
+                        author = text
+                        break
 
         # Date
         published_at = None
-        # Try standard OGP first
-        meta_date = soup.find("meta", {"property": "article:published_time"}) or soup.find("time")
-        if meta_date:
-            published_at = meta_date.get("content") or meta_date.get("datetime")
-        
+
+        # 1) JSON-LD first
+        for script in soup.find_all("script", type="application/ld+json"):
+            if not script.string:
+                continue
+            try:
+                data = json.loads(script.string)
+                items = data if isinstance(data, list) else [data]
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    value = item.get("datePublished") or item.get("dateCreated")
+                    if value:
+                        published_at = str(value).strip()
+                        break
+                if published_at:
+                    break
+            except Exception:
+                continue
+
+        # 2) Meta tags
+        if not published_at:
+            date_candidates = [
+                soup.find("meta", {"property": "article:published_time"}),
+                soup.find("meta", {"property": "article:modified_time"}),
+                soup.find("meta", {"property": "og:updated_time"}),
+                soup.find("meta", {"name": "pubdate"}),
+            ]
+
+            for tag in date_candidates:
+                if not tag:
+                    continue
+                value = tag.get("content") or tag.get("datetime")
+                if value:
+                    published_at = value.strip()
+                    break
+
+        # 3) <time> tag
+        if not published_at:
+            time_tag = soup.find("time")
+            if time_tag:
+                published_at = time_tag.get("datetime") or time_tag.get_text(" ", strip=True)
+                if published_at:
+                    published_at = published_at.strip()
         if not title or not author or not published_at:
-            print(f"[HARDCODED PARSE ERROR] something is not correct for {article_url}\n\t:text{text}\n\ttitle:{title}\n\tauthor:{author}\n\tpublished:{published_at}") 
+            print(f"[BBCParser WARNING] Partial parse for {article_url} | title={bool(title)} author={bool(author)} published={bool(published_at)}")
 
         return ParseResult(text, title, author, published_at)
