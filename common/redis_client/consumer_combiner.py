@@ -85,45 +85,30 @@ class RedisConsumerCombiner:
         """
         Waits for and consumes ONE message from ANY of the configured streams.
 
-        It returns the first message that becomes available. If multiple streams
-        had data when called, it returns the first message from the first stream
-        in the Redis response.
-        
-        Args:
-            block: Time in milliseconds to wait before timing out.
-            
-        Returns:
-            A single decoded message dictionary, or None if the operation timed out.
+        In Redis cluster mode, multi-stream XREADGROUP across different stream
+        keys can fail with a cross-slot error, so we probe one stream at a time.
         """
         try:
-            streams:Dict[str,str] = {stream: ">" for stream in self.streams}
+            for stream_name in self.streams:
+                response = self.client.xreadgroup(
+                    self.group_name,
+                    self.consumer_name,
+                    streams={stream_name: ">"},
+                    count=1,
+                    block=block,
+                )
 
-            response = self.client.xreadgroup(
-                self.group_name,
-                self.consumer_name,
-                streams=streams,
-                count=1,
-                block=block,
-            )
+                if not response:
+                    continue
 
-            if not response:
-                return None
+                _, messages = response[0]
+                if not messages:
+                    continue
 
-            """
-            Example format of response
-            [
-                ["stream_name_A", (message1, message2, ...)],
-                ["stream_name_B", (message1, message2, ...)]
-            ]
-            """
-            
-            stream_name:str
-            messages: List[str]
-            
-            stream_name, messages = response[0]
-            redis_message_id, fields = messages[0]
+                redis_message_id, fields = messages[0]
+                return self._decode_one_message(stream_name, redis_message_id, fields)
 
-            return self._decode_one_message(stream_name, redis_message_id, fields)
+            return None
 
         except Exception as e:
             self.logger.error(f"Could not consume a single message: {e}")
@@ -136,46 +121,42 @@ class RedisConsumerCombiner:
         """
         Waits for and consumes up to N messages from ANY of the configured streams.
 
-        Args:
-            num_to_consume: The maximum number of messages to consume from each stream.
-            block: Time in milliseconds to wait before timing out.
-
-        Returns:
-            A list of decoded message dictionaries, or an empty list on timeout.
+        To stay compatible with Redis cluster mode, each stream is read
+        individually instead of issuing a single multi-stream XREADGROUP.
         """
     
         try:
-            all_messages: List[Dict[str, Any]] = []
-            streams:Dict[str,str]  = {stream: ">" for stream in self.streams}
+            for stream_name in self.streams:
+                all_messages: List[Dict[str, Any]] = []
 
-            response = self.client.xreadgroup(
-                self.group_name,
-                self.consumer_name,
-                streams=streams,
-                count=num_to_consume,
-                block=block,
-            )
+                response = self.client.xreadgroup(
+                    self.group_name,
+                    self.consumer_name,
+                    streams={stream_name: ">"},
+                    count=num_to_consume,
+                    block=block,
+                )
 
-            if not response:
-                return all_messages
+                if not response:
+                    continue
 
-            for stream_name, messages in response:
+                _, messages = response[0]
                 for redis_message_id, fields in messages:
                     try:
-                        
                         message_dict:Dict[str, Any] = self._decode_one_message(
                             stream_name, redis_message_id, fields
                         )
-                        
                         all_messages.append(message_dict)
-                        
                     except json.JSONDecodeError as e:
                         self.logger.error(
                             f"Skipping message {redis_message_id}... Could not decode message from stream '{stream_name}' due to JSON decode error: {e}"
                         )
                         continue
-                    
-            return all_messages
+
+                if all_messages:
+                    return all_messages
+
+            return []
 
         except Exception as e:
             self.logger.error(f"Could not consume a many messages: {e}")
@@ -188,19 +169,19 @@ class RedisConsumerCombiner:
         """
 
         try:
-            pending_streams:Dict[str,str]  = {stream: "0-0" for stream in self.streams}
             all_messages: List[Dict[str, Any]] = []
 
-            response = self.client.xreadgroup(
-                self.group_name,
-                self.consumer_name,
-                streams=pending_streams,
-            )
+            for stream_name in self.streams:
+                response = self.client.xreadgroup(
+                    self.group_name,
+                    self.consumer_name,
+                    streams={stream_name: "0-0"},
+                )
 
-            if not response:
-                return all_messages
+                if not response:
+                    continue
 
-            for stream_name, messages in response:
+                _, messages = response[0]
                 for redis_message_id, fields in messages:
                     try:
                         message_dict:Dict[str, Any] = self._decode_one_message(
