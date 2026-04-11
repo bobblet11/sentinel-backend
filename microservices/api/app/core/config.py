@@ -18,6 +18,7 @@ POSTGRES_PORT: int = get_env_var("POSTGRES_PORT",int, config_logger)
 POSTGRES_DB: str = get_env_var("POSTGRES_DB",str, config_logger)
 POSTGRES_USER: str = get_env_var("POSTGRES_USER",str, config_logger)
 POSTGRES_PASSWORD: str = get_env_var("POSTGRES_PASSWORD",str, config_logger)
+POSTGRES_SSLMODE: str = get_env_var("POSTGRES_SSLMODE", str, config_logger, default="disable")
 
 # Redis stream configs
 OUTPUT_STREAM: str = get_env_var("OUTPUT_STREAM",str, config_logger)
