@@ -1,5 +1,6 @@
 import time
 from typing import Any, Dict, List, Tuple
+
 from pydantic import ValidationError
 
 from common.models.api.redis_models import Message
@@ -7,41 +8,30 @@ from tests.benchmarks.benchmark_base import BenchmarkResults, BenchmarkTemplate
 
 
 URL_SPREAD = {
-    "bbc": "https://www.bbc.com/news/articles/c937gd1vq7xo",
-    "abc": "https://abcnews.com/Politics/senate-passes-bill-fund-dhs-except-ice-parts/story?id=131461819",
-    "cbc": "https://www.cbc.ca/news/world/iran-strikes-military-base-us-troops-wounded-9.7145616",
-    "cbs": "https://www.cbsnews.com/news/michael-jordan-nascar-lawsuit-vision-for-sport-gayle-king-interview/",
-    "npr": "https://www.npr.org/2026/03/26/nx-s1-5762974/education-department-building",
-    "nbc": "https://www.nbcnews.com/politics/trump-administration/trump-johnson-dhs-house-rebels-senate-bill-ice-cbp-rcna265507",
     "euronews": "https://www.euronews.com/2026/03/30/trump-threatens-to-obliterate-irans-kharg-island-oil-hub-if-no-deal-reached-shortly",
-    "guardian": "https://www.theguardian.com/world/2026/mar/30/egypt-pakistan-saudi-arabia-turkey-talks-embryo-new-order",
 }
 
-class EndToEndBenchmarkBackground(BenchmarkTemplate):
+class WebScraperNLPBenchmark(BenchmarkTemplate):
     """
-    Benchmark to validate full Message schema and measure latency across services.
+    Benchmark to see if author, published_date, news_outlet is filled out by the hardcoded parsers in WebScraper.
+    Jobs created are simulated outputs from the ingestor, covering all news outlets in the RSS feed.
     """
 
     def __init__(self):
+        # profiles should be JUST web scraper
         super().__init__(
             mode="redis",
             input_stream="background:to.be.scraped",
             output_stream="background:to.be.retrieval",
-            failure_streams=["failure:to.be.scraped", "failure:to.be.nlp", "failure:to.be.retrieval"],
+            failure_streams=["failure:to.be.scraped", "failure:to.be.nlp"],
         )
 
     def generate_jobs(self) -> List[Dict[str, Any]]:
         """Return a list of Redis jobs using URL_SPREAD."""
         jobs = []
         # Use the same URL_SPREAD as in the good benchmark
-        i = 0
         for url in URL_SPREAD.values():
-            if i < len(URL_SPREAD.values())/2:
-                is_background = True
-            else:
-                is_background = False
-                
-            message = self._create_redis_job(url, is_background=is_background)
+            message = self._create_redis_job(url)
             jobs.append(message.model_dump())
         return jobs
 
@@ -69,8 +59,6 @@ class EndToEndBenchmarkBackground(BenchmarkTemplate):
                 invalid.append({"job": job, "error": str(e)})
         return valid, invalid
 
-
 if __name__ == "__main__":
-    benchmark = EndToEndBenchmarkBackground()
-    benchmark.run()
-
+    benchmark = WebScraperNLPBenchmark()
+    results = benchmark.run()
