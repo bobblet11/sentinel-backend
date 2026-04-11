@@ -156,8 +156,8 @@ class BiasProfile:
 @dataclass
 class NLPResult:
     """The aggregate object containing all insights produced by the pipeline."""
-    claims_in_article: List[Claim] = field(default_factory=list)
-    entities_in_article: List[Entity] = field(default_factory=list)
+    claims_in_article: Optional[List[Claim]] = field(default_factory=list)
+    entities_in_article: Optional[List[Entity]] = field(default_factory=list)
     bias_profile: Optional[BiasProfile] = None
 
 @dataclass
@@ -298,7 +298,14 @@ class StreamMessage:
             
         if not self.data.payload.publish_date and parsed_result.published_at:
             self.data.payload.publish_date = parsed_result.published_at
-            
+    
+    def create_nlp_result(self) -> NLPResult:
+        return NLPResult(
+            claims_in_article = self.data.payload.claims_in_article,
+            entities_in_article = self.data.payload.entities_in_article,
+            bias_profile = self.data.payload.bias_profile 
+        )
+    
     def set_nlp_result(self, nlp_result: NLPResult) -> None:
         """Unpacks a ParseResult object and updates the message payload."""
         # Use dot notation on the ParseResult object for clarity and safety

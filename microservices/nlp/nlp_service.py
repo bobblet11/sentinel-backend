@@ -120,27 +120,26 @@ class NLPService(ServiceTemplate):
         Runs the article through each pipeline component using typed dispatch.
 
         Dispatch types (matching the test scripts):
-          SentenceGenerator  — run(article, result, options) -> List[SentenceScore]
-          SentenceProcessor  — run(article, result, options, sentences) -> List[SentenceScore]
-          SentenceConsumer   — run(article, result, options, sentences) -> None
-          ArticleProcessor   — run(article, result, options) -> None
+          SentenceGenerator  — run(article, message, options) -> List[SentenceScore]
+          SentenceProcessor  — run(article, message, options, sentences) -> List[SentenceScore]
+          SentenceConsumer   — run(article, message, options, sentences) -> None
+          ArticleProcessor   — run(article, message, options) -> None
         """
         article = Article(text=message.text, title=message.title, link=message.link)
-        analysis_result = NLPResult()
         sentences: List[SentenceScore] = []
 
         for name, component, component_type in self.pipeline:
             try:
                 if component_type == "SentenceGenerator":
-                    sentences = component.run(article, analysis_result, self.options)
+                    sentences = component.run(article, message, self.options)
                 elif component_type == "SentenceProcessor":
                     sentences = component.run(
-                        article, analysis_result, self.options, sentences
+                        article, message, self.options, sentences
                     )
                 elif component_type == "SentenceConsumer":
-                    component.run(article, analysis_result, self.options, sentences)
+                    component.run(article, message, self.options, sentences)
                 else:  # ArticleProcessor
-                    component.run(article, analysis_result, self.options)
+                    component.run(article, message, self.options)
             except torch.cuda.OutOfMemoryError as oom:
                 logger.error(
                     "CUDA OOM in %s: %s. Flushing cache and aborting article.",
@@ -157,8 +156,9 @@ class NLPService(ServiceTemplate):
         # ClaimExtraction sets result.sentences internally; only override
         # if the dispatch loop produced its own sentence list.
         if sentences:
-            analysis_result.sentences = sentences
-        message.set_nlp_result(analysis_result)
+            result = message.create_nlp_result()
+            result.sentences = sentences
+            message.set_nlp_result(result)
         return message
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:

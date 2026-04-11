@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
 from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, Entity, SentenceScore
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, Entity, SentenceScore, StreamMessage
 from microservices.nlp.config import NER_MODEL, NER_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class EntityRecognizer(ArticleProcessor):
             logger.error(f"EntityRecognizer: Failed to load model: {e}")
             raise
 
-    def run(self, article: Article, result: NLPResult, options: NLPOptions,
+    def run(self, article: Article, message: StreamMessage, options: NLPOptions,
             sentences: List[SentenceScore]) -> None:
         """
         Runs NER over all sentences provided by the Preprocessor.
@@ -122,8 +122,10 @@ class EntityRecognizer(ArticleProcessor):
                         unique_entities[key] = {"entity_obj": e_obj, "score": score}
 
             # Map results to the NLPResult object
+            result = message.create_nlp_result()
             result.entities_in_article = [v["entity_obj"] for v in unique_entities.values()]
             logger.info(f"EntityRecognizer: Found {len(result.entities_in_article)} unique entities.")
+            message.set_nlp_result(result)
 
         except Exception as e:
             logger.error(f"EntityRecognizer failed during execution: {e}")

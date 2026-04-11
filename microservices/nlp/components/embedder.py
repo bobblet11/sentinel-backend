@@ -7,7 +7,7 @@ from sentence_transformers import SentenceTransformer
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
 from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore, StreamMessage
 from microservices.nlp.config import EMBEDDING_MODEL, EMBEDDER_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ class Embedder(SentenceProcessor):
     def run(
         self,
         article: Article,
-        result: NLPResult,
+        message: StreamMessage,
         options: NLPOptions,
         sentences: List[SentenceScore],
     ) -> List[SentenceScore]:

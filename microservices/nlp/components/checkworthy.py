@@ -4,7 +4,7 @@ from typing import Any, List, Optional
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
 from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, Claim, SentenceScore
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, Claim, SentenceScore, StreamMessage
 from microservices.nlp.config import (
     CHECKWORTHY_BATCH_SIZE,
     CHECKWORTHY_MODEL,
@@ -55,7 +55,7 @@ class CheckWorthinessFilter(SentenceProcessor):
                     e,
                 )
 
-    def run(self, article: Article, result: NLPResult, options: NLPOptions, sentences: List[SentenceScore]) -> List[SentenceScore]:
+    def run(self, article: Article, message: StreamMessage, options: NLPOptions, sentences: List[SentenceScore]) -> List[SentenceScore]:
         """
         Classifies each sentence in the provided list.
         Adds 'is_checkworthy', 'claim_type', and 'confidence' attributes to each sentence.
@@ -135,7 +135,9 @@ class CheckWorthinessFilter(SentenceProcessor):
                     claims_discovered.append(claim_obj)
 
             # Update the result object
+            result = message.create_nlp_result()
             result.claims_in_article = claims_discovered
+            message.set_nlp_result(result)
             logger.info(f"CheckWorthiness: Identified {count} factual claims out of {len(texts)} sentences.")
 
         except Exception as e:

@@ -473,22 +473,28 @@ class RetrievalService(ServiceTemplate):
         # one db session to make sure the entire thing is 1 transcation
         # just raise an exception and it will roll back everything
         with get_db_transaction() as db:
+            message.add_timestamp(JobStage.SAVE_DATA_IN)
             save_data_result = self._save_data_into_postgres(db, message)
+            message.add_timestamp(JobStage.SAVE_DATA_OUT)
             if message.type == JobType.BACKGROUND:
                 return message
             
             #continue to retrieval
             # retrieval stuff is only for user jobs
             original_article_id = save_data_result.get("article_entry_id") or 0
+            message.add_timestamp(JobStage.RETRIEVE_EVIDENCE_IN)
             claim_evidence_matches, related_articles = self._retrieve_evidence(db, message, original_article_id)
-            save_job_result = self._save_job_into_postgres(db, message)
+            message.add_timestamp(JobStage.RETRIEVE_EVIDENCE_OUT)
             
+            message.add_timestamp(JobStage.UPDATE_JOB_IN)
+            save_job_result = self._save_job_into_postgres(db, message)
+            message.add_timestamp(JobStage.UPDATE_JOB_OUT)
 
             retrieval_result = RetrievalResult(
-            save_data_result,
-            save_job_result,
-            claim_evidence_matches,
-            related_articles
+                save_data_result,
+                save_job_result,
+                claim_evidence_matches,
+                related_articles
             )
             # hashstore inside transaction block — if this fails, DB rolls back too
             # if message.type == JobType.USER:

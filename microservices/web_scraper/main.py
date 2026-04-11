@@ -19,7 +19,7 @@ from microservices.web_scraper.config import (
     USER_OUTPUT_STREAM,
     LOG_MODE
 )
-from microservices.web_scraper.scraper_service_benchmark import ScraperServiceBenchmark
+
 SERVICE_NAME="scraper"
 CONTAINER_NAME="web_scraper"
 

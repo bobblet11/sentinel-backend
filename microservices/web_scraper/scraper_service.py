@@ -189,7 +189,9 @@ class ScraperService(ServiceTemplate):
         try:
             # maybe this timing needs to be refactored
             fetch_time, parse_time = None, None
-    
+
+            message.add_timestamp(JobStage.WEB_SCRAPE_START)
+            
             if not message.html:
                 fetch_start = time.perf_counter()
                 message.add_timestamp(JobStage.FETCHED_IN)
@@ -232,6 +234,9 @@ class ScraperService(ServiceTemplate):
                 message.data.payload.author,
                 message.data.payload.publish_date,
             )
+            
+            message.add_timestamp(JobStage.WEB_SCRAPE_END)
+            
             return message
         
         except FailedToFetch as e:

@@ -5,7 +5,7 @@ from typing import List
 
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore, StreamMessage
 from microservices.nlp.config import PREPROCESS_MIN_TOKENS, PHOTO_CREDIT_MAX_LEN
 
 logger = logging.getLogger(__name__)
@@ -202,7 +202,7 @@ class Preprocessor(SentenceProcessor):
             
         return " ".join(cleaned_lines)
 
-    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> List[SentenceScore]:
+    def run(self, article: Article, message: StreamMessage, options: NLPOptions) -> List[SentenceScore]:
         """
         Cleans and tokenizes the article text into local SentenceScore objects.
         """

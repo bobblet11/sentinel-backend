@@ -10,7 +10,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForQuest
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
 from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore, StreamMessage
 from microservices.nlp.config import (
     QG_MODEL, QA_MODEL, GEN_MODEL,
     BM25_TOP_K, QA_SCORE_THRESHOLD,
@@ -286,7 +286,7 @@ class Decontextualizer(SentenceProcessor):
     def run(
         self,
         article: Article,
-        result: NLPResult,
+        message: StreamMessage,
         options: NLPOptions,
         sentences: List[SentenceScore],
     ) -> List[SentenceScore]:
