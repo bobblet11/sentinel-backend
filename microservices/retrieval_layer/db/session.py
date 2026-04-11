@@ -10,6 +10,7 @@ from microservices.retrieval_layer.config import (
     POSTGRES_HOST,
     POSTGRES_PORT,
     POSTGRES_DB,
+    POSTGRES_SSLMODE,
 )
 from microservices.retrieval_layer.db.models import Base
 
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 DATABASE_URL = (
     f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}"
     f"@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+    f"?sslmode={POSTGRES_SSLMODE}"
 )
 
 engine = create_engine(

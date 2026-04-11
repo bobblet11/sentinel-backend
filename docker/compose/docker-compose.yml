@@ -18,14 +18,19 @@ version: '3.8'
 x-common-env: &common-env
   env_file:
     - ${ENV_FILE_PATH}
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
 
 services:
   # --- INFRASTRUCTURE ---
   redis:
     container_name: sentinel-redis-container
     image: "redis:8.4.0-alpine"
+    profiles:
+      - local
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_EXTERNAL_PORT:-${REDIS_PORT:-6379}}:6379"
+      # - "${REDIS_PORT:-6379}:6379"
     volumes:
       - ${HOST_ROOT}/data/redis_data:/data
     restart: unless-stopped
@@ -57,6 +62,8 @@ services:
   postgres:
     container_name: sentinel-postgres-container
     image: pgvector/pgvector:pg15
+    profiles:
+      - local
     ports:
       - ${POSTGRES_EXTERNAL_PORT:-${POSTGRES_PORT:-5432}}:5432
     environment:
@@ -95,10 +102,13 @@ services:
       context: ../../
       dockerfile: ./microservices/api/Dockerfile
 
+<<<<<<< HEAD
     # depends_on:
     #   - postgres
     #   - redis
 
+=======
+>>>>>>> b96e58e (full end to end run)
     profiles:
       - api
 
@@ -120,6 +130,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-sentinel}
       - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sentinelpass}
+      - POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-disable}
       - OUTPUT_STREAM=${API_OUTPUT_STREAM:-user:to.be.scraped}
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
@@ -140,10 +151,13 @@ services:
       context: ../../
       dockerfile: ./microservices/ingestor/Dockerfile
 
+<<<<<<< HEAD
     # depends_on:
     #   - postgres
     #   - redis
 
+=======
+>>>>>>> b96e58e (full end to end run)
     volumes:
       - ${HOST_LOG_ROOT}/ingestor:/app/logs
 
@@ -181,10 +195,13 @@ services:
     shm_size: '${WEB_SCRAPER_SHM_SIZE:-4gb}'
     ipc: host
 
+<<<<<<< HEAD
     # depends_on:
     #   - postgres
     #   - redis
 
+=======
+>>>>>>> b96e58e (full end to end run)
     profiles:
       - scraper
 
@@ -236,10 +253,13 @@ services:
       dockerfile: ./microservices/nlp/Dockerfile
     shm_size: '${NLP_SHM_SIZE:-4gb}'
 
+<<<<<<< HEAD
     # depends_on:
     #   - postgres
     #   - redis
 
+=======
+>>>>>>> b96e58e (full end to end run)
     profiles:
       - nlp-cpu
 
@@ -289,10 +309,13 @@ services:
       dockerfile: ./microservices/nlp/Dockerfile
     shm_size: '${NLP_SHM_SIZE:-4gb}'
 
+<<<<<<< HEAD
     # depends_on:
     #   - postgres
     #   - redis
 
+=======
+>>>>>>> b96e58e (full end to end run)
     profiles:
       - nlp-gpu
 
@@ -348,10 +371,13 @@ services:
       context: ../../
       dockerfile: ./microservices/retrieval_layer/Dockerfile
 
+<<<<<<< HEAD
     # depends_on:
     #   - postgres
     #   - redis
 
+=======
+>>>>>>> b96e58e (full end to end run)
     profiles:
       - retrieval
 
@@ -379,6 +405,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-sentinel}
       - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sentinelpass}
+      - POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-disable}
 
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
