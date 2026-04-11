@@ -30,3 +30,5 @@ AGENTS.md
 .zip
 backups.zip
 node_modules/
+.pem
+*.pem
