@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Union
 
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
+from common.models.api.redis_models import Article, Message, NLPOptions, NLPResult, SentenceScore, StreamMessage
 
 
 class NLPComponent(ABC):
@@ -29,7 +29,7 @@ class ArticleProcessor(ABC):
     """
 
     @abstractmethod
-    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
+    def run(self, article: Article, message: StreamMessage, options: NLPOptions) -> None:
         """Executes component logic and writes into result in-place."""
         pass
 
@@ -47,7 +47,7 @@ class SentenceProcessor(ABC):
     def run(
         self,
         article: Article,
-        result: NLPResult,
+        message: StreamMessage,
         options: NLPOptions,
         sentences: List[SentenceScore],
     ) -> List[SentenceScore]:

@@ -9,7 +9,7 @@ from torch.amp import autocast
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
 from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore, StreamMessage
 from microservices.nlp.config import (
     BERT_SCORING_MODEL, NLI_MODEL,
     SENTENCE_SCORING_BATCH, NLI_MAX_PAIRS,
@@ -110,7 +110,7 @@ class SentenceExtraction(SentenceProcessor):
                 probs = F.softmax(outputs.logits.float(), dim=-1)
                 return bool((probs[:, 1] > NLI_ENTAILMENT_THRESHOLD).any())
 
-    def run(self, article: Article, result: NLPResult, options: NLPOptions,
+    def run(self, article: Article, message: StreamMessage, options: NLPOptions,
             sentences: List[SentenceScore]) -> List[SentenceScore]:
         """
         Scores and deduplicates sentences.

@@ -146,8 +146,7 @@ class BaseIngestor:
                 payload=payload,
                 stage_timestamps=[]
             )
-            
-            message = add_timestamp_to_message(message=message, stage_name=JobStage.INGESTED)
+            add_timestamp_to_message(message=message, stage_name=JobStage.INGESTED)
             messages_to_publish.append(message.model_dump())
         if len(messages_to_publish) == 0:
             self.logger.info("--- Ingestion cycle finished. No messages to publish. ---\n\n")

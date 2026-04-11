@@ -6,7 +6,7 @@ from transformers import pipeline
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
 from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, BiasProfile, NLPOptions, NLPResult
+from common.models.api.redis_models import Article, BiasProfile, Message, NLPOptions, NLPResult, StreamMessage
 from microservices.nlp.config import (
     BIAS_POLITICAL_MODEL, BIAS_SENTIMENT_MODEL,
     BIAS_MAX_CHARS, BIAS_SENTIMENT_MAX_LEN,
@@ -114,7 +114,7 @@ class BiasDetector(ArticleProcessor):
             sentiment_analysis_confidence=0.0,
         )
 
-    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
+    def run(self, article: Article, message: StreamMessage, options: NLPOptions) -> None:
         """
         Classifies the article's political lean and emotional tone.
         Writes the result to result.bias_profile.
@@ -123,7 +123,9 @@ class BiasDetector(ArticleProcessor):
         text = (article.text or article.summary or "").strip()
         if not text:
             logger.warning("BiasDetector: No text available — using neutral profile.")
+            result = message.create_nlp_result()
             result.bias_profile = self._neutral_profile()
+            message.set_nlp_result(result)
             return
 
         analysis_text = text[:BIAS_MAX_CHARS]
@@ -171,7 +173,8 @@ class BiasDetector(ArticleProcessor):
                 sentiment_confidence = float(tone_out[0]["score"])
         except (KeyError, IndexError, TypeError):
             pass
-
+        
+        result = message.create_nlp_result()
         result.bias_profile = BiasProfile(
             bias_category=political_bias,
             bias_score=bias_score,
@@ -179,6 +182,7 @@ class BiasDetector(ArticleProcessor):
             sentiment_category=emotional_tone,
             sentiment_analysis_confidence=sentiment_confidence,
         )
+        message.set_nlp_result(result)
         logger.info(
             f"BiasDetector: Result — {political_bias} (conf={confidence:.2f}), "
             f"tone={emotional_tone}."

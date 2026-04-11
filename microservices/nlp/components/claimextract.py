@@ -1,4 +1,5 @@
 import logging
+from common.models.api.dtos.job import JobStage
 import spacy
 import time
 from typing import List
@@ -6,7 +7,7 @@ from typing import List
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
 from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, Claim, NLPOptions, NLPResult, SentenceScore
+from common.models.api.redis_models import Article, Claim, NLPOptions, NLPResult, SentenceScore, StreamMessage
 
 # Pipeline stage imports
 from microservices.nlp.components.preprocess import Preprocessor
@@ -108,20 +109,22 @@ class ClaimExtraction(ArticleProcessor):
                 if ent.entity_text.lower() in s_obj.text.lower()
             ]
 
-    def run(self, article: Article, result: NLPResult, options: NLPOptions) -> None:
+    def run(self, article: Article, message: StreamMessage, options: NLPOptions) -> None:
         """
         Executes the full NLP pipeline end-to-end.
         Writes final data to result.claims_in_article, result.entities_in_article,
         and (if enabled) result.bias_profile.
         """
         pipeline_start = time.time()
-
+        message.add_timestamp(JobStage.NLP_START)
         # ── Stage 1 — Preprocessing ──────────────────────────────────────────
         t = time.time()
         try:
+            message.add_timestamp(JobStage.PREPROCESS_IN)
             sentences: List[SentenceScore] = self.preprocessor.run(
-                article, result, options
+                article, message, options
             )
+            message.add_timestamp(JobStage.PREPROCESS_OUT)
         except Exception as e:
             logger.error("ClaimExtraction [Stage 1 Preprocessor] failed: %s", e)
             raise
@@ -140,20 +143,24 @@ class ClaimExtraction(ArticleProcessor):
         # ── Stage 2 — Named Entity Recognition ──────────────────────────────
         t = time.time()
         try:
-            self.entity_recognizer.run(article, result, options, sentences)
+            message.add_timestamp(JobStage.NER_IN)
+            self.entity_recognizer.run(article, message, options, sentences)
+            message.add_timestamp(JobStage.NER_OUT)
         except Exception as e:
             logger.error("ClaimExtraction [Stage 2 NER] failed: %s", e)
             raise
         logger.info(
             "[Stage 2 | EntityRecognizer] %d entities in %.2fs",
-            len(result.entities_in_article),
+            len(message.create_nlp_result().entities_in_article),
             time.time() - t,
         )
 
         # ── Stage 3 — Sentence Extraction + Deduplication ───────────────────
         t = time.time()
         try:
-            sentences = self.sentence_extractor.run(article, result, options, sentences)
+            message.add_timestamp(JobStage.SENT_EXTRACTION_IN)
+            sentences = self.sentence_extractor.run(article, message, options, sentences)
+            message.add_timestamp(JobStage.SENT_EXTRACTION_OUT)
         except Exception as e:
             logger.error("ClaimExtraction [Stage 3 SentenceExtraction] failed: %s", e)
             raise
@@ -165,10 +172,11 @@ class ClaimExtraction(ArticleProcessor):
 
         # ── Stage 4 — Decontextualization ────────────────────────────────────
         t = time.time()
+        message.add_timestamp(JobStage.DECONTEXT_IN)
         if options.enable_decontextualization and self.decontextualizer is not None:
             try:
                 sentences = self.decontextualizer.run(
-                    article, result, options, sentences
+                    article, message, options, sentences
                 )
             except Exception as e:
                 logger.error(
@@ -183,14 +191,21 @@ class ClaimExtraction(ArticleProcessor):
         else:
             logger.info("[Stage 4 | Decontextualizer] skipped (disabled in options)")
 
+        message.add_timestamp(JobStage.DECONTEXT_OUT)
+        
         # ── Stage 5 — Check-Worthiness Scoring ──────────────────────────────
         t = time.time()
         try:
+            message.add_timestamp(JobStage.CHECK_WORTHY_IN)
             sentences = self.checkworthiness.run(
-                article, result, options, sentences
+                article, message, options, sentences
             )
             # Clear claims built by CheckWorthinessFilter; Stage 7 rebuilds them.
+            
+            result = message.create_nlp_result()
             result.claims_in_article = []
+            message.set_nlp_result(result)
+            message.add_timestamp(JobStage.CHECK_WORTHY_OUT)
         except Exception as e:
             logger.error(
                 "ClaimExtraction [Stage 5 CheckWorthiness] failed: %s", e
@@ -202,15 +217,19 @@ class ClaimExtraction(ArticleProcessor):
 
         # ── Stage 5.5 — Entity Mapping ───────────────────────────────────────
         t = time.time()
-        self._map_entities_to_sentences(sentences, result)
+        message.add_timestamp(JobStage.CHECK_WORTHY_ENTITY_MAPPING_IN)
+        self._map_entities_to_sentences(sentences, message)
         logger.info(
             "[Stage 5.5 | EntityMapping] complete in %.2fs", time.time() - t
         )
-
+        message.add_timestamp(JobStage.CHECK_WORTHY_ENTITY_MAPPING_OUT)
+         
         # ── Stage 6 — Sentence Embedding ─────────────────────────────────────
         t = time.time()
         try:
-            sentences = self.embedder.run(article, result, options, sentences)
+            message.add_timestamp(JobStage.SENTENCE_EMBED_IN)
+            sentences = self.embedder.run(article, message, options, sentences)
+            message.add_timestamp(JobStage.SENTENCE_EMBED_OUT)
         except Exception as e:
             logger.error("ClaimExtraction [Stage 6 Embedder] failed: %s", e)
             raise
@@ -218,6 +237,7 @@ class ClaimExtraction(ArticleProcessor):
 
         # ── Stage 7 — Sentence → Claim Conversion ────────────────────────────
         t = time.time()
+        message.add_timestamp(JobStage.CONVERT_TO_CLAIM_IN)
         selected_sentences = [
             s
             for s in sentences
@@ -237,6 +257,7 @@ class ClaimExtraction(ArticleProcessor):
                 fallback_limit,
             )
 
+        result = message.create_nlp_result()
         result.claims_in_article = [
             Claim(
                 confidence=s.confidence,
@@ -247,20 +268,24 @@ class ClaimExtraction(ArticleProcessor):
             )
             for s in selected_sentences
         ]
+        message.set_nlp_result(result)
         logger.info(
             "[Stage 7 | Sentence→Claim] %d claims in %.2fs",
             len(result.claims_in_article),
             time.time() - t,
         )
+        message.add_timestamp(JobStage.CONVERT_TO_CLAIM_OUT)
 
         # ── Stage 8 — Bias Detection (optional) ──────────────────────────────
         if options.enable_bias_detection:
             t = time.time()
             try:
-                self.bias_detector.run(article, result, options)
+                message.add_timestamp(JobStage.BIAS_ANAL_IN)
+                self.bias_detector.run(article, message, options)
                 logger.info(
                     "[Stage 8 | BiasDetector] complete in %.2fs", time.time() - t
                 )
+                message.add_timestamp(JobStage.BIAS_ANAL_OUT)
             except Exception as e:
                 logger.error(
                     "[Stage 8 | BiasDetector] failed after %.2fs: %s",
@@ -271,7 +296,9 @@ class ClaimExtraction(ArticleProcessor):
 
         # Expose processed sentences so set_nlp_result() can copy them
         # to the MessagePayload for downstream services.
+        result = message.create_nlp_result()
         result.sentences = sentences
+        message.set_nlp_result(result)
 
         logger.info(
             "--- ClaimExtraction Pipeline complete in %.2fs | "
@@ -280,3 +307,5 @@ class ClaimExtraction(ArticleProcessor):
             len(result.claims_in_article),
             len(result.entities_in_article),
         )
+        
+        message.add_timestamp(JobStage.NLP_END)
