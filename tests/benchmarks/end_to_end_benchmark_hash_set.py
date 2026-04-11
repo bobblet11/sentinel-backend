@@ -24,18 +24,20 @@ class EndToEndBenchmarkUser(BenchmarkTemplate):
         )
         self.hash_key = hash_key
         self.hash_store = RedisHashStore(hash_namespace=hash_key)
-    def setup(self):
-        """Clear Redis streams before running."""
-        for stream in [self.input_stream, self.output_stream] + self.failure_streams:
-            self.redis.xtrim(stream, maxlen=0)
-        print("[INFO] Redis streams cleared")
 
     def generate_jobs(self) -> List[Dict[str, Any]]:
-        """Generate Redis jobs from URL spread."""
+        """Return a list of Redis jobs using URL_SPREAD."""
         jobs = []
-        for url in URL_SPREAD:
-            message = self._create_redis_job(url, is_background=False)
-            jobs.append(message.__dict__)
+        # Use the same URL_SPREAD as in the good benchmark
+        i = 0
+        for url in URL_SPREAD.values():
+            if i < len(URL_SPREAD.values())/2:
+                is_background = True
+            else:
+                is_background = False
+                
+            message = self._create_redis_job(url, is_background=is_background)
+            jobs.append(message.model_dump())
         return jobs
     
     

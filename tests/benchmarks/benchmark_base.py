@@ -13,9 +13,39 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Tuple, Optional
 from abc import ABC, abstractmethod
 
-from common.models.api.dtos.job import JobStatus, JobType
+from common.models.api.dtos.job import JobStage, JobStatus, JobType
 from common.models.api.redis_models import Message, MessageHeader, MessagePayload
 
+
+# Define service boundaries (START/END pairs)
+SERVICE_BOUNDARIES = {
+    "WEB_SCRAPE": (JobStage.WEB_SCRAPE_START, JobStage.WEB_SCRAPE_END),
+    "NLP": (JobStage.NLP_START, JobStage.NLP_END),
+    "RETRIEVAL": (JobStage.RETRIEVAL_START, JobStage.RETRIEVAL_END)
+}
+
+# Define IN/OUT subtask pairs within services
+SUBTASK_PAIRS = {
+    # NLP subtasks
+    "NLP.PREPROCESS": (JobStage.PREPROCESS_IN, JobStage.PREPROCESS_OUT),
+    "NLP.NER": (JobStage.NER_IN, JobStage.NER_OUT),
+    "NLP.SENT_EXTRACTION": (JobStage.SENT_EXTRACTION_IN, JobStage.SENT_EXTRACTION_OUT),
+    "NLP.DECONTEXT": (JobStage.DECONTEXT_IN, JobStage.DECONTEXT_OUT),
+    "NLP.CHECK_WORTHY": (JobStage.CHECK_WORTHY_IN, JobStage.CHECK_WORTHY_OUT),
+    "NLP.ENTITY_MAPPING": (JobStage.CHECK_WORTHY_ENTITY_MAPPING_IN, JobStage.CHECK_WORTHY_ENTITY_MAPPING_OUT),
+    "NLP.SENTENCE_EMBED": (JobStage.SENTENCE_EMBED_IN, JobStage.SENTENCE_EMBED_OUT),
+    "NLP.CONVERT_TO_CLAIM": (JobStage.CONVERT_TO_CLAIM_IN, JobStage.CONVERT_TO_CLAIM_OUT),
+    "NLP.BIAS_ANAL": (JobStage.BIAS_ANAL_IN, JobStage.BIAS_ANAL_OUT),
+    
+    # Web scrape subtasks  
+    "WEB_SCRAPE.FETCH": (JobStage.FETCHED_IN, JobStage.FETCHED_OUT),
+    "WEB_SCRAPE.PARSE": (JobStage.PARSED_IN, JobStage.PARSED_OUT),
+    
+    # Retrieval subtasks
+    "RETRIEVAL.SAVE_DATA": (JobStage.SAVE_DATA_IN, JobStage.SAVE_DATA_OUT),
+    "RETRIEVAL.RETRIEVE_EVIDENCE": (JobStage.RETRIEVE_EVIDENCE_IN, JobStage.RETRIEVE_EVIDENCE_OUT),
+    "RETRIEVAL.UPDATE_JOB": (JobStage.UPDATE_JOB_IN, JobStage.UPDATE_JOB_OUT),
+}
 
 @dataclass
 class MetricStats:
@@ -33,8 +63,9 @@ class GroupStats:
     """Statistics for a single job type (ALL/USER/BACKGROUND)."""
     name: str
     job_count: int = 0
+    service_latencies: Dict[str, MetricStats] = field(default_factory=dict)  # NEW: Service-level
+    subtask_latencies: Dict[str, MetricStats] = field(default_factory=dict)  # NEW: Subtask-level  
     end_to_end: MetricStats = field(default_factory=MetricStats)
-    stage_latencies: Dict[str, MetricStats] = field(default_factory=dict)
     raw_durations: Dict[str, List[float]] = field(default_factory=dict)
 
 @dataclass
@@ -70,7 +101,7 @@ class BenchmarkResults:
         )
 
     def _calculate_group_stats(self, jobs: List[Dict[str, Any]], group_name: str) -> GroupStats:
-        """Calculate stats for a specific group of jobs."""
+        """Calculate stats for a specific group of jobs with service/subtask segmentation."""
         if not jobs:
             return GroupStats(name=group_name, job_count=0)
 
@@ -82,23 +113,49 @@ class BenchmarkResults:
             if len(timestamps) < 2:
                 continue
             valid_jobs.append(job)
-            # End-to-end latency
+            
+            # End-to-end (first to last timestamp)
             end_to_end = timestamps[-1]["offset_s"] - timestamps[0]["offset_s"]
             durations["end_to_end"].append(end_to_end)
-            # Per-stage latencies
-            for i in range(1, len(timestamps)):
-                stage_name = f"{timestamps[i-1]['stage_name']} -> {timestamps[i]['stage_name']}"
-                latency = timestamps[i]["offset_s"] - timestamps[i-1]["offset_s"]
-                durations.setdefault(stage_name, []).append(latency)
+            
+            # SERVICE-LEVEL durations (START→END)
+            for service_name, (start_stage, end_stage) in SERVICE_BOUNDARIES.items():
+                start_idx = next((i for i, ts in enumerate(timestamps) if ts["stage_name"] == start_stage), None)
+                end_idx = next((i for i, ts in enumerate(timestamps) if ts["stage_name"] == end_stage), None)
+                if start_idx is not None and end_idx is not None and end_idx > start_idx:
+                    service_duration = timestamps[end_idx]["offset_s"] - timestamps[start_idx]["offset_s"]
+                    durations.setdefault(service_name, []).append(service_duration)
+            
+            # SUBTASK durations (IN→OUT)
+            for subtask_name, (in_stage, out_stage) in SUBTASK_PAIRS.items():
+                in_idx = next((i for i, ts in enumerate(timestamps) if ts["stage_name"] == in_stage), None)
+                out_idx = next((i for i, ts in enumerate(timestamps) if ts["stage_name"] == out_stage), None)
+                if in_idx is not None and out_idx is not None and out_idx > in_idx:
+                    subtask_duration = timestamps[out_idx]["offset_s"] - timestamps[in_idx]["offset_s"]
+                    durations.setdefault(subtask_name, []).append(subtask_duration)
 
-        stats = GroupStats(name=group_name, job_count=len(valid_jobs), raw_durations=durations)
+        stats = GroupStats(
+            name=group_name, 
+            job_count=len(valid_jobs), 
+            raw_durations=durations
+        )
+        
         if valid_jobs:
+            # Overall end-to-end
             stats.end_to_end = self._get_metric_stats(durations["end_to_end"], valid_jobs)
-            for stage_name, values in durations.items():
-                if stage_name != "end_to_end":
-                    stats.stage_latencies[stage_name] = self._get_metric_stats(values, valid_jobs)
-        return stats
+            
+            # SERVICE latencies (exactly what you want #1)
+            for service_name, values in durations.items():
+                if service_name in SERVICE_BOUNDARIES:
+                    stats.service_latencies[service_name] = self._get_metric_stats(values, valid_jobs)
+            
+            # SUBTASK latencies (exactly what you want #2) 
+            for subtask_name, values in durations.items():
+                if subtask_name in SUBTASK_PAIRS:
+                    stats.subtask_latencies[subtask_name] = self._get_metric_stats(values, valid_jobs)
 
+        return stats
+    
     def calculate_statistics(self) -> Dict[str, GroupStats]:
         """Segment by job type and calculate statistics for each + overall."""
         user_jobs, background_jobs, all_jobs = [], [], self.successfully_processed_results
@@ -127,21 +184,21 @@ class BenchmarkResults:
         serializable = asdict(self)
         serializable["statistics"] = {}
         
-        # Add computed statistics
+        # Add computed statistics - FIXED for new GroupStats fields
         stats = self.calculate_statistics()
         for group_name, group_stats in stats.items():
             serializable["statistics"][group_name] = {
                 "job_count": group_stats.job_count,
                 "end_to_end": asdict(group_stats.end_to_end),
-                "stage_latencies": {k: asdict(v) for k, v in group_stats.stage_latencies.items()},
+                "service_latencies": {k: asdict(v) for k, v in group_stats.service_latencies.items()},
+                "subtask_latencies": {k: asdict(v) for k, v in group_stats.subtask_latencies.items()},
                 "raw_durations": group_stats.raw_durations
             }
         
-        # Save raw jobs (truncate large fields for readability)
+        # Save raw jobs (unchanged)
         serializable["raw_success_jobs"] = []
-        for job in self.successfully_processed_results[:50]:  # Limit to 50
-            job_copy = json.loads(json.dumps(job))  # Deep copy
-            # Truncate large fields
+        for job in self.successfully_processed_results[:50]:
+            job_copy = json.loads(json.dumps(job))
             if "html" in job_copy.get("data", {}).get("payload", {}):
                 job_copy["data"]["payload"]["html"] = "[TRUNCATED HTML]"
             serializable["raw_success_jobs"].append(job_copy)
@@ -152,7 +209,7 @@ class BenchmarkResults:
         
         print(f"💾 Saved benchmark results: {full_path}")
         return full_path
-
+    
     def print_report(self) -> None:
         print(f"Mode: {self.mode}")
         print(f"Jobs submitted: {self.jobs_submitted}")
@@ -168,21 +225,27 @@ class BenchmarkResults:
         for group_name, group_stats in stats_dict.items():
             print(f"\n=== {group_name} Jobs (n={group_stats.job_count}) ===")
             print(f"End-to-End: avg={group_stats.end_to_end.avg:.2f}s, "
-                  f"p50={group_stats.end_to_end.p50:.2f}s, "
-                  f"p75={group_stats.end_to_end.p75:.2f}s, "
-                  f"p95={group_stats.end_to_end.p95:.2f}s")
-
-            # Top 5 slowest stages by p95
-            sorted_stages = sorted(group_stats.stage_latencies.items(), 
-                                 key=lambda x: x[1].p95, reverse=True)[:5]
-            for stage_name, metric in sorted_stages:
-                print(f"  {stage_name}: avg={metric.avg:.2f}s, p95={metric.p95:.2f}s")
-
-            # Sample percentile jobs
-            p_stats = group_stats.end_to_end
-            if p_stats.p50_job:
-                uid = p_stats.p50_job['data']['header']['uid'][:12]
-                print(f"  p50 sample: {uid}... ({p_stats.p50:.2f}s)")
+                f"p50={group_stats.end_to_end.p50:.2f}s, "
+                f"p75={group_stats.end_to_end.p75:.2f}s, "
+                f"p95={group_stats.end_to_end.p95:.2f}s")
+            
+            # SERVICE-LEVEL REPORTING
+            if group_stats.service_latencies:
+                print("\n📊 SERVICE LEVEL (avg/p95):")
+                for service_name, metric in sorted(group_stats.service_latencies.items()):
+                    print(f"  {service_name:15}: {metric.avg:6.2f}s / p95:{metric.p95:6.2f}s")
+            
+            # SUBTASK-LEVEL REPORTING  
+            if group_stats.subtask_latencies:
+                print("\n🔍 TOP 10 SUBTASKS by p95:")
+                top_subtasks = sorted(
+                    group_stats.subtask_latencies.items(), 
+                    key=lambda x: x[1].p95, 
+                    reverse=True
+                )[:10]
+                for subtask_name, metric in top_subtasks:
+                    service = subtask_name.split('.')[0]
+                    print(f"  {service:12} | {subtask_name:25}: {metric.avg:5.2f}s / p95:{metric.p95:5.2f}s")
 class BenchmarkTemplate(ABC):
     """
     A reusable benchmark framework that can:
