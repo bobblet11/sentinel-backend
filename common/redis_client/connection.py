@@ -1,11 +1,46 @@
 import os
 import threading
+from typing import Any
 
 import redis
 from common.requests.retry_request import exponential_retry
 
 REDIS_HOST:str = str(os.getenv("REDIS_HOST", "redis"))
 REDIS_PORT:int = int(os.getenv("REDIS_PORT", 6379))
+REDIS_SSL: bool = str(os.getenv("REDIS_SSL", "false")).strip().lower() in {"1", "true", "yes", "on"}
+REDIS_SSL_CERT_REQS: str = str(os.getenv("REDIS_SSL_CERT_REQS", "required")).strip().lower()
+REDIS_USERNAME: str | None = os.getenv("REDIS_USERNAME") or None
+REDIS_PASSWORD: str | None = os.getenv("REDIS_PASSWORD") or None
+
+
+def _build_connection_kwargs() -> dict[str, Any]:
+    """Build Redis connection kwargs from environment variables."""
+    kwargs: dict[str, Any] = {
+        "host": REDIS_HOST,
+        "port": REDIS_PORT,
+        "db": 0,
+        "decode_responses": True,
+        "socket_timeout": 30,
+        "socket_connect_timeout": 30,
+        "retry_on_timeout": True,
+    }
+
+    if REDIS_USERNAME:
+        kwargs["username"] = REDIS_USERNAME
+    if REDIS_PASSWORD:
+        kwargs["password"] = REDIS_PASSWORD
+
+    if REDIS_SSL:
+        kwargs["connection_class"] = redis.SSLConnection
+        kwargs["ssl_check_hostname"] = False
+        if REDIS_SSL_CERT_REQS in {"none", "no", "false", "0"}:
+            kwargs["ssl_cert_reqs"] = "none"
+        elif REDIS_SSL_CERT_REQS in {"optional", "want"}:
+            kwargs["ssl_cert_reqs"] = "optional"
+        else:
+            kwargs["ssl_cert_reqs"] = "required"
+
+    return kwargs
 
 
 class RedisConnection:
@@ -51,15 +86,7 @@ class RedisConnection:
         """
         Idempotently attempts to establish a connection to the Redis server.
         """
-        pool = redis.ConnectionPool(
-            host=REDIS_HOST, 
-            port=REDIS_PORT, 
-            db=0, 
-            decode_responses=True,
-            socket_timeout=30,          # wait up to 30s for a response
-            socket_connect_timeout=30,  # wait up to 30s to connect
-            retry_on_timeout=True       # retry if a timeout occurs
-        )
+        pool = redis.ConnectionPool(**_build_connection_kwargs())
 
         client = redis.Redis(connection_pool=pool)
 
