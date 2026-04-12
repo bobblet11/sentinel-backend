@@ -155,10 +155,12 @@ class NLPService(ServiceTemplate):
         # Expose processed sentences for downstream services.
         # ClaimExtraction sets result.sentences internally; only override
         # if the dispatch loop produced its own sentence list.
-        if sentences:
-            result = message.create_nlp_result()
-            result.sentences = sentences
-            message.set_nlp_result(result)
+        
+        
+        # if sentences:
+        #     result = message.create_nlp_result()
+        #     result.sentences = sentences
+        #     message.set_nlp_result(result)
         return message
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:

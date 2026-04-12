@@ -309,8 +309,8 @@ class StreamMessage:
     def set_nlp_result(self, nlp_result: NLPResult) -> None:
         """Unpacks a ParseResult object and updates the message payload."""
         # Use dot notation on the ParseResult object for clarity and safety
-        if not self.data.payload.sentences and nlp_result.sentences:
-            self.data.payload.sentences = nlp_result.sentences
+        # if not self.data.payload.sentences and nlp_result.sentences:
+        #     self.data.payload.sentences = nlp_result.sentences
 
         if not self.data.payload.claims_in_article and nlp_result.claims_in_article:
             self.data.payload.claims_in_article = nlp_result.claims_in_article
