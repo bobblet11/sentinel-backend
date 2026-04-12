@@ -24,7 +24,7 @@ NLI_MODEL = "cross-encoder/nli-distilroberta-base"
 QG_MODEL = "Salesforce/mixqg-base"
 QA_MODEL = "deepset/roberta-base-squad2"
 GEN_MODEL = "google/flan-t5-base"
-BIAS_POLITICAL_MODEL = "typeform/distilbert-base-uncased-mnli"
+BIAS_POLITICAL_MODEL = "premsa/political-bias-prediction-allsides-BERT"
 BIAS_SENTIMENT_MODEL = "cardiffnlp/twitter-roberta-base-sentiment-latest"
 CW_NLI_MODEL = "typeform/distilbert-base-uncased-mnli"
 

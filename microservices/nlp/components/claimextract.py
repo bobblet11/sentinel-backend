@@ -83,7 +83,10 @@ class ClaimExtraction(ArticleProcessor):
             logger.info("ClaimExtraction: Decontextualizer disabled via service configuration.")
         self.checkworthiness = CheckWorthinessFilter(device_config=device_config)
         self.embedder = Embedder(device_config=device_config, model_manager=model_manager)
-        self.bias_detector = BiasDetector(device_config=device_config, model_manager=model_manager)
+        # Store args for lazy BiasDetector initialization (Stage 8)
+        self._bias_device_config = device_config
+        self._bias_model_manager = model_manager
+        self._bias_detector = None
 
         logger.info(
             "ClaimExtraction: All models ready in %.2fs.",
@@ -280,10 +283,15 @@ class ClaimExtraction(ArticleProcessor):
 
         # ── Stage 8 — Bias Detection (optional) ──────────────────────────────
         if options.enable_bias_detection:
+            if self._bias_detector is None:
+                self._bias_detector = BiasDetector(
+                    device_config=self._bias_device_config,
+                    model_manager=self._bias_model_manager,
+                )
             t = time.time()
             try:
                 message.add_timestamp(JobStage.BIAS_ANAL_IN)
-                self.bias_detector.run(article, message, options)
+                self._bias_detector.run(article, message, options)
                 logger.info(
                     "[Stage 8 | BiasDetector] complete in %.2fs", time.time() - t
                 )
