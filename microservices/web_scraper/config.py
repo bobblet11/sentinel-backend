@@ -18,7 +18,6 @@ WEBSHARIO_URL: str = get_env_var("WEBSHARIO_URL",str, config_logger)
 
 BATCH_SIZE: int = get_env_var("BATCH_SIZE",int, config_logger)
 SCRAPER_MAX_WORKERS: int = get_env_var("SCRAPER_MAX_WORKERS",int, config_logger)
-MAX_PROXY_VALIDATION_WORKERS: int = get_env_var("MAX_PROXY_VALIDATION_WORKERS",int, config_logger)
 MAX_FETCH_RETRIES: int = get_env_var("MAX_FETCH_RETRIES",int, config_logger)
 INITIAL_FETCH_DELAY_S: float = get_env_var("INITIAL_FETCH_DELAY_S",float, config_logger)
 FETCH_DELAY_GROWTH_RATE: float = get_env_var("FETCH_DELAY_GROWTH_RATE",float, config_logger)
@@ -38,7 +37,6 @@ env_variables: List[EnvVariable] = [
     
     EnvVariable("BATCH_SIZE", BATCH_SIZE), 
     EnvVariable("SCRAPER_MAX_WORKERS", SCRAPER_MAX_WORKERS), 
-    EnvVariable("MAX_PROXY_VALIDATION_WORKERS", MAX_PROXY_VALIDATION_WORKERS), 
     EnvVariable("MAX_FETCH_RETRIES", MAX_FETCH_RETRIES), 
     EnvVariable("INITIAL_FETCH_DELAY_S", INITIAL_FETCH_DELAY_S), 
     EnvVariable("FETCH_DELAY_GROWTH_RATE", FETCH_DELAY_GROWTH_RATE),
