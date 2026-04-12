@@ -33,7 +33,7 @@ class BiasDetector(ArticleProcessor):
         The top label from {negative, neutral, positive} is mapped to
         a human-readable tone string ("Negative", "Neutral", "Positive") and
         stored in BiasProfile.emotional_tone.
-    3.  Text Truncation: Analysis is bounded to the first POLITICAL_MAX_CHARS
+    3.  Text Truncation: Analysis is bounded to the first BIAS_MAX_CHARS
         (default 2000) characters of the article body. This keeps inference
         fast (< 1 s on CPU for most articles) while capturing the lede and early
         paragraphs that typically set the article's framing.
