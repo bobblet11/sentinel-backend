@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=sentinel/python-ml-cpu:3.11
+ARG BASE_IMAGE
 FROM $BASE_IMAGE
 
 WORKDIR /app
