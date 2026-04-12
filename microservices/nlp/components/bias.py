@@ -23,14 +23,11 @@ class BiasDetector(ArticleProcessor):
     analysis using two lightweight NLI/sentiment transformer pipelines.
 
     Strategies Applied:
-    1.  Political Bias via Zero-Shot NLI (typeform/distilbert-base-uncased-mnli):
-        The article text (truncated to POLITICAL_MAX_CHARS characters) is classified
-        against three mutually exclusive hypothesis labels:
-        ["left-leaning", "centrist", "right-leaning"].
-        The model operates via soft-NLI entailment — no political fine-tuning is
-        required, making it robust to domain shift across news publishers.
-        Scores are normalised across labels using the model's own softmax
-        (hypothesis_template='This text has a {} political perspective.').
+    1.  Political Bias via Direct Classification (premsa/political-bias-prediction-allsides-BERT):
+        The article text (truncated to BIAS_MAX_CHARS characters) is classified into
+        one of three categories: Left, Center, or Right. The model is fine-tuned on
+        AllSides-rated news articles (F1=0.904). Label mapping: LABEL_0=Left,
+        LABEL_1=Center, LABEL_2=Right (AllSides dataset standard ordering).
     2.  Emotional Tone via Sentiment Analysis (cardiffnlp/twitter-roberta-base-sentiment-latest):
         The same truncated text is scored for emotional polarity.
         The top label from {negative, neutral, positive} is mapped to
@@ -47,12 +44,12 @@ class BiasDetector(ArticleProcessor):
     Writes to result.bias_profile only; does NOT modify sentences.
     """
 
-    POLITICAL_LABELS = ["left-leaning", "centrist", "right-leaning"]
-    # Map classifier output labels to the canonical BiasProfile string format
+    # premsa/political-bias-prediction-allsides-BERT label mapping
+    # Dataset label order: 0=Left, 1=Center, 2=Right
     _LABEL_MAP = {
-        "left-leaning":  "Left",
-        "centrist":      "Center",
-        "right-leaning": "Right",
+        "LABEL_0": "Left",
+        "LABEL_1": "Center",
+        "LABEL_2": "Right",
     }
     _TONE_MAP = {
         "negative": "Negative",
@@ -86,10 +83,11 @@ class BiasDetector(ArticleProcessor):
                     )
 
             self.political_classifier = pipeline(
-                "zero-shot-classification",
+                "text-classification",
                 model=BIAS_POLITICAL_MODEL,
                 device=device_config.device_id,
                 dtype=device_config.dtype,
+                top_k=None,
             )
             self.sentiment_analyzer = pipeline(
                 "sentiment-analysis",
@@ -133,19 +131,16 @@ class BiasDetector(ArticleProcessor):
 
         # ── Political Bias ──────────────────────────────────────────────────────
         try:
-            bias_out = self.political_classifier(
-                analysis_text,
-                self.POLITICAL_LABELS,  # class-level label list; unchanged
-                multi_label=False,
-                hypothesis_template="This text has a {} political perspective.",
-            )
-            raw_label  = bias_out["labels"][0]          # e.g. "left-leaning"
-            confidence = float(bias_out["scores"][0])
-
-            # Build canonical scores dict using BiasProfile keys
+            bias_out_raw = self.political_classifier(analysis_text)
+            # top_k=None returns [[{label, score}, ...]] for a single string — unwrap batch dim
+            bias_out: list = bias_out_raw[0] if bias_out_raw and isinstance(bias_out_raw[0], list) else bias_out_raw
+            # Sort descending by score to get top prediction first
+            bias_out = sorted(bias_out, key=lambda x: x["score"], reverse=True)
+            raw_label  = bias_out[0]["label"]
+            confidence = float(bias_out[0]["score"])
             scores: Dict[str, float] = {
-                self._LABEL_MAP[lbl]: float(sc)
-                for lbl, sc in zip(bias_out["labels"], bias_out["scores"])
+                self._LABEL_MAP.get(item["label"], "Center"): float(item["score"])
+                for item in bias_out
             }
             political_bias = self._LABEL_MAP.get(raw_label, "Center")
 
