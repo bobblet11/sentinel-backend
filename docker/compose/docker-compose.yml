@@ -202,7 +202,7 @@ services:
       # performance tuning
       - BATCH_SIZE=${WEB_SCRAPER_BATCH_SIZE:-10}
       - SCRAPER_MAX_WORKERS=${WEB_SCRAPER_MAX_WORKERS:-2}
-      - MAX_PROXY_VALIDATION_WORKERS=${WEB_SCRAPER_MAX_PROXY_VALIDATION_WORKERS:-100}
+
       - MAX_FETCH_RETRIES=${WEB_SCRAPER_MAX_FETCH_RETRIES:-3}
       - INITIAL_FETCH_DELAY_S=${WEB_SCRAPER_INITIAL_FETCH_DELAY_S:-1}
       - FETCH_DELAY_GROWTH_RATE=${WEB_SCRAPER_FETCH_DELAY_GROWTH_RATE:-1.2}
@@ -319,19 +319,18 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-
-  retrieval-layer-service:
+  retrieval-layer-service-gpu:
     container_name: sentinel-retrieval-layer-service-container
     shm_size: '${RETRIEVAL_LAYER_SHM_SIZE:-2gb}'
     image: sentinel/retrieval-layer-service:latest
     build:
       args:
-        BASE_IMAGE: ${RETRIEVAL_BASE:-sentinel/python-ml-cpu:3.12} 
+        BASE_IMAGE: sentinel/python-ml-gpu:3.12-cuda124
       context: ../../
       dockerfile: ./microservices/retrieval_layer/Dockerfile
 
     profiles:
-      - retrieval
+      - retrieval-gpu
 
     volumes:
       - ${HOST_LOG_ROOT}/retrieval/logs:/app/logs
@@ -362,7 +361,59 @@ services:
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
       
-      - USE_GPU=${USE_GPU}
+      - HASH_STORE_NAMESPACE=${HASH_STORE_NAMESPACE}
+
+    deploy:
+      resources:
+        limits:
+          cpus: '${RETRIEVAL_CPU_LIMIT:-0.5}'
+          memory: '${RETRIEVAL_MEMORY_LIMIT:-2G}'
+        reservations:
+          cpus: '${RETRIEVAL_CPU_RESERVATION:-0.25}'
+          memory: '${RETRIEVAL_MEMORY_RESERVATION:-1G}'
+
+  retrieval-layer-service-cpu:
+    container_name: sentinel-retrieval-layer-service-container
+    shm_size: '${RETRIEVAL_LAYER_SHM_SIZE:-2gb}'
+    image: sentinel/retrieval-layer-service:latest
+    build:
+      args:
+        BASE_IMAGE: sentinel/python-ml-cpu:3.12
+      context: ../../
+      dockerfile: ./microservices/retrieval_layer/Dockerfile
+
+    profiles:
+      - retrieval-cpu
+
+    volumes:
+      - ${HOST_LOG_ROOT}/retrieval/logs:/app/logs
+
+    restart: unless-stopped
+    networks:
+      - sentinel-net
+
+    <<: *common-env
+
+    environment:
+      - INPUT_STREAMS=${RETRIEVAL_INPUT_STREAMS:-user:to.be.retrieval}
+      - FAILURE_OUTPUT_STREAM=${RETRIEVAL_FAILURE_OUTPUT_STREAM:-failure:to.be.retrieval}
+
+      - GROUP_NAME=${RETRIEVAL_GROUP_NAME:-default}
+      - CONSUMER_NAME=${RETRIEVAL_CONSUMER_NAME:-retrieval-layer-1}
+
+      - DUMMY_NLP_MODE=${RETRIEVAL_DUMMY_NLP_MODE:-False}
+      - DUMMY_SEED_MODE=${RETRIEVAL_DUMMY_SEED_MODE:-False}
+
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_DB=${POSTGRES_DB:-sentinel}
+      - POSTGRES_USER=${POSTGRES_USER:-sentinel}
+      - POSTGRES_HOST=${POSTGRES_HOST:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sentinelpass}
+      - POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-disable}
+
+      - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
+      - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
+
       - HASH_STORE_NAMESPACE=${HASH_STORE_NAMESPACE}
 
     deploy:
