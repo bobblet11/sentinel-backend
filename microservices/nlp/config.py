@@ -110,6 +110,9 @@ try:
     BIAS_POLITICAL_MODEL = get_env_var(
         "NLP_BIAS_MODEL", str, config_logger, BIAS_POLITICAL_MODEL
     )
+    BIAS_SENTIMENT_MODEL = get_env_var(
+        "NLP_SENTIMENT_MODEL", str, config_logger, BIAS_SENTIMENT_MODEL
+    )
     QG_MODEL = get_env_var("NLP_QG_MODEL", str, config_logger, QG_MODEL)
     QA_MODEL = get_env_var("NLP_QA_MODEL", str, config_logger, QA_MODEL)
     GEN_MODEL = get_env_var("NLP_GEN_MODEL", str, config_logger, GEN_MODEL)
@@ -141,6 +144,7 @@ try:
         EnvVariable("NER_MODEL", NER_MODEL),
         EnvVariable("EMBEDDING_MODEL", EMBEDDING_MODEL),
         EnvVariable("BIAS_POLITICAL_MODEL", BIAS_POLITICAL_MODEL),
+        EnvVariable("BIAS_SENTIMENT_MODEL", BIAS_SENTIMENT_MODEL),
         EnvVariable("QG_MODEL", QG_MODEL),
         EnvVariable("QA_MODEL", QA_MODEL),
         EnvVariable("GEN_MODEL", GEN_MODEL),

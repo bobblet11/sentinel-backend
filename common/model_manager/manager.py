@@ -83,7 +83,10 @@ class ModelManager:
             ),
             ModelEntry(
                 key="BIAS_SENTIMENT",
-                model_name="cardiffnlp/twitter-roberta-base-sentiment-latest",
+                model_name=os.environ.get(
+                    "NLP_SENTIMENT_MODEL",
+                    "cardiffnlp/twitter-roberta-base-sentiment-latest",
+                ),
                 task_type="sentiment_analysis",
                 owner_component="BiasDetector",
                 loader="transformers_pipeline",
