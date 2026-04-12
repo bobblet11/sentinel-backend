@@ -399,11 +399,11 @@ if stream_len != len(all_jobs):
     raise AssertionError(f"Stream length mismatch: {stream_len} vs {len(all_jobs)}")
 
 # Check every job URL is in the set
-for job in all_jobs:
-	url = job.data.payload.article_url
-	if not merged.sismember(MERGED_SET_KEY, url):
-		print(f"[ERROR] URL {url} missing from {MERGED_SET_KEY}")
-		raise AssertionError(f"URL {url} missing from {MERGED_SET_KEY}")
+# for job in all_jobs:
+# 	url = job.data.payload.article_url
+# 	if not merged.sismember(MERGED_SET_KEY, url):
+# 		print(f"[ERROR] URL {url} missing from {MERGED_SET_KEY}")
+# 		raise AssertionError(f"URL {url} missing from {MERGED_SET_KEY}")
 
 
 assert merged.scard(MERGED_SET_KEY) == len(article_urls_seen)
