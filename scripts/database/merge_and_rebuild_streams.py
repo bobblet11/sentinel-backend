@@ -27,7 +27,7 @@ MERGED_SET_KEY = "ingestor:seen.articles"
 NUMBER_OF_BACKUPS = 9
 START_PORT = 6380
 ALL_CONNS = [(START_PORT + i, "localhost") for i in range(NUMBER_OF_BACKUPS)]
-ALL_CONNS.append((REDIS_PORT, REDIS_HOST))
+# ALL_CONNS.append((REDIS_PORT, REDIS_HOST))
 # MERGED_PORT = 6379
 job_start_mono = time.monotonic()
 
