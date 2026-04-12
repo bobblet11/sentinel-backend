@@ -128,6 +128,7 @@ class BiasDetector(ArticleProcessor):
             message.set_nlp_result(result)
             return
 
+        result = message.create_nlp_result()
         analysis_text = text[:BIAS_MAX_CHARS]
 
         # ── Political Bias ──────────────────────────────────────────────────────
@@ -151,6 +152,7 @@ class BiasDetector(ArticleProcessor):
         except Exception as e:
             logger.error(f"BiasDetector: Political bias classification failed: {e}")
             result.bias_profile = self._neutral_profile()
+            message.set_nlp_result(result)
             return
 
         # ── Emotional Tone ──────────────────────────────────────────────────────
@@ -174,7 +176,6 @@ class BiasDetector(ArticleProcessor):
         except (KeyError, IndexError, TypeError):
             pass
         
-        result = message.create_nlp_result()
         result.bias_profile = BiasProfile(
             bias_category=political_bias,
             bias_score=bias_score,
