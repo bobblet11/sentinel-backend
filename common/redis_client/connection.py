@@ -12,6 +12,11 @@ REDIS_SSL_CERT_REQS: str = str(os.getenv("REDIS_SSL_CERT_REQS", "required")).str
 REDIS_USERNAME: str | None = os.getenv("REDIS_USERNAME") or None
 REDIS_PASSWORD: str | None = os.getenv("REDIS_PASSWORD") or None
 
+print(f"REDIS_HOST: {REDIS_HOST}")
+print(f"REDIS_PORT: {REDIS_PORT}")
+print(f"REDIS_SSL: {REDIS_SSL}")
+print(f"REDIS_SSL_CERT_REQS: {REDIS_SSL_CERT_REQS}")
+print(f"REDIS_USERNAME: {REDIS_USERNAME}")
 
 def _build_connection_kwargs() -> dict[str, Any]:
     """Build Redis connection kwargs from environment variables."""
