@@ -57,7 +57,7 @@ class BaseIngestor:
         self.stats_json_handler = JsonHandler(filename="stats.json")
 
 
-    def _log_stats(self, newly_seen_articles:int, non_new_articles:int, total_deduplicated_articles_processed:int) -> None:
+    def _log_stats(self, newly_seen_articles:int =0, non_new_articles:int=0, total_deduplicated_articles_processed:int=0) -> None:
         file_data = self.stats_json_handler.read_json()
 
         # Step 1: Generate key for our json file
