@@ -3,7 +3,7 @@ import time
 from tests.benchmarks.benchmark_base import BenchmarkResults, BenchmarkTemplate
 
 
-class Benchmark_2(BenchmarkTemplate):
+class Benchmark_1_2(BenchmarkTemplate):
 	def __init__(self):
 		super().__init__()
 	
@@ -17,6 +17,6 @@ class Benchmark_2(BenchmarkTemplate):
 
 
 if __name__ == "__main__":
-        benchmark = Benchmark_2()
+        benchmark = Benchmark_1_2()
         benchmark.execute()
         

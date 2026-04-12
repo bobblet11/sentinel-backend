@@ -1,7 +1,9 @@
+import datetime
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging import Logger, getLogger
 from typing import Any, Dict, Optional, List, Tuple
+from common.io.json_updater import JsonHandler
 from common.models.api.dtos.job import JobStage
 from common.models.api.redis_models import StreamMessage
 from common.redis_client.consumer import RedisConsumer
@@ -29,6 +31,52 @@ class ScraperService(ServiceTemplate):
 
     def __init__(self, config:ServiceConfig) -> None:
         super().__init__(config)
+        self.stats_json_handler = JsonHandler(filename="stats.json")
+
+    def _log_stats(self, fetch_time, parse_time) -> None:
+        file_data = self.stats_json_handler.read_json()
+        
+        total_time = file_data.get("total_time_spent_both", 0)
+        
+        total_jobs_processed = file_data.get("total_jobs_processed", 0)
+        total_jobs_processed += 1
+        
+        
+        if fetch_time:
+            number_of_fetch_jobs_processed = file_data.get("number_of_fetch_jobs_processed", 0)
+            number_of_fetch_jobs_processed += 1
+            
+            total_fetch_time = file_data.get("total_time_spent_fetching", 0)
+
+            total_fetch_time += fetch_time
+
+            file_data["number_of_fetch_jobs_processed"] = number_of_fetch_jobs_processed
+            file_data["total_time_spent_fetching"] = total_fetch_time
+            file_data["avg_fetch_time"] = total_fetch_time / number_of_fetch_jobs_processed
+
+            total_time += fetch_time
+
+        if parse_time:
+            number_of_parse_jobs_processed = file_data.get("number_of_parse_jobs_processed", 0)
+            number_of_parse_jobs_processed += 1
+            
+            total_parse_time = file_data.get("total_time_spent_parsing", 0)
+
+            total_parse_time += parse_time
+            
+            file_data["number_of_parse_jobs_processed"] = number_of_parse_jobs_processed
+            file_data["total_time_spent_parsing"] = total_parse_time
+            file_data["avg_parse_time"] = total_parse_time / number_of_parse_jobs_processed
+            
+            total_time += parse_time
+        
+    
+        file_data["total_time_spent_both"] = total_time
+        file_data["total_jobs_processed"] = total_jobs_processed 
+        file_data["avg_total_time"] = total_time / total_jobs_processed
+        
+        self.stats_json_handler.write_json(file_data)
+        
 
     def _fetch_article_and_update(self, message: StreamMessage) -> StreamMessage:
         try:
@@ -87,19 +135,38 @@ class ScraperService(ServiceTemplate):
     def _process_message(self, message: StreamMessage) -> StreamMessage:
         
         try:
+            fetch_time, parse_time = None, None
             message.add_timestamp(JobStage.IN)
-            
             if not message.html:
+                fetch_start = time.perf_counter()
                 message.add_timestamp(JobStage.FETCHED_IN)
                 message:StreamMessage = self._fetch_article_and_update(message)
                 message.add_timestamp(JobStage.FETCHED_OUT)
+                fetch_end = time.perf_counter()
+                fetch_time = fetch_end - fetch_start
                 
             if not message.text:
+                parse_start = time.perf_counter()
                 message.add_timestamp(JobStage.PARSED_IN)
                 message:StreamMessage = self._parse_article_and_update(message)
                 message.add_timestamp(JobStage.PARSED_OUT)
+                parse_end = time.perf_counter()
+                parse_time = parse_end - parse_start
+
+            if message.text:
+                text_preview = (message.text[:200] + "...") if len(message.text) > 200 else message.text
+                self.logger.info(
+                    "Scraper result url=%s title=%s publish_date=%s text_len=%s html_len=%s text_preview=%s",
+                    message.link,
+                    message.title,
+                    message.data.payload.publish_date,
+                    len(message.text or ""),
+                    len(message.html or ""),
+                    text_preview,
+                )
             
             message.add_timestamp(JobStage.OUT)
+            self._log_stats(fetch_time, parse_time)
             return message
         
         except FailedToFetch as e:

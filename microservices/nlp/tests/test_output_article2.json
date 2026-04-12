@@ -1,0 +1,270 @@
+{
+  "claims_in_article": [],
+  "entities_in_article": [
+    {
+      "entity_text": "venezuela",
+      "type_of_entity": "LOC",
+      "start_char": 4721,
+      "end_char": 4730
+    },
+    {
+      "entity_text": "davos",
+      "type_of_entity": "LOC",
+      "start_char": 568,
+      "end_char": 573
+    },
+    {
+      "entity_text": "##aire woods",
+      "type_of_entity": "PER",
+      "start_char": 3756,
+      "end_char": 3766
+    },
+    {
+      "entity_text": "world economic forum",
+      "type_of_entity": "ORG",
+      "start_char": 205,
+      "end_char": 225
+    },
+    {
+      "entity_text": "nicolas maduro",
+      "type_of_entity": "PER",
+      "start_char": 345,
+      "end_char": 359
+    },
+    {
+      "entity_text": "washington",
+      "type_of_entity": "LOC",
+      "start_char": 7277,
+      "end_char": 7287
+    },
+    {
+      "entity_text": "latin american",
+      "type_of_entity": "MISC",
+      "start_char": 894,
+      "end_char": 908
+    },
+    {
+      "entity_text": "ricardo hausmann",
+      "type_of_entity": "PER",
+      "start_char": 1222,
+      "end_char": 1238
+    },
+    {
+      "entity_text": "harvard university",
+      "type_of_entity": "ORG",
+      "start_char": 1264,
+      "end_char": 1282
+    },
+    {
+      "entity_text": "lab",
+      "type_of_entity": "ORG",
+      "start_char": 1292,
+      "end_char": 1295
+    },
+    {
+      "entity_text": "venezuelan",
+      "type_of_entity": "MISC",
+      "start_char": 1311,
+      "end_char": 1321
+    },
+    {
+      "entity_text": "planning",
+      "type_of_entity": "ORG",
+      "start_char": 1334,
+      "end_char": 1342
+    },
+    {
+      "entity_text": "##usmann",
+      "type_of_entity": "PER",
+      "start_char": 2061,
+      "end_char": 2067
+    },
+    {
+      "entity_text": "national assembly",
+      "type_of_entity": "ORG",
+      "start_char": 1922,
+      "end_char": 1939
+    },
+    {
+      "entity_text": "mad",
+      "type_of_entity": "PER",
+      "start_char": 2450,
+      "end_char": 2453
+    },
+    {
+      "entity_text": "##uro",
+      "type_of_entity": "PER",
+      "start_char": 2453,
+      "end_char": 2456
+    },
+    {
+      "entity_text": "jason bordoff",
+      "type_of_entity": "PER",
+      "start_char": 2645,
+      "end_char": 2658
+    },
+    {
+      "entity_text": "columbia university",
+      "type_of_entity": "ORG",
+      "start_char": 2681,
+      "end_char": 2700
+    },
+    {
+      "entity_text": "center on global energy policy",
+      "type_of_entity": "ORG",
+      "start_char": 2703,
+      "end_char": 2733
+    },
+    {
+      "entity_text": "##rdoff",
+      "type_of_entity": "PER",
+      "start_char": 3085,
+      "end_char": 3090
+    },
+    {
+      "entity_text": "trump",
+      "type_of_entity": "PER",
+      "start_char": 3328,
+      "end_char": 3333
+    },
+    {
+      "entity_text": "latin america",
+      "type_of_entity": "LOC",
+      "start_char": 3631,
+      "end_char": 3644
+    },
+    {
+      "entity_text": "blavatnik school of government",
+      "type_of_entity": "ORG",
+      "start_char": 3780,
+      "end_char": 3810
+    },
+    {
+      "entity_text": "university of oxford",
+      "type_of_entity": "ORG",
+      "start_char": 3812,
+      "end_char": 3832
+    },
+    {
+      "entity_text": "woods",
+      "type_of_entity": "PER",
+      "start_char": 4121,
+      "end_char": 4126
+    },
+    {
+      "entity_text": "daniel noboa",
+      "type_of_entity": "PER",
+      "start_char": 4817,
+      "end_char": 4829
+    },
+    {
+      "entity_text": "ecuador",
+      "type_of_entity": "LOC",
+      "start_char": 4833,
+      "end_char": 4840
+    },
+    {
+      "entity_text": "jose raul mulino",
+      "type_of_entity": "PER",
+      "start_char": 4845,
+      "end_char": 4861
+    },
+    {
+      "entity_text": "panama",
+      "type_of_entity": "LOC",
+      "start_char": 4865,
+      "end_char": 4871
+    },
+    {
+      "entity_text": "ecuadorean",
+      "type_of_entity": "MISC",
+      "start_char": 4962,
+      "end_char": 4972
+    },
+    {
+      "entity_text": "maduro",
+      "type_of_entity": "PER",
+      "start_char": 5096,
+      "end_char": 5102
+    },
+    {
+      "entity_text": "##lino",
+      "type_of_entity": "PER",
+      "start_char": 5173,
+      "end_char": 5177
+    },
+    {
+      "entity_text": "manuel noriega",
+      "type_of_entity": "PER",
+      "start_char": 5272,
+      "end_char": 5286
+    },
+    {
+      "entity_text": "darien",
+      "type_of_entity": "LOC",
+      "start_char": 5397,
+      "end_char": 5403
+    },
+    {
+      "entity_text": "##an goldfajn",
+      "type_of_entity": "PER",
+      "start_char": 5435,
+      "end_char": 5446
+    },
+    {
+      "entity_text": "inter - american development bank",
+      "type_of_entity": "ORG",
+      "start_char": 5465,
+      "end_char": 5496
+    },
+    {
+      "entity_text": "idb",
+      "type_of_entity": "ORG",
+      "start_char": 5498,
+      "end_char": 5501
+    },
+    {
+      "entity_text": "goldfajn",
+      "type_of_entity": "PER",
+      "start_char": 6118,
+      "end_char": 6126
+    },
+    {
+      "entity_text": "venezuela :",
+      "type_of_entity": "MISC",
+      "start_char": 6153,
+      "end_char": 6163
+    },
+    {
+      "entity_text": "what next",
+      "type_of_entity": "MISC",
+      "start_char": 6164,
+      "end_char": 6173
+    },
+    {
+      "entity_text": "jeff",
+      "type_of_entity": "PER",
+      "start_char": 6182,
+      "end_char": 6186
+    },
+    {
+      "entity_text": "##ry frieden",
+      "type_of_entity": "PER",
+      "start_char": 6186,
+      "end_char": 6196
+    },
+    {
+      "entity_text": "frieden",
+      "type_of_entity": "PER",
+      "start_char": 6930,
+      "end_char": 6937
+    },
+    {
+      "entity_text": "caracas",
+      "type_of_entity": "LOC",
+      "start_char": 7265,
+      "end_char": 7272
+    }
+  ],
+  "bias_profile": null
+}

@@ -1,0 +1,152 @@
+{
+  "sentences": [
+    {
+      "index": 7,
+      "text": "Venezuela faces profound political and economic uncertainty in the wake of the US military intervention that captured Nicol\u00e1s Maduro on 3 January .",
+      "original_text": null,
+      "score": 0.944412275174486,
+      "is_checkworthy": true,
+      "claim_type": null,
+      "confidence": 0.9,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 9,
+      "text": "Venezuela\u2019s political future and economic recovery have been debated across Davos this week, from Latin American leaders to geopolitical and energy experts .",
+      "original_text": null,
+      "score": 0.7903879556181321,
+      "is_checkworthy": false,
+      "claim_type": null,
+      "confidence": 0.4,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 15,
+      "text": "no election has been announced, despite constitutional provisions requiring interim authorities to call a vote within 30 days .",
+      "original_text": null,
+      "score": 0.7938621883900799,
+      "is_checkworthy": false,
+      "claim_type": null,
+      "confidence": 0.5,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 21,
+      "text": "Venezuela currently produces around 800,000 barrels of oil per day . this is down from a late-1990s peak of nearly 3.5 million barrels .",
+      "original_text": null,
+      "score": 0.9999999995256513,
+      "is_checkworthy": true,
+      "claim_type": null,
+      "confidence": 0.7999999999999999,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    },
+    {
+      "index": 40,
+      "text": "false False Mulino drew a direct parallel to Panama's 1989 invasion to capture Manuel Noriega .",
+      "original_text": null,
+      "score": 0.7741748693490422,
+      "is_checkworthy": true,
+      "claim_type": null,
+      "confidence": 0.9,
+      "embedding": "[STRIPPED]",
+      "entities": [],
+      "metadata": {}
+    }
+  ],
+  "claims_in_article": [],
+  "entities_in_article": [
+    {
+      "entity_text": "venezuela",
+      "type_of_entity": "LOC",
+      "start_char": 2226,
+      "end_char": 2235
+    },
+    {
+      "entity_text": "davos",
+      "type_of_entity": "LOC",
+      "start_char": 568,
+      "end_char": 573
+    },
+    {
+      "entity_text": "##aire woods",
+      "type_of_entity": "PER",
+      "start_char": 89,
+      "end_char": 99
+    },
+    {
+      "entity_text": "world economic forum",
+      "type_of_entity": "ORG",
+      "start_char": 205,
+      "end_char": 225
+    },
+    {
+      "entity_text": "nicolas maduro",
+      "type_of_entity": "PER",
+      "start_char": 784,
+      "end_char": 798
+    },
+    {
+      "entity_text": "washington",
+      "type_of_entity": "LOC",
+      "start_char": 1104,
+      "end_char": 1114
+    },
+    {
+      "entity_text": "latin american",
+      "type_of_entity": "MISC",
+      "start_char": 894,
+      "end_char": 908
+    },
+    {
+      "entity_text": "ricardo hausmann",
+      "type_of_entity": "PER",
+      "start_char": 1222,
+      "end_char": 1238
+    },
+    {
+      "entity_text": "harvard university",
+      "type_of_entity": "ORG",
+      "start_char": 1264,
+      "end_char": 1282
+    },
+    {
+      "entity_text": "growth lab",
+      "type_of_entity": "ORG",
+      "start_char": 1285,
+      "end_char": 1295
+    },
+    {
+      "entity_text": "venezuelan",
+      "type_of_entity": "MISC",
+      "start_char": 2139,
+      "end_char": 2149
+    },
+    {
+      "entity_text": "##usmann",
+      "type_of_entity": "PER",
+      "start_char": 1810,
+      "end_char": 1816
+    },
+    {
+      "entity_text": "national assembly",
+      "type_of_entity": "ORG",
+      "start_char": 1922,
+      "end_char": 1939
+    },
+    {
+      "entity_text": "maduro",
+      "type_of_entity": "PER",
+      "start_char": 2450,
+      "end_char": 2456
+    }
+  ],
+  "bias_profile": null
+}

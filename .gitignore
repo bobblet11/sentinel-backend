@@ -12,3 +12,8 @@ microservices/web_scraper/screenshots
 logs
 .log
 **.log
+data/postgres_data
+data/redis_data
+
+# HuggingFace model cache
+**/.cache/

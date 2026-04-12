@@ -35,10 +35,10 @@ class NLPOptions:
     """Toggles and thresholds to control the pipeline's execution."""
     enable_bias_detection: bool = True
     enable_ner: bool = True
-    enable_centrality: bool = True
     enable_claim_extraction: bool = True
+    enable_decontextualization: bool = False  # Set to True to enable decontextualization (slow)
     max_claims: int = 10
-    min_confidence: float = 0.75 # Updated default to match CheckWorthinessFilter
+    min_confidence: float = 0.50  # Recalibrated: hybrid CW ensemble tops out ~0.65; 0.50 gates low-signal sentences
     # If True, include high-dimensional embeddings in the final response
     return_embeddings: bool = True 
     
@@ -123,19 +123,6 @@ class SentenceScore:
     entities: List[Entity] = field(default_factory=list)
 
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
-
-
-@dataclass
-class SentenceScore:
-    """
-    Represents a sentence and its analysis scores across the pipeline.
-    """
-    index: int
-    text: str
-    score: float = 0.0  # Centrality or relevance score
-    embedding: Optional[List[float]] = None  # Vector representation
-    label: Optional[str] = None  # e.g., "CLAIM", "BIASED", "NEUTRAL"
 
     
 @dataclass
@@ -146,7 +133,6 @@ class Claim:
     """
     confidence: float
     source_sentence_indices: List[int] # which sentences are used to form the claim
-    contextualised_claim_text: str
     decontextualised_claim_text: Optional[str] = None
     decontextualised_claim_embedding: Optional[List[float]] = None
     NER_entities: List[Entity] = field(default_factory=list)
@@ -164,7 +150,6 @@ class BiasProfile:
 @dataclass
 class NLPResult:
     """The aggregate object containing all insights produced by the pipeline."""
-    sentences: List[SentenceScore] = field(default_factory=list)
     claims_in_article: List[Claim] = field(default_factory=list)
     entities_in_article: List[Entity] = field(default_factory=list)
     bias_profile: Optional[BiasProfile] = None
@@ -263,11 +248,7 @@ class StreamMessage:
             self.data.payload.publish_date = parsed_result.published_at
             
     def set_nlp_result(self, nlp_result: NLPResult) -> None:
-        """Unpacks a ParseResult object and updates the message payload."""
-        # Use dot notation on the ParseResult object for clarity and safety
-        if not self.data.payload.sentences and nlp_result.sentences:
-            self.data.payload.sentences = nlp_result.sentences
-
+        """Unpacks an NLPResult object and updates the message payload."""
         if not self.data.payload.claims_in_article and nlp_result.claims_in_article:
             self.data.payload.claims_in_article = nlp_result.claims_in_article
             

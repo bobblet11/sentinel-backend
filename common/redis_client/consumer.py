@@ -223,3 +223,24 @@ class RedisConsumer:
                 f"Failed to acknowledging message {redis_message_id} on stream {self.stream_name}: {e}"
             )
             raise e
+    
+    def acknowledge_and_delete(self, stream_name: str, redis_message_id: str) -> None:
+        """
+        Acknowledges that a message from a specific stream has been processed and deletes it from last stream
+        """
+        
+        try:
+            ack_result = self.client.xack(stream_name, self.group_name, redis_message_id)
+            if ack_result == 0:
+                raise Exception("Failed to ack")
+            
+            del_result = self.client.xdel(stream_name, redis_message_id)
+            if del_result == 0:
+                raise Exception("Failed to del")
+            
+            self.logger.debug(f"Successfully acknowledged and cleaned up {redis_message_id}")
+        except Exception as e:
+            self.logger.error(
+                f"Failed to acknowledging message {redis_message_id} on stream {stream_name}: {e}"
+            )
+            raise e

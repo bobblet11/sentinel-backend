@@ -5,7 +5,7 @@ set -e
 # All your Redis keys and names are in one place for easy changes.
 CONTAINER_NAME="sentinel-redis-container"
 SEEN_SET_KEY="ingestor:seen.articles"
-STREAM_KEY="ingestor:to.be.scraped"
+STREAM_KEY="background:to.be.scraped"
 GROUP_NAME="default"
 
 # --- Color Definitions ---
