@@ -39,6 +39,7 @@ if __name__ == "__main__":
         is_concurrent=False,
         max_workers=1,                 
         batch_size=BATCH_SIZE,
+        is_cut_and_paste_mode=True,
         retry_failure_mode=RETRY_FAILURE_MODE
         
     )
