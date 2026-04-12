@@ -71,14 +71,15 @@ class ModelManager:
                 key="BIAS_POLITICAL",
                 model_name=os.environ.get(
                     "NLP_BIAS_MODEL",
-                    "typeform/distilbert-base-uncased-mnli",
+                    "premsa/political-bias-prediction-allsides-BERT",
                 ),
-                task_type="zero_shot_classification",
+                task_type="text_classification",
                 owner_component="BiasDetector",
                 loader="transformers_pipeline",
                 device_policy=DevicePolicy.PREFER_GPU,
                 required=False,
-                estimated_memory_mb=260,
+                estimated_memory_mb=440,
+                loader_kwargs={"top_k": None},
             ),
             ModelEntry(
                 key="BIAS_SENTIMENT",
@@ -405,13 +406,6 @@ class ModelManager:
 
     def _resolve_hf_task(self, entry: ModelEntry) -> str:
         """Map a ModelEntry's task_type to the HuggingFace pipeline task string."""
-        if entry.key in ("BIAS", "BIAS_POLITICAL"):
-            if "mnli" in entry.model_name.lower():
-                return "zero-shot-classification"
-            else:
-                entry.loader_kwargs["return_all_scores"] = True
-                return "text-classification"
-
         _TASK_MAP = {
             "zero_shot_classification": "zero-shot-classification",
             "token_classification": "token-classification",
