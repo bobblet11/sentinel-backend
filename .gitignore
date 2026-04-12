@@ -35,3 +35,4 @@ node_modules/
 results/*
 tests/articles_export.csv
 tests/claims_export.csv
+.worktrees/
