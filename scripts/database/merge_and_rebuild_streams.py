@@ -348,17 +348,41 @@ assert len(all_jobs) == len(article_urls_seen)
 # print(f"[INFO] Clearing all jobs from merged")
 # merged.delete(MERGED_STREAM_KEY)
 
+BATCH_SIZE = 500
+
 print(f"[INFO] Writing {len(all_jobs)} jobs and {len(article_urls_seen)} URLs to merged Redis...")
+
+pipeline = merged.pipeline(transaction=False)
+count = 0
+
 for job in all_jobs:
-	payload: Message = job.data.model_dump()
-	payload: Dict[str, Any] =  {"payload": json.dumps(payload)}
-	merged.xadd(MERGED_STREAM_KEY, payload, approximate=True)
+    payload: Message = job.data.model_dump()
+    payload: Dict[str, Any] = {"payload": json.dumps(payload)}
+    pipeline.xadd(MERGED_STREAM_KEY, payload, approximate=True)
+    count += 1
+
+    if count % BATCH_SIZE == 0:
+        pipeline.execute()
+        print(f"[INFO] Flushed {count} jobs so far...")
+        
+if count % BATCH_SIZE != 0:
+    pipeline.execute()
  
 print(f"[INFO] Stream write complete")
-merged.sadd(MERGED_SET_KEY, *article_urls_seen or [])
+
+print(f"[INFO] Set write start")
+# Batch the set writes
+pipeline = merged.pipeline(transaction=False)
+count = 0
+urls = list(article_urls_seen)
+
+for i in range(0, len(urls), BATCH_SIZE):
+    batch = urls[i:i+BATCH_SIZE]
+    pipeline.sadd(MERGED_SET_KEY, *batch)
+    count += len(batch)
+    pipeline.execute()
+    print(f"[INFO] Flushed {count} URLs so far...")
 print(f"[INFO] Set write complete")
-
-
 
 print("[INFO] Running post-merge validation...")
 set_len = merged.scard(MERGED_SET_KEY)
