@@ -32,3 +32,6 @@ backups.zip
 node_modules/
 .pem
 *.pem
+results/*
+tests/articles_export.csv
+tests/claims_export.csv
