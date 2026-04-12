@@ -218,7 +218,9 @@ class ClaimExtraction(ArticleProcessor):
         # ── Stage 5.5 — Entity Mapping ───────────────────────────────────────
         t = time.time()
         message.add_timestamp(JobStage.CHECK_WORTHY_ENTITY_MAPPING_IN)
-        self._map_entities_to_sentences(sentences, message)
+        result = message.create_nlp_result()
+        self._map_entities_to_sentences(sentences, result)
+        message.set_nlp_result(result)
         logger.info(
             "[Stage 5.5 | EntityMapping] complete in %.2fs", time.time() - t
         )
@@ -296,9 +298,9 @@ class ClaimExtraction(ArticleProcessor):
 
         # Expose processed sentences so set_nlp_result() can copy them
         # to the MessagePayload for downstream services.
-        result = message.create_nlp_result()
-        result.sentences = sentences
-        message.set_nlp_result(result)
+        # result = message.create_nlp_result()
+        # result.sentences = sentences
+        # message.set_nlp_result(result)
 
         logger.info(
             "--- ClaimExtraction Pipeline complete in %.2fs | "
