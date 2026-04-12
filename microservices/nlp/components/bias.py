@@ -23,20 +23,17 @@ class BiasDetector(ArticleProcessor):
     analysis using two lightweight NLI/sentiment transformer pipelines.
 
     Strategies Applied:
-    1.  Political Bias via Zero-Shot NLI (typeform/distilbert-base-uncased-mnli):
-        The article text (truncated to POLITICAL_MAX_CHARS characters) is classified
-        against three mutually exclusive hypothesis labels:
-        ["left-leaning", "centrist", "right-leaning"].
-        The model operates via soft-NLI entailment — no political fine-tuning is
-        required, making it robust to domain shift across news publishers.
-        Scores are normalised across labels using the model's own softmax
-        (hypothesis_template='This text has a {} political perspective.').
+    1.  Political Bias via Direct Classification (premsa/political-bias-prediction-allsides-BERT):
+        The article text (truncated to BIAS_MAX_CHARS characters) is classified into
+        one of three categories: Left, Center, or Right. The model is fine-tuned on
+        AllSides-rated news articles (F1=0.904). Label mapping: LABEL_0=Left,
+        LABEL_1=Center, LABEL_2=Right (AllSides dataset standard ordering).
     2.  Emotional Tone via Sentiment Analysis (cardiffnlp/twitter-roberta-base-sentiment-latest):
         The same truncated text is scored for emotional polarity.
         The top label from {negative, neutral, positive} is mapped to
         a human-readable tone string ("Negative", "Neutral", "Positive") and
         stored in BiasProfile.emotional_tone.
-    3.  Text Truncation: Analysis is bounded to the first POLITICAL_MAX_CHARS
+    3.  Text Truncation: Analysis is bounded to the first BIAS_MAX_CHARS
         (default 2000) characters of the article body. This keeps inference
         fast (< 1 s on CPU for most articles) while capturing the lede and early
         paragraphs that typically set the article's framing.
@@ -47,12 +44,12 @@ class BiasDetector(ArticleProcessor):
     Writes to result.bias_profile only; does NOT modify sentences.
     """
 
-    POLITICAL_LABELS = ["left-leaning", "centrist", "right-leaning"]
-    # Map classifier output labels to the canonical BiasProfile string format
+    # premsa/political-bias-prediction-allsides-BERT label mapping
+    # Dataset label order: 0=Left, 1=Center, 2=Right
     _LABEL_MAP = {
-        "left-leaning":  "Left",
-        "centrist":      "Center",
-        "right-leaning": "Right",
+        "LABEL_0": "Left",
+        "LABEL_1": "Center",
+        "LABEL_2": "Right",
     }
     _TONE_MAP = {
         "negative": "Negative",
@@ -85,19 +82,23 @@ class BiasDetector(ArticleProcessor):
                         model_manager.get_state("BIAS_SENTIMENT").value,
                     )
 
+            _dtype_kwargs = {"dtype": device_config.dtype} if device_config.use_fp16 else {}
             self.political_classifier = pipeline(
-                "zero-shot-classification",
+                "text-classification",
                 model=BIAS_POLITICAL_MODEL,
                 device=device_config.device_id,
-                dtype=device_config.dtype,
+                top_k=None,
+                truncation=True,
+                max_length=512,
+                **_dtype_kwargs,
             )
             self.sentiment_analyzer = pipeline(
                 "sentiment-analysis",
                 model=BIAS_SENTIMENT_MODEL,
                 device=device_config.device_id,
-                dtype=device_config.dtype,
                 truncation=True,
                 max_length=BIAS_SENTIMENT_MAX_LEN,
+                **_dtype_kwargs,
             )
             logger.info("BiasDetector: Models loaded successfully.")
         except Exception as e:
@@ -128,29 +129,28 @@ class BiasDetector(ArticleProcessor):
             message.set_nlp_result(result)
             return
 
+        result = message.create_nlp_result()
         analysis_text = text[:BIAS_MAX_CHARS]
 
         # ── Political Bias ──────────────────────────────────────────────────────
         try:
-            bias_out = self.political_classifier(
-                analysis_text,
-                self.POLITICAL_LABELS,  # class-level label list; unchanged
-                multi_label=False,
-                hypothesis_template="This text has a {} political perspective.",
-            )
-            raw_label  = bias_out["labels"][0]          # e.g. "left-leaning"
-            confidence = float(bias_out["scores"][0])
-
-            # Build canonical scores dict using BiasProfile keys
+            bias_out_raw = self.political_classifier(analysis_text)
+            # top_k=None returns [[{label, score}, ...]] for a single string — unwrap batch dim
+            bias_out: list = bias_out_raw[0] if bias_out_raw and isinstance(bias_out_raw[0], list) else bias_out_raw
+            # Sort descending by score to get top prediction first
+            bias_out = sorted(bias_out, key=lambda x: x["score"], reverse=True)
+            raw_label  = bias_out[0]["label"]
+            confidence = float(bias_out[0]["score"])
             scores: Dict[str, float] = {
-                self._LABEL_MAP[lbl]: float(sc)
-                for lbl, sc in zip(bias_out["labels"], bias_out["scores"])
+                self._LABEL_MAP.get(item["label"], "Center"): float(item["score"])
+                for item in bias_out
             }
             political_bias = self._LABEL_MAP.get(raw_label, "Center")
 
         except Exception as e:
             logger.error(f"BiasDetector: Political bias classification failed: {e}")
             result.bias_profile = self._neutral_profile()
+            message.set_nlp_result(result)
             return
 
         # ── Emotional Tone ──────────────────────────────────────────────────────
@@ -174,7 +174,6 @@ class BiasDetector(ArticleProcessor):
         except (KeyError, IndexError, TypeError):
             pass
         
-        result = message.create_nlp_result()
         result.bias_profile = BiasProfile(
             bias_category=political_bias,
             bias_score=bias_score,

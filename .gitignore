@@ -35,5 +35,9 @@ node_modules/
 results/*
 tests/articles_export.csv
 tests/claims_export.csv
+<<<<<<< HEAD
 ./backups_extra
 backups_extra
+=======
+.worktrees/
+>>>>>>> features/bias
