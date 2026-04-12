@@ -477,6 +477,7 @@ class RetrievalService(ServiceTemplate):
             save_data_result = self._save_data_into_postgres(db, message)
             message.add_timestamp(JobStage.SAVE_DATA_OUT)
             if message.type == JobType.BACKGROUND:
+                self.logger.info("BACKGROUND JOB, end of line")
                 return message
             
             #continue to retrieval
