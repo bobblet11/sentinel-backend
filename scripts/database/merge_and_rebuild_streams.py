@@ -12,19 +12,23 @@ import re
 
 from typing import Any, Dict, List, Set
 
+from dotenv import load_dotenv
 import redis
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
 from common.models.api.redis_models import Message, MessageHeader, MessagePayload, MessageTimestamp, StreamMessage
+
+load_dotenv(dotenv_path="configs/aws/.env")
 from common.redis_client.connection import REDIS_HOST, REDIS_PORT, redis_connection
 INPUT_SET_KEY_OPTIONS = ["ingestor:seen.articles"]
 INPUT_STREAM_KEY_OPTIONS = ["background:to.be.scraped", "prioritised:to.be.scraped", "background:to.be.nlp", "ingestor:to.be.scraped", "failure:to.be.scraped"]
 
 MERGED_STREAM_KEY="background:to.be.scraped"
 MERGED_SET_KEY = "ingestor:seen.articles"
-NUMBER_OF_BACKUPS = 8
+NUMBER_OF_BACKUPS = 9
 START_PORT = 6380
-ALL_PORTS = [START_PORT + i for i in range(0, NUMBER_OF_BACKUPS)]
-MERGED_PORT = 6379
+ALL_CONNS = [(START_PORT + i, "localhost") for i in range(NUMBER_OF_BACKUPS)]
+ALL_CONNS.append((REDIS_PORT, REDIS_HOST))
+# MERGED_PORT = 6379
 job_start_mono = time.monotonic()
 
 BACKUP_FILE = f"./redis_backup_{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
@@ -52,7 +56,7 @@ def backup_jobs(all_jobs:List[StreamMessage], all_article_urls:Set[str]):
 	job_backup_data = []
 	for job in all_jobs:
 		# Dump the Message object into JSON‑serializable dict
-		payload: Dict[str, Any] = job.data.model_dump()
+		payload: Dict[str, Any] = job.get().model_dump()
 		job_backup_data.append({
 			"stream": job.stream,
 			"redis_id": job.redis_id,
@@ -78,8 +82,9 @@ def restore_jobs(backup_file: str, merged: redis.Redis):
 	merged.sadd(MERGED_SET_KEY, *backup_data["set_urls"])
 	print(f"[INFO] Restore complete: {len(backup_data['jobs'])} jobs, {len(backup_data['set_urls'])} set urls")
 
-def connect_redis(port: int = MERGED_PORT, host: str = REDIS_HOST) -> redis.Redis:
-	if port == MERGED_PORT and host == REDIS_HOST:
+def connect_redis(port: int = REDIS_PORT, host: str = REDIS_HOST) -> redis.Redis:
+	print(port, host)
+	if port == REDIS_PORT and host == REDIS_HOST:
 		print(f"[INFO] Using singleton RedisConnection for merged port {port}")
 		# Use the singleton for the merged instance
 		client = redis_connection.get_client()
@@ -107,12 +112,28 @@ def match_outlet_name(article_url: str) -> str:
     return None
 
 
+def load_stream(r, key, batch_size=500):
+    """Iterate through a Redis stream in batches to avoid connection resets."""
+    entries = []
+    last_id = "-"
+    while True:
+        batch = r.xrange(key, min=last_id, max="+", count=batch_size)
+        if not batch:
+            break
+        entries.extend(batch)
+        # advance last_id to just after the last seen entry
+        last_id = batch[-1][0]
+        # increment the sequence part to avoid re-reading the same entry
+        ms, seq = last_id.split("-")
+        last_id = f"{ms}-{int(seq)+1}"
+    return entries
+
 def load_stream_jobs(port, stream_keys: List[str], host="localhost") -> List[Dict[str, Any]]:
     r = connect_redis(port, host=host)
     jobs = []
     for key in stream_keys:
         try:
-            entries = r.xrange(key)
+            entries = load_stream(r, key)
         except redis.exceptions.ResponseError as e:
             print(f"[WARN] Could not read stream {key} on port {port}: {e}")
             continue
@@ -180,7 +201,7 @@ def transform_job(raw_msg: Dict[str, Any]) -> StreamMessage:
 
 	created_at_raw = header.get("created_at") or header.get("timestamp")
 	if not article_url:
-		print(f"[❌] Job missing article_url (stream={raw_msg.get('stream')}, redis_id={raw_msg.get('redis_message_id')})")
+		# print(f"[❌] Job missing article_url (stream={raw_msg.get('stream')}, redis_id={raw_msg.get('redis_message_id')})")
 		raise RuntimeError(f"Malformed job: missing article_url\n{json.dumps(raw_msg, indent=2)}")
 		return None
 
@@ -201,7 +222,7 @@ def transform_job(raw_msg: Dict[str, Any]) -> StreamMessage:
  
 	news_outlet = match_outlet_name(article_url)
 	if not news_outlet:
-		print(f"[❌] No outlet match for {article_url} (stream={raw_msg.get('stream')}, redis_id={raw_msg.get('redis_message_id')})")
+		# print(f"[❌] No outlet match for {article_url} (stream={raw_msg.get('stream')}, redis_id={raw_msg.get('redis_message_id')})")
 		# raise RuntimeError(f"Malformed job: missing news outlet\n{json.dumps(raw_msg, indent=2)}")
 		return None
 
@@ -284,20 +305,19 @@ def transform_job(raw_msg: Dict[str, Any]) -> StreamMessage:
 
 print(f"[INFO] trying to connect to merged")
 
-all_jobs: List[StreamMessage] = load_stream_jobs(REDIS_PORT, INPUT_STREAM_KEY_OPTIONS, REDIS_HOST)
-article_urls_seen = set(job.data.payload.article_url for job in all_jobs if job)
-backup_jobs(all_jobs, article_urls_seen)
-merged = connect_redis(host=REDIS_HOST, port=REDIS_PORT)
+all_jobs: List[StreamMessage] = []
+article_urls_seen = set()
+merged = connect_redis()
 print(f"[INFO] connected to merged")
 
 total_dupe_count=0
 total_fail_count=0
 
 
-for port in ALL_PORTS:  # ports for each backup instance
+for port, host in ALL_CONNS:  # ports for each backup instance
 	dupe_count=0
 	fail_count=0
-	untransformed_jobs=load_stream_jobs(port, INPUT_STREAM_KEY_OPTIONS)
+	untransformed_jobs=load_stream_jobs(port, INPUT_STREAM_KEY_OPTIONS, host)
 	for raw in untransformed_jobs:
 		job = transform_job(raw)
 		if job and job.data.payload.article_url not in article_urls_seen:
