@@ -36,20 +36,25 @@ class WebScraperNLPBenchmark(BenchmarkTemplate):
         return jobs
 
     def validate_results(
-        self, successfully_processed_jobs: List[Dict[str, Any]]
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+            self, successfully_processed_jobs: List[Dict[str, Any]]
+        ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Validate that all fields in Message are non-None."""
         valid, invalid = [], []
         for job in successfully_processed_jobs:
             try:
                 message = Message(**job["data"])
-                # Check every field in header and payload
-                header_ok = all(getattr(message.header, f.name) is not None for f in message.header.__fields__.values())
+                # Check every field in header
+                header_ok = all(
+                    getattr(message.header, field_name) is not None
+                    for field_name in message.header.model_fields.keys()
+                )
+                # Check every required field in payload
                 payload_ok = all(
-                    getattr(message.payload, f.name) is not None
-                    for f in message.payload.__fields__.values()
-                    if f.name not in ["sentences", "claims_in_article", "entities_in_article", "bias_profile",
-                                      "save_data_result", "save_job_result", "matches", "related_articles"]
+                    getattr(message.payload, field_name) is not None
+                    for field_name in message.payload.model_fields.keys()
+                    if field_name not in [
+                        "sentences", "claims_in_article", "entities_in_article", "bias_profile",
+                    ]
                 )
                 if header_ok and payload_ok:
                     valid.append(job)
@@ -58,7 +63,6 @@ class WebScraperNLPBenchmark(BenchmarkTemplate):
             except ValidationError as e:
                 invalid.append({"job": job, "error": str(e)})
         return valid, invalid
-
 if __name__ == "__main__":
     benchmark = WebScraperNLPBenchmark()
     results = benchmark.run()
