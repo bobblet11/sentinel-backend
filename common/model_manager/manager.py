@@ -79,7 +79,7 @@ class ModelManager:
                 device_policy=DevicePolicy.PREFER_GPU,
                 required=False,
                 estimated_memory_mb=440,
-                loader_kwargs={"top_k": None},
+                loader_kwargs={"top_k": None, "truncation": True, "max_length": 512},
             ),
             ModelEntry(
                 key="BIAS_SENTIMENT",
@@ -440,11 +440,16 @@ class ModelManager:
             from transformers import pipeline
 
             hf_device = 0 if device == "cuda" else -1
-            _dtype = _torch.float16 if device == "cuda" else _torch.float32
             task = self._resolve_hf_task(entry)
+            # Only pass dtype on CUDA (fp16 for memory efficiency).
+            # On CPU, omitting dtype avoids a transformers bug where
+            # dtype=torch.float32 triggers low_cpu_mem_usage meta-tensor
+            # initialization that fails to move tensors to CPU.
+            kwargs = dict(entry.loader_kwargs)
+            if device == "cuda":
+                kwargs["dtype"] = _torch.float16
             return pipeline(
-                task, model=entry.model_name, device=hf_device,
-                dtype=_dtype, **entry.loader_kwargs,
+                task, model=entry.model_name, device=hf_device, **kwargs
             )
 
         elif entry.loader == "auto_model_seq2seq":

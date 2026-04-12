@@ -82,20 +82,23 @@ class BiasDetector(ArticleProcessor):
                         model_manager.get_state("BIAS_SENTIMENT").value,
                     )
 
+            _dtype_kwargs = {"dtype": device_config.dtype} if device_config.use_fp16 else {}
             self.political_classifier = pipeline(
                 "text-classification",
                 model=BIAS_POLITICAL_MODEL,
                 device=device_config.device_id,
-                dtype=device_config.dtype,
                 top_k=None,
+                truncation=True,
+                max_length=512,
+                **_dtype_kwargs,
             )
             self.sentiment_analyzer = pipeline(
                 "sentiment-analysis",
                 model=BIAS_SENTIMENT_MODEL,
                 device=device_config.device_id,
-                dtype=device_config.dtype,
                 truncation=True,
                 max_length=BIAS_SENTIMENT_MAX_LEN,
+                **_dtype_kwargs,
             )
             logger.info("BiasDetector: Models loaded successfully.")
         except Exception as e:
