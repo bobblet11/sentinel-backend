@@ -27,19 +27,21 @@ if __name__ == "__main__":
     setup_logging(level=logging.INFO, container_name=CONTAINER_NAME)
 
     config = ServiceConfig(
-        routing_key=["header","type"],
-        max_workers=SCRAPER_MAX_WORKERS, 
         service_name=SERVICE_NAME, 
         input_streams=INPUT_STREAMS, 
         output_streams=[USER_OUTPUT_STREAM, BACKGROUND_OUTPUT_STREAM],
         router_key_values=[JobType.USER.value, JobType.BACKGROUND.value],
-        block_prioritisation_level=BlockPrioritisationLevel.EXPONENTIAL,
         group_name=GROUP_NAME, 
         consumer_name=CONSUMER_NAME, 
+        block_prioritisation_level=BlockPrioritisationLevel.EXPONENTIAL,
         failure_output_stream=FAILURE_OUTPUT_STREAM, 
+        routing_key=["header","type"],
+        
         is_concurrent=True, 
+        max_workers=SCRAPER_MAX_WORKERS, 
         batch_size=BATCH_SIZE,
-        is_cut_and_paste_mode=False
+        is_cut_and_paste_mode=False,
+        retry_failure_mode=False
         )
     
     

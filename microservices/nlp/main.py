@@ -14,18 +14,22 @@ if __name__ == "__main__":
     main_logger: Logger = getLogger("__main__")
     
     config = ServiceConfig(
-        routing_key=["header","type"], 
-        max_workers=1, 
         service_name=SERVICE_NAME, 
         input_streams=INPUT_STREAMS, 
         output_streams=[USER_OUTPUT_STREAM, BACKGROUND_OUTPUT_STREAM],
-        router_key_values=[JobType.USER.value, JobType.BACKGROUND.value],
-        block_prioritisation_level=BlockPrioritisationLevel.EXPONENTIAL,
+        routing_key=["header","type"], 
         group_name=GROUP_NAME, 
         consumer_name=CONSUMER_NAME, 
+        block_prioritisation_level=BlockPrioritisationLevel.EXPONENTIAL,
         failure_output_stream=FAILURE_OUTPUT_STREAM, 
+        router_key_values=[JobType.USER.value, JobType.BACKGROUND.value],
+        
         is_concurrent=False, 
-        batch_size=BATCH_SIZE)
+        max_workers=1, 
+        batch_size=BATCH_SIZE,
+        is_cut_and_paste_mode=True, #delete job on ack
+        retry_failure_mode=False #if input stream is empty, retry jobs in failure mode. Turn on after fixing failed jobs.
+    )
     
     nlp_service = NLPService(config, options=None)
     
