@@ -105,7 +105,7 @@ class RetrievalService(ServiceTemplate):
 
     def _save_data_into_postgres(self, db: Session, message: StreamMessage):
         
-        claims: List[Claim] = message.all_claims 
+        claims: List[Claim] = message.all_claims or []
         
         self.logger.debug(
                 "=== SAVING JOB FOR ARTICLE ===\n"
