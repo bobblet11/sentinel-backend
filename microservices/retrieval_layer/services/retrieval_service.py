@@ -1,11 +1,11 @@
 from asyncio import as_completed
 from concurrent.futures import ThreadPoolExecutor
+from email.mime import message
 from typing import Any, Dict, List, Tuple
 from datetime import datetime, timedelta
 from requests import Session
 
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
-from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_nlp, validate_after_retrieval
 from common.redis_client.hash_store import RedisHashStore
 from common.service.service_template import ServiceTemplate
 from common.models.api.redis_models import BiasProfile, Claim, Message, RetrievalResult, StreamMessage
@@ -105,19 +105,32 @@ class RetrievalService(ServiceTemplate):
         return verdict, confidence
 
     def _save_data_into_postgres(self, db: Session, message: StreamMessage):
-        
+
         claims: List[Claim] = message.all_claims or []
-        
+
         self.logger.debug("Saving article uid=%s claims=%d", message.uid, len(claims))
         bias_profile = message.bias_profile
 
+        # Guard against None bias_profile when NLP bias detection fails
+        if bias_profile is None:
+            self.logger.warning("bias_profile is None for uid=%s, using defaults", message.uid)
+            sentiment_dto = CreateOrModifySentiment(
+                bias_category="center",
+                # bias_score=0.0,
+                bias_analysis_confidence=0.0,
+                sentiment_category="neutral",
+                sentiment_analysis_confidence=0.0,
+            )
+        else:
+            sentiment_dto = CreateOrModifySentiment(
+                bias_profile.bias_category,
+                # bias_profile.bias_score,
+                bias_profile.bias_analysis_confidence,
+                bias_profile.sentiment_category,
+                bias_profile.sentiment_analysis_confidence,
+            )
+        
         article_dto = CreateOrModifyArticle(message.link, message.title, message.text, message.html, message.publish_date, message.data.payload.author)
-        sentiment_dto = CreateOrModifySentiment(
-            bias_profile.bias_category if bias_profile else None,
-            bias_profile.bias_analysis_confidence if bias_profile else None,
-            bias_profile.sentiment_category if bias_profile else None,
-            bias_profile.sentiment_analysis_confidence if bias_profile else None,
-        )
         outlet_dto = CreateOrModifyOutlet(message.news_outlet_name)
         
         article_entry = get_or_create_article(db, article_dto, sentiment_dto, outlet_dto)
@@ -405,14 +418,23 @@ class RetrievalService(ServiceTemplate):
                 self.logger.warning(f"A worker for message {original_message.redis_id} failed. See previous error logs for details.")
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
-        validate_after_nlp(message)
-        self.logger.debug(get_pretty_print_stream_message(message))
+        
         # one db session to make sure the entire thing is 1 transcation
         # just raise an exception and it will roll back everything
+        
+        self.logger.info("=== PROCESSING MESSAGE uid=%s type=%s ===", message.header.uid, message.type)
+        self.logger.info("Message fields: link=%s title=%s outlet=%s publish_date=%s",
+            message.link, message.title, message.news_outlet_name, message.publish_date)
+        self.logger.info("Claims count: %s", len(message.all_claims or []))
+        self.logger.info("Bias profile: %s", message.bias_profile)
+        
         with get_db_transaction() as db:
+            self.logger.info("--- STEP 1: Saving data to postgres ---")
             message.add_timestamp(JobStage.SAVE_DATA_IN)
             save_data_result = self._save_data_into_postgres(db, message)
             message.add_timestamp(JobStage.SAVE_DATA_OUT)
+            self.logger.info("--- STEP 1 COMPLETE: save_data_result=%s ---", save_data_result)
+
             if message.type == JobType.BACKGROUND:
                 self.logger.info("BACKGROUND JOB, end of line")
                 return message
@@ -420,13 +442,18 @@ class RetrievalService(ServiceTemplate):
             #continue to retrieval
             # retrieval stuff is only for user jobs
             original_article_id = save_data_result.get("article_entry_id") or 0
+            self.logger.info("--- STEP 2: Retrieving evidence for article_id=%s ---", original_article_id)
             message.add_timestamp(JobStage.RETRIEVE_EVIDENCE_IN)
             claim_evidence_matches, related_articles = self._retrieve_evidence(db, message, original_article_id)
             message.add_timestamp(JobStage.RETRIEVE_EVIDENCE_OUT)
+            self.logger.info("--- STEP 2 COMPLETE: matches=%s related_articles=%s ---", len(claim_evidence_matches), len(related_articles))
             
+            self.logger.info("--- STEP 3: Saving job to postgres ---")
             message.add_timestamp(JobStage.UPDATE_JOB_IN)
             save_job_result = self._save_job_into_postgres(db, message)
             message.add_timestamp(JobStage.UPDATE_JOB_OUT)
+            self.logger.info("--- STEP 3 COMPLETE: save_job_result=%s ---", save_job_result)
+
 
             retrieval_result = RetrievalResult(
                 save_data_result,
@@ -439,7 +466,6 @@ class RetrievalService(ServiceTemplate):
             #     self.hash_store.set(message.uid, retrieval_result.__dict__)
         
             message.set_retrieval_result(retrieval_result)
-            validate_after_retrieval(message)
-            self.logger.debug(get_pretty_print_stream_message(message))
+            self.logger.info("=== MESSAGE COMPLETE uid=%s ===", message.header.uid)
             return message
                     

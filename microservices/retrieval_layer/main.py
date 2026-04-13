@@ -1,5 +1,5 @@
 import signal
-from logging import DEBUG, INFO
+from logging import INFO
 
 from common.io.logging import setup_logging
 from common.models.api.dtos.job import JobType

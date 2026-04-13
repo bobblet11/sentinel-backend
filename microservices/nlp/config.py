@@ -24,7 +24,11 @@ NLI_MODEL = "cross-encoder/nli-distilroberta-base"
 QG_MODEL = "Salesforce/mixqg-base"
 QA_MODEL = "deepset/roberta-base-squad2"
 GEN_MODEL = "google/flan-t5-base"
+<<<<<<< HEAD
+BIAS_POLITICAL_MODEL = "typeform/distilbert-base-uncased-mnli"
+=======
 BIAS_POLITICAL_MODEL = "premsa/political-bias-prediction-allsides-BERT"
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 BIAS_SENTIMENT_MODEL = "cardiffnlp/twitter-roberta-base-sentiment-latest"
 CW_NLI_MODEL = "typeform/distilbert-base-uncased-mnli"
 
@@ -76,8 +80,11 @@ SENTENCE_EXTRACT_TOP_K = 15
 # component-only imports (e.g. in tests) do not call exit(1) on missing vars.
 # =============================================================================
 try:
+<<<<<<< HEAD
+=======
     LOG_MODE: int = get_env_var("LOG_MODE",int, config_logger)
     
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
     INPUT_STREAMS: List[str] = [
         x.strip(" ,")
         for x in get_env_var("INPUT_STREAMS", str, config_logger).split(",")
@@ -112,9 +119,12 @@ try:
     BIAS_POLITICAL_MODEL = get_env_var(
         "NLP_BIAS_MODEL", str, config_logger, BIAS_POLITICAL_MODEL
     )
+<<<<<<< HEAD
+=======
     BIAS_SENTIMENT_MODEL = get_env_var(
         "NLP_SENTIMENT_MODEL", str, config_logger, BIAS_SENTIMENT_MODEL
     )
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
     QG_MODEL = get_env_var("NLP_QG_MODEL", str, config_logger, QG_MODEL)
     QA_MODEL = get_env_var("NLP_QA_MODEL", str, config_logger, QA_MODEL)
     GEN_MODEL = get_env_var("NLP_GEN_MODEL", str, config_logger, GEN_MODEL)
@@ -135,8 +145,11 @@ try:
     ]
 
     env_variables: List[EnvVariable] = [
+<<<<<<< HEAD
+=======
         EnvVariable("LOG_MODE", LOG_MODE),
         
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
         EnvVariable("INPUT_STREAMS", INPUT_STREAMS),
         EnvVariable("USER_OUTPUT_STREAM", USER_OUTPUT_STREAM),
         EnvVariable("BACKGROUND_OUTPUT_STREAM", BACKGROUND_OUTPUT_STREAM),
@@ -148,7 +161,10 @@ try:
         EnvVariable("NER_MODEL", NER_MODEL),
         EnvVariable("EMBEDDING_MODEL", EMBEDDING_MODEL),
         EnvVariable("BIAS_POLITICAL_MODEL", BIAS_POLITICAL_MODEL),
+<<<<<<< HEAD
+=======
         EnvVariable("BIAS_SENTIMENT_MODEL", BIAS_SENTIMENT_MODEL),
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
         EnvVariable("QG_MODEL", QG_MODEL),
         EnvVariable("QA_MODEL", QA_MODEL),
         EnvVariable("GEN_MODEL", GEN_MODEL),

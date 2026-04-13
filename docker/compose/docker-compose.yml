@@ -37,14 +37,7 @@ services:
     networks:
       - sentinel-net
     command: >
-      redis-server 
-      --appendonly no 
-      --appendfsync everysec 
-      --save 60 1 
-      --timeout 0 
-      --tcp-keepalive 60 
-      --dbfilename "dump.rdb" 
-      --dir /data
+      redis-server  --appendonly no  --appendfsync everysec  --save 60 1  --timeout 0  --tcp-keepalive 60  --dbfilename "dump.rdb"  --dir /data
 
     <<: *common-env
     deploy:
@@ -198,7 +191,6 @@ services:
       - FAILURE_OUTPUT_STREAM=${WEB_SCRAPER_FAILURE_OUTPUT_STREAM:-failure:to.be.scraped}
       - GROUP_NAME=${WEB_SCRAPER_GROUP_NAME:-default}
       - CONSUMER_NAME=${WEB_SCRAPER_CONSUMER_NAME:-web-scraper-1}
-
       - MAX_SCREENSHOT_FOLDER_SIZE=${WEB_SCRAPER_MAX_SCREENSHOT_FOLDER_SIZE:-10000000}
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
@@ -325,7 +317,7 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
+              capabilities: [ gpu ]
   retrieval-layer-service-gpu:
     container_name: sentinel-retrieval-layer-service-container
     shm_size: '${RETRIEVAL_LAYER_SHM_SIZE:-2gb}'
@@ -368,7 +360,7 @@ services:
 
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
-      
+
       - HASH_STORE_NAMESPACE=${HASH_STORE_NAMESPACE}
 
     deploy:

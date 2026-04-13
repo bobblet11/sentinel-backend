@@ -60,7 +60,11 @@ os.environ.setdefault("TRANSFORMERS_CACHE", str(_NLP_TEST_CACHE / "hub"))
 # Use models that are confirmed present in the local cache (see .cache/huggingface/hub/).
 os.environ["NLP_EMBEDDING_MODEL"] = "sentence-transformers/all-mpnet-base-v2"
 os.environ["NLP_NER_MODEL"] = "dslim/bert-base-NER-uncased"
+<<<<<<< HEAD
+os.environ["NLP_BIAS_MODEL"] = "typeform/distilbert-base-uncased-mnli"
+=======
 os.environ["NLP_BIAS_MODEL"] = "premsa/political-bias-prediction-allsides-BERT"
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 
 # Stub required service-config env vars that NLP config.py demands at import time.
 # These are only used by the stream-based service runner, not by the components themselves.
@@ -164,7 +168,11 @@ def print_result(result: "NLPResult", stage_timings: Dict[str, float], errors: L
     print("-" * 70)
     if result.bias_profile:
         bp = result.bias_profile
+<<<<<<< HEAD
+        print(f"  score={bp.bias_score}  category={bp.bias_category}")
+=======
         print(f"  conf={bp.bias_analysis_confidence}  category={bp.bias_category}")
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
     else:
         print("  (none)")
 
