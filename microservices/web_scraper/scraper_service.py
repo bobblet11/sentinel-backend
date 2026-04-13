@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, List, Tuple
 from common.io.json_updater import JsonHandler
 from common.models.api.dtos.job import JobStage
 from common.models.api.redis_models import StreamMessage
+from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_webscraper
 from common.redis_client.consumer import RedisConsumer
 from common.redis_client.publisher import RedisPublisher
 from common.redis_client.publisher_router import RedisPublisherRouter
@@ -236,6 +237,9 @@ class ScraperService(ServiceTemplate):
             )
             
             message.add_timestamp(JobStage.WEB_SCRAPE_END)
+            
+            validate_after_webscraper(message)
+            self.logger.debug(get_pretty_print_stream_message(message))
             
             return message
         

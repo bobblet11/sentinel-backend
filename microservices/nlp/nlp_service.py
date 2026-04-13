@@ -2,6 +2,7 @@
 from typing import List
 from logging import getLogger
 import random
+from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_nlp
 import torch
 
 from common.models.api.redis_models import (
@@ -160,6 +161,9 @@ class NLPService(ServiceTemplate):
         #     result = message.create_nlp_result()
         #     result.sentences = sentences
         #     message.set_nlp_result(result)
+        
+        validate_after_nlp(message)
+        self.logger.debug(get_pretty_print_stream_message(message))
         return message
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from requests import Session
 
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
+from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_nlp, validate_after_retrieval
 from common.redis_client.hash_store import RedisHashStore
 from common.service.service_template import ServiceTemplate
 from common.models.api.redis_models import BiasProfile, Claim, Message, RetrievalResult, StreamMessage
@@ -474,7 +475,8 @@ class RetrievalService(ServiceTemplate):
                 self.logger.warning(f"A worker for message {original_message.redis_id} failed. See previous error logs for details.")
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
-        
+        validate_after_nlp(message)
+        self.logger.debug(get_pretty_print_stream_message(message))
         # one db session to make sure the entire thing is 1 transcation
         # just raise an exception and it will roll back everything
         with get_db_transaction() as db:
@@ -507,5 +509,7 @@ class RetrievalService(ServiceTemplate):
             #     self.hash_store.set(message.uid, retrieval_result.__dict__)
         
             message.set_retrieval_result(retrieval_result)
+            validate_after_retrieval(message)
+            self.logger.debug(get_pretty_print_stream_message(message))
             return message
                     

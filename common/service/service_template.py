@@ -91,7 +91,7 @@ class ServiceTemplate(ABC):
 	def _handle_failure(self, message: StreamMessage | Dict[str, Any], error: Exception):
 		"""Logs the error and publishes the message to the failure stream."""
 		is_stream_message:bool = isinstance(message, StreamMessage)
-		self.logger.debug(message)
+		# self.logger.debug(message)
 	
 		redis_id = message.redis_id if is_stream_message else message.get("redis_message_id", "N/A")
 		stream_name = message.stream if is_stream_message else message.get("stream", "N/A")
