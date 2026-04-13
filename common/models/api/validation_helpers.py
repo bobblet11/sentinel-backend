@@ -34,6 +34,10 @@ def validate_after_webscraper(stream_message: StreamMessage) -> None:
 
 
 def validate_after_nlp(stream_message: StreamMessage) -> None:
+    """
+    Validate that NLP stage has produced well-formed claims, entities, and bias profile.
+    Raises ValueError if any required field is missing or malformed.
+    """
     message = stream_message.data
     required = [
         "claims_in_article",
@@ -73,15 +77,16 @@ def validate_after_nlp(stream_message: StreamMessage) -> None:
         if entity.end_char is None:
             errors.append(f"Entity[{idx}] missing end_char")
 
-    # --- Bias Profile ---
+    # --- Bias Profile (renamed class) ---
     bp = payload.bias_profile
     if bp is None:
         errors.append("BiasProfile missing entirely")
     else:
+        # Adjusted to match your new dataclass `bias_score`
         if bp.bias_category is None:
             errors.append("BiasProfile missing bias_category")
-        if bp.bias_score is None:
-            errors.append("BiasProfile missing bias_score")
+        if bp.bias_analysis_confidence is None:
+            errors.append("BiasProfile missing bias_analysis_confidence")
         if bp.sentiment_category is None:
             errors.append("BiasProfile missing sentiment_category")
         if bp.sentiment_analysis_confidence is None:
@@ -105,46 +110,24 @@ def validate_after_retrieval(stream_message: StreamMessage) -> None:
 def get_pretty_print_message(message: Message, text_snippet_len: int = 10) -> str:
     """
     Pretty prints a Message object for inspection.
+    Uses Pydantic's model_dump for safe serialization.
     Long text/html fields are truncated to a snippet.
     """
-    def safe_dict(obj: Any) -> Any:
-        if hasattr(obj, "dict"):   # Pydantic BaseModel
-            return obj.dict()
-        if hasattr(obj, "__dict__"):  # Dataclass or custom class
-            return obj.__dict__
-        return obj
+    msg_dict = message.model_dump()
 
-    def snippet(value: str, length: int) -> str:
-        if not value:
-            return None
-        return value[:length] + ("..." if len(value) > length else "")
-
-    msg_dict = {
-        "Header": safe_dict(message.header),
-        "Payload": {
-            "article_url": message.payload.article_url,
-            "news_outlet": message.payload.news_outlet,
-            "title": message.payload.title,
-            "publish_date": message.payload.publish_date,
-            "author": message.payload.author,
-            "summary": message.payload.summary,
-            "parsed_text_snippet": snippet(message.payload.parsed_text, text_snippet_len),
-            "raw_html_snippet": snippet(message.payload.raw_html, text_snippet_len),
-            "claims_in_article": [safe_dict(c) for c in message.payload.claims_in_article] 
-                                 if message.payload.claims_in_article else [],
-            "entities_in_article": [safe_dict(e) for e in message.payload.entities_in_article] 
-                                   if message.payload.entities_in_article else [],
-            "bias_profile": safe_dict(message.payload.bias_profile) 
-                            if message.payload.bias_profile else None,
-            "retrieval": {
-                "save_data_result": message.payload.save_data_result,
-                "save_job_result": message.payload.save_job_result,
-                "matches": message.payload.matches,
-                "related_articles": message.payload.related_articles,
-            }
-        },
-        "StageTimestamps": [safe_dict(ts) for ts in message.stage_timestamps]
-    }
+    # Truncate long text/html fields
+    if msg_dict["payload"].get("parsed_text"):
+        msg_dict["payload"]["parsed_text_snippet"] = (
+            msg_dict["payload"]["parsed_text"][:text_snippet_len] + "..."
+            if len(msg_dict["payload"]["parsed_text"]) > text_snippet_len
+            else msg_dict["payload"]["parsed_text"]
+        )
+    if msg_dict["payload"].get("raw_html"):
+        msg_dict["payload"]["raw_html_snippet"] = (
+            msg_dict["payload"]["raw_html"][:text_snippet_len] + "..."
+            if len(msg_dict["payload"]["raw_html"]) > text_snippet_len
+            else msg_dict["payload"]["raw_html"]
+        )
 
     return json.dumps(msg_dict, indent=4, ensure_ascii=False)
 
@@ -152,47 +135,28 @@ def get_pretty_print_message(message: Message, text_snippet_len: int = 10) -> st
 def get_pretty_print_stream_message(stream_message: StreamMessage, snippet_len: int = 200) -> str:
     """
     Pretty prints a StreamMessage object for inspection.
+    Uses Pydantic's model_dump for safe serialization.
     Long text/html fields are truncated to a snippet.
     """
-    message = stream_message.data
+    msg_dict = stream_message.data.model_dump()
 
-    def safe_dict(obj: Any) -> Any:
-        if hasattr(obj, "dict"):
-            return obj.dict()
-        if hasattr(obj, "__dict__"):
-            return obj.__dict__
-        return obj
+    # Add stream metadata
+    msg_dict["Stream"] = stream_message.stream
+    msg_dict["RedisID"] = stream_message.redis_id
+    msg_dict["Priority"] = stream_message.priority
 
-    def snippet(value: str, length: int) -> str:
-        if not value:
-            return None
-        return value[:length] + ("..." if len(value) > length else "")
-
-    msg_dict = {
-        "Stream": stream_message.stream,
-        "RedisID": stream_message.redis_id,
-        "Priority": stream_message.priority,
-        "Header": safe_dict(message.header),
-        "Payload": {
-            "article_url": message.payload.article_url,
-            "news_outlet": message.payload.news_outlet,
-            "title": message.payload.title,
-            "publish_date": message.payload.publish_date,
-            "author": message.payload.author,
-            "summary": message.payload.summary,
-            "parsed_text_snippet": snippet(message.payload.parsed_text, snippet_len),
-            "raw_html_snippet": snippet(message.payload.raw_html, snippet_len),
-            "claims_in_article": [safe_dict(c) for c in message.payload.claims_in_article] or [],
-            "entities_in_article": [safe_dict(e) for e in message.payload.entities_in_article] or [],
-            "bias_profile": safe_dict(message.payload.bias_profile) if message.payload.bias_profile else None,
-            "retrieval": {
-                "save_data_result": message.payload.save_data_result,
-                "save_job_result": message.payload.save_job_result,
-                "matches": message.payload.matches,
-                "related_articles": message.payload.related_articles,
-            }
-        },
-        "StageTimestamps": [safe_dict(ts) for ts in message.stage_timestamps]
-    }
+    # Truncate long text/html fields
+    if msg_dict["payload"].get("parsed_text"):
+        msg_dict["payload"]["parsed_text_snippet"] = (
+            msg_dict["payload"]["parsed_text"][:snippet_len] + "..."
+            if len(msg_dict["payload"]["parsed_text"]) > snippet_len
+            else msg_dict["payload"]["parsed_text"]
+        )
+    if msg_dict["payload"].get("raw_html"):
+        msg_dict["payload"]["raw_html_snippet"] = (
+            msg_dict["payload"]["raw_html"][:snippet_len] + "..."
+            if len(msg_dict["payload"]["raw_html"]) > snippet_len
+            else msg_dict["payload"]["raw_html"]
+        )
 
     return json.dumps(msg_dict, indent=4, ensure_ascii=False)

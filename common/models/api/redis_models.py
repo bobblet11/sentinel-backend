@@ -34,6 +34,14 @@ In redis, each message looks like this
 
 #redis message wraps a message/job object
 @dataclass
+class BiasProfile:
+    """Result of political and emotional bias analysis."""
+    bias_category: str  # e.g., "Left", "Center", "Right"
+    bias_analysis_confidence: float
+    sentiment_category: Optional[str] = None
+    sentiment_analysis_confidence: float = 0.0
+
+@dataclass
 class NLPOptions:
     """Toggles and thresholds to control the pipeline's execution."""
     enable_bias_detection: bool = True
@@ -144,7 +152,7 @@ class Claim:
 
 
 @dataclass
-class BiasProfile:
+class bias_score:
     """Result of political and emotional bias analysis."""
     bias_category:Optional[str] # e.g., "Left", "Center", "Right"
     bias_analysis_confidence:Optional[float]
