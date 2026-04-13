@@ -377,6 +377,7 @@ class RetrievalService(ServiceTemplate):
             if IS_BENCHMARK:
                 payload = processed_message.data.model_dump(mode='json')
                 new_redis_id = self.success_publish_router.publish_one(payload)
+                self.logger.debug(f" [BENCHMARK] Successfully published Msg {message.redis_id} -> {new_redis_id} to stream")
                 return message.redis_id, new_redis_id 
             
             payload = processed_message.retrieval_results or {}
@@ -398,13 +399,7 @@ class RetrievalService(ServiceTemplate):
                     len(matches),
                     len(related_articles)
                 )
-            else:
-                self.uid_store.add_one(str(message.uid))
-                self.logger.info(
-                    "Stored retrieval result for background job_uid=%s:\n",
-                    message.uid
-                )
-
+            self.uid_store.add_one(str(message.uid))
             if self.is_cut_and_paste_mode:
                 self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
             else:
@@ -432,7 +427,7 @@ class RetrievalService(ServiceTemplate):
                 if IS_BENCHMARK:
                     payload = processed_message.data.model_dump(mode='json')
                     new_redis_id = self.success_publish_router.publish_one(payload)
-                    self.logger.debug(f"Successfully published Msg {message.redis_id} -> {new_redis_id} in hashset")
+                    self.logger.debug(f" [BENCHMARK] Successfully published Msg {message.redis_id} -> {new_redis_id} to stream")
                     ack_count+=1
                 
                 payload = processed_message.retrieval_results or {}
@@ -453,14 +448,9 @@ class RetrievalService(ServiceTemplate):
                         list(payload.get("save_job_result", {}).keys()) if payload.get("save_job_result") else [],
                         len(matches),
                         len(related_articles)
-                    )
-                else:
-                    self.uid_store.add_one(str(message.uid))
-                    self.logger.info(
-                        "Stored retrieval result for background job_uid=%s:\n",
-                        message.uid
-                    )
-                
+                    )                    
+                    
+                self.uid_store.add_one(str(message.uid))
                 if self.is_cut_and_paste_mode:
                     self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
                 else:

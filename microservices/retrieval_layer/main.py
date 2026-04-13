@@ -25,8 +25,8 @@ CONTAINER_NAME = "retrieval-layer"
 
 if __name__ == "__main__":
     setup_logging(level=LOG_MODE, container_name=CONTAINER_NAME)
-    print([BENCHMARK_OUTPUT_STREAM,BENCHMARK_OUTPUT_STREAM] if IS_BENCHMARK else [])
-    
+    print(IS_BENCHMARK)
+    print(BENCHMARK_OUTPUT_STREAM)
     config = ServiceConfig(
         service_name=SERVICE_NAME,
                 
@@ -45,9 +45,8 @@ if __name__ == "__main__":
         batch_size=BATCH_SIZE,
         is_cut_and_paste_mode=True,
         retry_failure_mode=RETRY_FAILURE_MODE
-        
     )
-
+    print(config.output_streams)
     ensure_schema_compatibility()
     retrieval_service = RetrievalService(config)
 
