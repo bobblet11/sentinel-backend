@@ -97,7 +97,7 @@ class ServiceTemplate(ABC):
 		stream_name = message.stream if is_stream_message else message.get("stream", "N/A")
 		self.logger.error(f"Failed to process message {redis_id}: {error}")
 		
-		payload = message.data.model_dump() if is_stream_message else message.get("data", {})
+		payload = message.data.model_dump(mode='json') if is_stream_message else message.get("data", {})
   		# Acknowledge the original message before publishing to failure queue
 		self.fail_publisher.publish_one(payload)	
 
@@ -151,7 +151,7 @@ class ServiceTemplate(ABC):
 		"""Worker for concurrent mode. Processes, then publishes."""
 		try:
 			processed_message:StreamMessage = self._process_message(message)
-			payload = processed_message.data.model_dump()
+			payload = processed_message.data.model_dump(mode='json')
 			new_redis_id = self.success_publish_router.publish_one(payload)
    
 			if not new_redis_id:
@@ -180,8 +180,8 @@ class ServiceTemplate(ABC):
 		for message in stream_messages:
 			try:
 				processed_message = self._process_message(message)
-				payload = processed_message.data.model_dump()
-            
+				payload = processed_message.data.model_dump(mode='json')
+
 				# Store the mapping
 				payload_to_message_map[id(payload)] = message 
 				payloads_to_publish.append(payload)
