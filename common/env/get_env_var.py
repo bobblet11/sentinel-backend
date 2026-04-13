@@ -9,8 +9,8 @@ T = TypeVar("T")
 def get_env_var(key: str, cast_to: Type[T], logger: Logger, default: Any = None) -> T:
 	value = os.getenv(key)
 
-	# 1. Handle Missing Variables
-	if value is None:
+	# 1. Handle Missing or Empty Variables
+	if not value:
 		if default is not None:
 			return default
 		logger.error(f"FATAL: {key} environment variable is not set. Exiting.")
