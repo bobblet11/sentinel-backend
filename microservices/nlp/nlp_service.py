@@ -2,6 +2,7 @@
 from typing import List
 from logging import getLogger
 import random
+from common.models.api.dtos.job import JobType
 from common.models.api.validation_helpers import get_pretty_print_stream_message, validate_after_nlp
 import torch
 
@@ -167,8 +168,8 @@ class NLPService(ServiceTemplate):
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
         try:
-            if message.data.header.type == "user":
-                logger.info("Processing user article: %s", message.data.payload.link if hasattr(message.data, 'payload') else "unknown")
+            if message.type == JobType.USER:
+                logger.info("Processing user article: %s", message.link)
 
             if DUMMY_NLP_MODE:
                 dummy_result = _build_dummy_result()
