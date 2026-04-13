@@ -76,7 +76,7 @@ SENTENCE_EXTRACT_TOP_K = 15
 # component-only imports (e.g. in tests) do not call exit(1) on missing vars.
 # =============================================================================
 try:
-    LOG_MODE: str = get_env_var("LOG_MODE",str, config_logger)
+    LOG_MODE: int = get_env_var("LOG_MODE",int, config_logger)
     
     INPUT_STREAMS: List[str] = [
         x.strip(" ,")
