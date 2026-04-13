@@ -210,11 +210,9 @@ class ClaimExtraction(ArticleProcessor):
             sentences = self.checkworthiness.run(
                 article, message, options, sentences
             )
-            # Clear claims built by CheckWorthinessFilter; Stage 7 rebuilds them.
-            
-            result = message.create_nlp_result()
-            result.claims_in_article = []
-            message.set_nlp_result(result)
+            # Clear claims built by CheckWorthinessFilter; Stage 7 rebuilds them
+            # after embeddings and entity mapping are complete.
+            message.data.payload.claims_in_article = []
             message.add_timestamp(JobStage.CHECK_WORTHY_OUT)
         except Exception as e:
             logger.error(
@@ -269,8 +267,8 @@ class ClaimExtraction(ArticleProcessor):
                 fallback_limit,
             )
 
-        result = message.create_nlp_result()
-        result.claims_in_article = [
+        # Write directly to payload — set_nlp_result won't overwrite a non-empty list.
+        message.data.payload.claims_in_article = [
             Claim(
                 confidence=s.confidence,
                 source_sentence_indices=[s.index],
@@ -280,10 +278,9 @@ class ClaimExtraction(ArticleProcessor):
             )
             for s in selected_sentences
         ]
-        message.set_nlp_result(result)
         logger.info(
             "[Stage 7 | Sentence→Claim] %d claims in %.2fs",
-            len(result.claims_in_article),
+            len(message.data.payload.claims_in_article),
             time.time() - t,
         )
         message.add_timestamp(JobStage.CONVERT_TO_CLAIM_OUT)
@@ -329,8 +326,8 @@ class ClaimExtraction(ArticleProcessor):
             "--- ClaimExtraction Pipeline complete in %.2fs | "
             "claims=%d entities=%d ---",
             time.time() - pipeline_start,
-            len(result.claims_in_article),
-            len(result.entities_in_article),
+            len(message.data.payload.claims_in_article),
+            len(message.data.payload.entities_in_article),
         )
         
         message.add_timestamp(JobStage.NLP_END)
