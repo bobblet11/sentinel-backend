@@ -158,5 +158,28 @@ def get_pretty_print_stream_message(stream_message: StreamMessage, snippet_len: 
             if len(msg_dict["payload"]["raw_html"]) > snippet_len
             else msg_dict["payload"]["raw_html"]
         )
+            
+    if msg_dict["payload"].get("claims_in_article"):
+        truncated_claims = []
+        for claim in msg_dict["payload"]["claims_in_article"]:
+            # claims are dicts after model_dump
+            truncated_claims.append({
+                "confidence": claim.get("confidence"),
+                "source_sentence_indices": (
+                    str(claim.get("source_sentence_indices"))[:snippet_len] +
+                    ("..." if len(str(claim.get("source_sentence_indices"))) > snippet_len else "")
+                ),
+                "decontextualised_claim_text": (
+                    str(claim.get("decontextualised_claim_text"))[:snippet_len] +
+                    ("..." if len(str(claim.get("decontextualised_claim_text"))) > snippet_len else "")
+                ),
+                "decontextualised_claim_embedding": f"[{len(claim.get('decontextualised_claim_embedding') or [])} dims]",
+                "NER_entities": (
+                    str(claim.get("NER_entities"))[:snippet_len] +
+                    ("..." if len(str(claim.get("NER_entities"))) > snippet_len else "")
+                )
+            })
+        msg_dict["payload"]["claims_in_article"] = truncated_claims
+
 
     return json.dumps(msg_dict, indent=4, ensure_ascii=False)
