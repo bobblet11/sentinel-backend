@@ -116,11 +116,8 @@ class UserAgentManager:
         if getattr(self, "_initialized", False):
             return
         self.logger:Logger = getLogger("user_agent_manager")
-        self.logger.info("Initialising UserAgentManager...")
-        
         self.min_browser_version=MIN_CHROME_BROWSER_VERSION
         self.max_browser_version=MAX_CHROME_BROWSER_VERSION
-        self.logger.info(f"Initialization complete!")
     
     def set_max_browser_version(self, major_chrome_version:int) -> None:
         self.max_browser_version = major_chrome_version

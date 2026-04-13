@@ -18,17 +18,11 @@ def print_env(
 	logger: Logger
 ) -> None:
 	for variable in config.environment_variables:
-		logger.info(f"{variable.name} = {variable.value}\n")
+		logger.info(f"{variable.name} = {variable.value}")
 
 	if config.input_stream:
-		logger.info("-" * 9)
-		logger.info(config.input_stream)
-		logger.info("-" * 9)
-
-	logger.info("    |    \n    V    ")
+		logger.info(f"input_stream: {config.input_stream}")
 
 	if config.output_stream:
-		logger.info("-" * 9)
-		logger.info(config.output_stream)
-		logger.info("-" * 9)
+		logger.info(f"output_stream: {config.output_stream}")
 

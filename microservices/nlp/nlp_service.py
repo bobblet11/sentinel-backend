@@ -169,7 +169,7 @@ class NLPService(ServiceTemplate):
     def _process_message(self, message: StreamMessage) -> StreamMessage:
         try:
             if message.data.header.type == "user":
-                logger.info("Received user message for NLP: %s", message.data.payload)
+                logger.info("Processing user article: %s", message.data.payload.link if hasattr(message.data, 'payload') else "unknown")
 
             if DUMMY_NLP_MODE:
                 dummy_result = _build_dummy_result()
