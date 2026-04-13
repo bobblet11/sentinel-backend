@@ -43,7 +43,7 @@ OUTLET_PATTERNS = {
     r"(euronews\.com|www\.euronews\.com)": "Euronews",
     r"(abcnews\.go\.com|abcnews\.com)": "ABC",
     r"(cbsnews\.com|www\.cbsnews\.com)": "CBS",
-    r"(nbcnews\.com|www\.nbcnews\.com)": "NBC",
+    r"(nbcnews\.com|www\.nbcnews\.com|feeds\.nbcnews\.com)": "NBC",
     r"(npr\.org|www\.npr\.org)": "NPR",
     r"(foxnews\.com|www\.foxnews\.com)": "Fox News",
     r"(reuters\.com|www\.reuters\.com)": "Reuters",
@@ -348,20 +348,6 @@ assert len(all_jobs) == len(article_urls_seen)
 # print(f"[INFO] Clearing all jobs from merged")
 # merged.delete(MERGED_STREAM_KEY)
 
-<<<<<<< HEAD
-print(f"[INFO] Writing {len(all_jobs)} jobs and {len(article_urls_seen)} URLs to merged Redis...")
-for job in all_jobs:
-	payload: Message = job.data.model_dump()
-	payload: Dict[str, Any] =  {"payload": json.dumps(payload)}
-	merged.xadd(MERGED_STREAM_KEY, payload, approximate=True)
- 
-print(f"[INFO] Stream write complete")
-merged.sadd(MERGED_SET_KEY, *article_urls_seen or [])
-print(f"[INFO] Set write complete")
-
-
-
-=======
 BATCH_SIZE = 500
 
 print(f"[INFO] Writing {len(all_jobs)} jobs and {len(article_urls_seen)} URLs to merged Redis...")
@@ -398,7 +384,6 @@ for i in range(0, len(urls), BATCH_SIZE):
     print(f"[INFO] Flushed {count} URLs so far...")
 print(f"[INFO] Set write complete")
 
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 print("[INFO] Running post-merge validation...")
 set_len = merged.scard(MERGED_SET_KEY)
 stream_len = merged.xlen(MERGED_STREAM_KEY)
@@ -414,19 +399,11 @@ if stream_len != len(all_jobs):
     raise AssertionError(f"Stream length mismatch: {stream_len} vs {len(all_jobs)}")
 
 # Check every job URL is in the set
-<<<<<<< HEAD
-for job in all_jobs:
-	url = job.data.payload.article_url
-	if not merged.sismember(MERGED_SET_KEY, url):
-		print(f"[ERROR] URL {url} missing from {MERGED_SET_KEY}")
-		raise AssertionError(f"URL {url} missing from {MERGED_SET_KEY}")
-=======
 # for job in all_jobs:
 # 	url = job.data.payload.article_url
 # 	if not merged.sismember(MERGED_SET_KEY, url):
 # 		print(f"[ERROR] URL {url} missing from {MERGED_SET_KEY}")
 # 		raise AssertionError(f"URL {url} missing from {MERGED_SET_KEY}")
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 
 
 assert merged.scard(MERGED_SET_KEY) == len(article_urls_seen)

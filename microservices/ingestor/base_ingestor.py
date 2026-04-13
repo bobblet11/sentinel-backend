@@ -20,7 +20,7 @@ OUTLET_PATTERNS = {
     r"(euronews\.com|www\.euronews\.com)": "Euronews",
     r"(abcnews\.go\.com|abcnews\.com)": "ABC",
     r"(cbsnews\.com|www\.cbsnews\.com)": "CBS",
-    r"(nbcnews\.com|www\.nbcnews\.com)": "NBC",
+    r"(nbcnews\.com|www\.nbcnews\.com|feeds\.nbcnews\.com)": "NBC",
     r"(npr\.org|www\.npr\.org)": "NPR",
     r"(foxnews\.com|www\.foxnews\.com)": "Fox News",
     r"(reuters\.com|www\.reuters\.com)": "Reuters",
@@ -134,6 +134,8 @@ class BaseIngestor:
         for article in unseen_articles:
             matched_outlet = match_outlet_name(article.link or None)
             news_outlet = matched_outlet or article.source
+            if news_outlet and news_outlet.startswith("http"):
+                news_outlet = "UNKNOWN"
             payload = MessagePayload(article_url=article.link, news_outlet=news_outlet, title=article.title, summary=article.summary)
             job_uid = hashlib.md5(article.link.encode()).hexdigest()[:36]
             message = Message(
