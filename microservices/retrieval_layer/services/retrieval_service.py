@@ -418,42 +418,25 @@ class RetrievalService(ServiceTemplate):
                 self.logger.warning(f"A worker for message {original_message.redis_id} failed. See previous error logs for details.")
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
-        
-        # one db session to make sure the entire thing is 1 transcation
+        # one db session to make sure the entire thing is 1 transaction
         # just raise an exception and it will roll back everything
-        
-        self.logger.info("=== PROCESSING MESSAGE uid=%s type=%s ===", message.header.uid, message.type)
-        self.logger.info("Message fields: link=%s title=%s outlet=%s publish_date=%s",
-            message.link, message.title, message.news_outlet_name, message.publish_date)
-        self.logger.info("Claims count: %s", len(message.all_claims or []))
-        self.logger.info("Bias profile: %s", message.bias_profile)
-        
         with get_db_transaction() as db:
-            self.logger.info("--- STEP 1: Saving data to postgres ---")
             message.add_timestamp(JobStage.SAVE_DATA_IN)
             save_data_result = self._save_data_into_postgres(db, message)
             message.add_timestamp(JobStage.SAVE_DATA_OUT)
-            self.logger.info("--- STEP 1 COMPLETE: save_data_result=%s ---", save_data_result)
 
             if message.type == JobType.BACKGROUND:
-                self.logger.info("BACKGROUND JOB, end of line")
+                self.logger.info("Background job complete uid=%s", message.header.uid)
                 return message
-            
-            #continue to retrieval
-            # retrieval stuff is only for user jobs
+
             original_article_id = save_data_result.get("article_entry_id") or 0
-            self.logger.info("--- STEP 2: Retrieving evidence for article_id=%s ---", original_article_id)
             message.add_timestamp(JobStage.RETRIEVE_EVIDENCE_IN)
             claim_evidence_matches, related_articles = self._retrieve_evidence(db, message, original_article_id)
             message.add_timestamp(JobStage.RETRIEVE_EVIDENCE_OUT)
-            self.logger.info("--- STEP 2 COMPLETE: matches=%s related_articles=%s ---", len(claim_evidence_matches), len(related_articles))
-            
-            self.logger.info("--- STEP 3: Saving job to postgres ---")
+
             message.add_timestamp(JobStage.UPDATE_JOB_IN)
             save_job_result = self._save_job_into_postgres(db, message)
             message.add_timestamp(JobStage.UPDATE_JOB_OUT)
-            self.logger.info("--- STEP 3 COMPLETE: save_job_result=%s ---", save_job_result)
-
 
             retrieval_result = RetrievalResult(
                 save_data_result,
@@ -461,11 +444,7 @@ class RetrievalService(ServiceTemplate):
                 claim_evidence_matches,
                 related_articles
             )
-            # hashstore inside transaction block — if this fails, DB rolls back too
-            # if message.type == JobType.USER:
-            #     self.hash_store.set(message.uid, retrieval_result.__dict__)
-        
+
             message.set_retrieval_result(retrieval_result)
-            self.logger.info("=== MESSAGE COMPLETE uid=%s ===", message.header.uid)
             return message
                     
