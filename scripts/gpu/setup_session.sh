@@ -19,7 +19,7 @@ ssh $PORTAL_ID@$GATEWAY << 'EOF'
 mkdir -p ~/.jupyter
 cat > ~/.jupyter/jupyter_server_config.py << 'CONFIG'
 c = get_config()
-c.ServerApp.token = 'your-jupyter-token-here'
+c.ServerApp.token = ''
 c.ServerApp.password = ''
 c.ServerApp.open_browser = False
 CONFIG

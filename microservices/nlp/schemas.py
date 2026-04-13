@@ -49,7 +49,6 @@ class SentenceScore:
 class BiasProfile:
     """Result of political and emotional bias analysis."""
     bias_category: str  # e.g., "Left", "Center", "Right"
-    bias_score: float
     bias_analysis_confidence: float
     sentiment_category: Optional[str] = None
     sentiment_analysis_confidence: float = 0.0

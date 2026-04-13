@@ -241,7 +241,6 @@ def main() -> None:
                 "source": article.source or path.stem,
                 "title": article.title[:55] + "..." if len(article.title) > 55 else article.title,
                 "bias_category": bias_profile.bias_category,
-                "bias_score": bias_profile.bias_score,
                 "bias_confidence": bias_profile.bias_analysis_confidence,
                 "sentiment_category": bias_profile.sentiment_category,
                 "sentiment_confidence": bias_profile.sentiment_analysis_confidence,
@@ -254,7 +253,7 @@ def main() -> None:
 
     # ── Print results table ──────────────────────────────────────────────────
     print(SEP)
-    print(f"{'FILE':<22} {'SOURCE':<15} {'LEAN':<10} {'SCORE':>6}  {'BIAS BAR':<22} {'SENTIMENT':<12} {'S.CONF':>6}  {'TIME':>5}")
+    print(f"{'FILE':<22} {'SOURCE':<15} {'LEAN':<10} {'CONF':>6}  {'BIAS BAR':<22} {'SENTIMENT':<12} {'S.CONF':>6}  {'TIME':>5}")
     print(SEP)
 
     for r in results:
@@ -262,8 +261,8 @@ def main() -> None:
             f"{r['file']:<22} "
             f"{r['source'][:14]:<15} "
             f"{lean_label(r['bias_category']):<10} "
-            f"{r['bias_score']:>6.3f}  "
-            f"{bias_bar(r['bias_score']):<22} "
+            f"{r['bias_confidence']:>6.3f}  "
+            f"{bias_bar(r['bias_confidence']):<22} "
             f"{r['sentiment_category']:<12} "
             f"{r['sentiment_confidence']:>6.3f}  "
             f"{r['elapsed']:>4.1f}s"
@@ -285,7 +284,7 @@ def main() -> None:
             print(f"\n  File    : {r['file']}")
             print(f"  Source  : {r['source']}")
             print(f"  Title   : {r['title']}")
-            print(f"  Lean    : {lean_label(r['bias_category'])}  (score={r['bias_score']:.4f}, conf={r['bias_confidence']:.4f})")
+            print(f"  Lean    : {lean_label(r['bias_category'])}  (conf={r['bias_confidence']:.4f})")
             print(f"  Tone    : {r['sentiment_category']}  (conf={r['sentiment_confidence']:.4f})")
         print(SEP)
 

@@ -52,7 +52,6 @@ def get_or_create_all_entities(db: Session, entities: List[Entity]) -> List[Enti
 def create_sentiment(db: Session, sentiment_dto: CreateOrModifySentiment) -> SentimentAnalysis:
     new_sentiment_entry = SentimentAnalysis(
         bias_category=sentiment_dto.bias_category,
-        bias_score=sentiment_dto.bias_score,
         bias_analysis_confidence=sentiment_dto.bias_analysis_confidence,
         sentiment_category=sentiment_dto.sentiment_category,
         sentiment_analysis_confidence=sentiment_dto.sentiment_analysis_confidence,

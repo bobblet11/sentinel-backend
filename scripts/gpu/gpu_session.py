@@ -55,7 +55,7 @@ def launch_gpu_jupyter(portal_id="farhan", gateway="gpu2gate1.cs.hku.hk"):
 
         config_cmd = """cat > ~/.jupyter/jupyter_server_config.py << 'EOF'
 c = get_config()
-c.ServerApp.token = 'your-jupyter-token-here'
+c.ServerApp.token = ''
 c.ServerApp.password = ''
 c.ServerApp.open_browser = False
 EOF"""

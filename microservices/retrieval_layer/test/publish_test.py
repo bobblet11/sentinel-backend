@@ -47,7 +47,6 @@ full_message = {
         "entities_in_article": [],
         "bias_profile": {
             "bias_category": "center",
-            "bias_score": 0.0,
             "bias_analysis_confidence": 0.9,
             "sentiment_category": "neutral",
             "sentiment_analysis_confidence": 0.95

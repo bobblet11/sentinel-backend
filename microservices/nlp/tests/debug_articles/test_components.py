@@ -240,7 +240,6 @@ def print_bias(result: NLPResult, sentences: list) -> None:
         print("  No bias profile generated.")
         return
     print(f"  bias_category:               {bp.bias_category}")
-    print(f"  bias_score:                  {bp.bias_score:.4f}")
     print(f"  bias_analysis_confidence:    {bp.bias_analysis_confidence:.4f}")
     print(f"  sentiment_category:          {bp.sentiment_category}")
     print(f"  sentiment_analysis_confidence: {bp.sentiment_analysis_confidence:.4f}")

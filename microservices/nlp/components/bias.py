@@ -109,7 +109,6 @@ class BiasDetector(ArticleProcessor):
         """Returns a zero-confidence neutral bias profile for graceful degradation."""
         return BiasProfile(
             bias_category="Center",
-            bias_score=0.0,
             bias_analysis_confidence=0.0,
             sentiment_category="Neutral",
             sentiment_analysis_confidence=0.0,
@@ -165,18 +164,15 @@ class BiasDetector(ArticleProcessor):
             emotional_tone = "Neutral"
 
         # ── Commit Results ──────────────────────────────────────────────────────
-        # Pick the top score from the political bias scores dict as bias_score
-        bias_score = max(scores.values()) if scores else 0.0
         sentiment_confidence = 0.0
         try:
             if tone_out:
                 sentiment_confidence = float(tone_out[0]["score"])
         except (KeyError, IndexError, TypeError):
             pass
-        
+
         result.bias_profile = BiasProfile(
             bias_category=political_bias,
-            bias_score=bias_score,
             bias_analysis_confidence=confidence,
             sentiment_category=emotional_tone,
             sentiment_analysis_confidence=sentiment_confidence,

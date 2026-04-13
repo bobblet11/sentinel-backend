@@ -71,7 +71,6 @@ def _build_dummy_result() -> NLPResult:
     )
     bias_profile = BiasProfile(
         bias_category="center",
-        bias_score=0.7,
         bias_analysis_confidence=0.7,
         sentiment_category="neutral",
         sentiment_analysis_confidence=0.8,

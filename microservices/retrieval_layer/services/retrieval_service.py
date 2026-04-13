@@ -129,9 +129,14 @@ class RetrievalService(ServiceTemplate):
             )
         
         bias_profile = message.bias_profile
-        
+
         article_dto = CreateOrModifyArticle(message.link, message.title, message.text, message.html, message.publish_date, message.data.payload.author)
-        sentiment_dto = CreateOrModifySentiment(bias_profile.bias_category, bias_profile.bias_score, bias_profile.bias_analysis_confidence, bias_profile.sentiment_category, bias_profile.sentiment_analysis_confidence)
+        sentiment_dto = CreateOrModifySentiment(
+            bias_profile.bias_category if bias_profile else None,
+            bias_profile.bias_analysis_confidence if bias_profile else None,
+            bias_profile.sentiment_category if bias_profile else None,
+            bias_profile.sentiment_analysis_confidence if bias_profile else None,
+        )
         outlet_dto = CreateOrModifyOutlet(message.news_outlet_name)
         
         article_entry = get_or_create_article(db, article_dto, sentiment_dto, outlet_dto)

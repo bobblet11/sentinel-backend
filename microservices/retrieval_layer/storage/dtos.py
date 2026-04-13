@@ -21,7 +21,6 @@ class CreateOrModifyOutlet:
 @dataclass
 class CreateOrModifySentiment:
     bias_category: Optional[str] = None
-    bias_score: Optional[float] = None
     bias_analysis_confidence: Optional[float] = None
     sentiment_category: Optional[str] = None
     sentiment_analysis_confidence: Optional[float] = None

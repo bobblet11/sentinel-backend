@@ -7,7 +7,7 @@ from typing import List
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
 from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, Claim, NLPOptions, NLPResult, SentenceScore, StreamMessage
+from common.models.api.redis_models import Article, BiasProfile, Claim, NLPOptions, NLPResult, SentenceScore, StreamMessage
 
 # Pipeline stage imports
 from microservices.nlp.components.preprocess import Preprocessor
@@ -141,6 +141,13 @@ class ClaimExtraction(ArticleProcessor):
             logger.warning(
                 "ClaimExtraction: No sentences after preprocessing — aborting."
             )
+            if not message.data.payload.bias_profile:
+                message.data.payload.bias_profile = BiasProfile(
+                    bias_category="Center",
+                    bias_analysis_confidence=0.0,
+                    sentiment_category="Neutral",
+                    sentiment_analysis_confidence=0.0,
+                )
             return
 
         # ── Stage 2 — Named Entity Recognition ──────────────────────────────
@@ -302,7 +309,15 @@ class ClaimExtraction(ArticleProcessor):
                     time.time() - t,
                     e,
                 )
-                # Non-critical — do not re-raise; claims are already committed
+                # Non-critical — do not re-raise; claims are already committed.
+                # Write a neutral fallback so downstream never sees None.
+                if not message.data.payload.bias_profile:
+                    message.data.payload.bias_profile = BiasProfile(
+                        bias_category="Center",
+                        bias_analysis_confidence=0.0,
+                        sentiment_category="Neutral",
+                        sentiment_analysis_confidence=0.0,
+                    )
 
         # Expose processed sentences so set_nlp_result() can copy them
         # to the MessagePayload for downstream services.

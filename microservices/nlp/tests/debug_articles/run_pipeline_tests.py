@@ -164,7 +164,7 @@ def print_result(result: "NLPResult", stage_timings: Dict[str, float], errors: L
     print("-" * 70)
     if result.bias_profile:
         bp = result.bias_profile
-        print(f"  score={bp.bias_score}  category={bp.bias_category}")
+        print(f"  conf={bp.bias_analysis_confidence}  category={bp.bias_category}")
     else:
         print("  (none)")
 

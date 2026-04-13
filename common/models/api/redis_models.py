@@ -147,7 +147,6 @@ class Claim:
 class BiasProfile:
     """Result of political and emotional bias analysis."""
     bias_category:Optional[str] # e.g., "Left", "Center", "Right"
-    bias_score:Optional[float]
     bias_analysis_confidence:Optional[float]
     sentiment_category:Optional[str]
     sentiment_analysis_confidence:Optional[float]
