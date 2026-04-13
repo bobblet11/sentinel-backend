@@ -10,6 +10,8 @@ load_dotenv()
 config_logger: Logger = getLogger("config")
 
 # Service Configuration
+LOG_MODE: int = get_env_var("LOG_MODE", int, config_logger, default=10)
+
 # Postgres Connection Configuration
 POSTGRES_HOST: str = get_env_var("POSTGRES_HOST", str, config_logger)
 POSTGRES_PORT: int = get_env_var("POSTGRES_PORT", int, config_logger)
@@ -71,6 +73,8 @@ HASH_STORE_NAMESPACE: str = get_env_var("HASH_STORE_NAMESPACE",str, config_logge
 TEST_MODE: bool = False
 
 env_variables: List[EnvVariable] = [
+    EnvVariable("LOG_MODE", LOG_MODE),
+    
     EnvVariable("POSTGRES_HOST", POSTGRES_HOST),
     EnvVariable("POSTGRES_PORT", POSTGRES_PORT),
     EnvVariable("POSTGRES_DB", POSTGRES_DB),

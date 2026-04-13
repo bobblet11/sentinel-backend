@@ -4,6 +4,7 @@ import logging
 
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
 from common.models.api.redis_models import Article, Message, MessageHeader, MessagePayload, MessageTimestamp, add_timestamp_to_message
+from common.models.api.validation_helpers import get_pretty_print_message, validate_after_ingestor
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 from common.io.json_updater import JsonHandler
@@ -57,7 +58,7 @@ class BaseIngestor:
         self.stats_json_handler = JsonHandler(filename="stats.json")
 
 
-    def _log_stats(self, newly_seen_articles:int, non_new_articles:int, total_deduplicated_articles_processed:int) -> None:
+    def _log_stats(self, newly_seen_articles:int =0, non_new_articles:int=0, total_deduplicated_articles_processed:int=0) -> None:
         file_data = self.stats_json_handler.read_json()
 
         # Step 1: Generate key for our json file
@@ -147,6 +148,10 @@ class BaseIngestor:
                 stage_timestamps=[]
             )
             add_timestamp_to_message(message=message, stage_name=JobStage.INGESTED)
+            
+            validate_after_ingestor(message)
+            self.logger.debug(get_pretty_print_message(message))
+            
             messages_to_publish.append(message.model_dump())
         if len(messages_to_publish) == 0:
             self.logger.info("--- Ingestion cycle finished. No messages to publish. ---\n\n")

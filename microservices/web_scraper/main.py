@@ -4,7 +4,6 @@ from common.io.logging import setup_logging
 from common.models.api.dtos.job import JobType
 from common.redis_client.prioritised_consumer_combiner import BlockPrioritisationLevel
 from common.service.service_template import ServiceConfig
-from microservices.web_scraper.config import BACKGROUND_OUTPUT_STREAM, USER_OUTPUT_STREAM
 from microservices.web_scraper.scraper_service import ScraperService
 from logging import Logger, getLogger, DEBUG
 
@@ -24,7 +23,7 @@ SERVICE_NAME="scraper"
 CONTAINER_NAME="web_scraper"
 
 if __name__ == "__main__":
-    setup_logging(level=logging.INFO, container_name=CONTAINER_NAME)
+    setup_logging(level=LOG_MODE, container_name=CONTAINER_NAME)
 
     config = ServiceConfig(
         service_name=SERVICE_NAME, 

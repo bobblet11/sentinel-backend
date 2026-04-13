@@ -11,10 +11,13 @@ MAX_INGESTOR_WORKERS: int = get_env_var("MAX_INGESTOR_WORKERS",int, config_logge
 REDIS_DUPLICATE_FILTER_KEY: str = get_env_var("REDIS_DUPLICATE_FILTER_KEY",str, config_logger)
 OUTPUT_STREAM: str = get_env_var("OUTPUT_STREAM",str, config_logger)
 
+LOG_MODE: int = get_env_var("LOG_MODE",int, config_logger)
+
 env_variables: List[EnvVariable] = [
     EnvVariable("MAX_INGESTOR_WORKERS", MAX_INGESTOR_WORKERS), 
     EnvVariable("OUTPUT_STREAM", OUTPUT_STREAM), 
-    EnvVariable("REDIS_DUPLICATE_FILTER_KEY", REDIS_DUPLICATE_FILTER_KEY)
+    EnvVariable("REDIS_DUPLICATE_FILTER_KEY", REDIS_DUPLICATE_FILTER_KEY),
+    EnvVariable("LOG_MODE", LOG_MODE)
 ]
 
 input_sources:str = "RSS FEEDS"

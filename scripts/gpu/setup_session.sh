@@ -19,7 +19,7 @@ ssh $PORTAL_ID@$GATEWAY << 'EOF'
 mkdir -p ~/.jupyter
 cat > ~/.jupyter/jupyter_server_config.py << 'CONFIG'
 c = get_config()
-c.ServerApp.token = 'my-fixed-token-12345'
+c.ServerApp.token = ''
 c.ServerApp.password = ''
 c.ServerApp.open_browser = False
 CONFIG
@@ -64,7 +64,7 @@ echo "In a NEW terminal, run:"
 echo "  ssh -L 8888:localhost:8888 farhan@\$GPU_IP"
 echo ""
 echo "Then open in browser:"
-echo "  http://localhost:8888/lab?token=my-fixed-token-12345"
+echo "  http://localhost:8888/lab?token=your-jupyter-token-here"
 echo ""
 echo "================================"
 echo "IMPORTANT: Keep this session open!"

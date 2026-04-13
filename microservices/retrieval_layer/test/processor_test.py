@@ -11,7 +11,10 @@ SAMPLE_MESSAGE = {
         "outlet_name": "Example News",
         "sentiment": {
             "bias_category": "center",
+<<<<<<< HEAD
             "bias_score": 0.0,
+=======
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
             "bias_analysis_confidence": 0.9,
             "sentiment_category": "neutral",
             "sentiment_analysis_confidence": 0.95

@@ -348,6 +348,7 @@ assert len(all_jobs) == len(article_urls_seen)
 # print(f"[INFO] Clearing all jobs from merged")
 # merged.delete(MERGED_STREAM_KEY)
 
+<<<<<<< HEAD
 print(f"[INFO] Writing {len(all_jobs)} jobs and {len(article_urls_seen)} URLs to merged Redis...")
 for job in all_jobs:
 	payload: Message = job.data.model_dump()
@@ -360,6 +361,44 @@ print(f"[INFO] Set write complete")
 
 
 
+=======
+BATCH_SIZE = 500
+
+print(f"[INFO] Writing {len(all_jobs)} jobs and {len(article_urls_seen)} URLs to merged Redis...")
+
+pipeline = merged.pipeline(transaction=False)
+count = 0
+
+for job in all_jobs:
+    payload: Message = job.data.model_dump()
+    payload: Dict[str, Any] = {"payload": json.dumps(payload)}
+    pipeline.xadd(MERGED_STREAM_KEY, payload, approximate=True)
+    count += 1
+
+    if count % BATCH_SIZE == 0:
+        pipeline.execute()
+        print(f"[INFO] Flushed {count} jobs so far...")
+        
+if count % BATCH_SIZE != 0:
+    pipeline.execute()
+ 
+print(f"[INFO] Stream write complete")
+
+print(f"[INFO] Set write start")
+# Batch the set writes
+pipeline = merged.pipeline(transaction=False)
+count = 0
+urls = list(article_urls_seen)
+
+for i in range(0, len(urls), BATCH_SIZE):
+    batch = urls[i:i+BATCH_SIZE]
+    pipeline.sadd(MERGED_SET_KEY, *batch)
+    count += len(batch)
+    pipeline.execute()
+    print(f"[INFO] Flushed {count} URLs so far...")
+print(f"[INFO] Set write complete")
+
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 print("[INFO] Running post-merge validation...")
 set_len = merged.scard(MERGED_SET_KEY)
 stream_len = merged.xlen(MERGED_STREAM_KEY)
@@ -375,11 +414,19 @@ if stream_len != len(all_jobs):
     raise AssertionError(f"Stream length mismatch: {stream_len} vs {len(all_jobs)}")
 
 # Check every job URL is in the set
+<<<<<<< HEAD
 for job in all_jobs:
 	url = job.data.payload.article_url
 	if not merged.sismember(MERGED_SET_KEY, url):
 		print(f"[ERROR] URL {url} missing from {MERGED_SET_KEY}")
 		raise AssertionError(f"URL {url} missing from {MERGED_SET_KEY}")
+=======
+# for job in all_jobs:
+# 	url = job.data.payload.article_url
+# 	if not merged.sismember(MERGED_SET_KEY, url):
+# 		print(f"[ERROR] URL {url} missing from {MERGED_SET_KEY}")
+# 		raise AssertionError(f"URL {url} missing from {MERGED_SET_KEY}")
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 
 
 assert merged.scard(MERGED_SET_KEY) == len(article_urls_seen)

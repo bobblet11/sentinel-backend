@@ -37,14 +37,7 @@ services:
     networks:
       - sentinel-net
     command: >
-      redis-server 
-      --appendonly no 
-      --appendfsync everysec 
-      --save 60 1 
-      --timeout 0 
-      --tcp-keepalive 60 
-      --dbfilename "dump.rdb" 
-      --dir /data
+      redis-server  --appendonly no  --appendfsync everysec  --save 60 1  --timeout 0  --tcp-keepalive 60  --dbfilename "dump.rdb"  --dir /data
 
     <<: *common-env
     deploy:
@@ -150,6 +143,8 @@ services:
 
     <<: *common-env
     environment:
+      - LOG_MODE=${INGESTOR_LOG_MODE:-10}
+
       - REDIS_DUPLICATE_FILTER_KEY=${INGESTOR_REDIS_DUPLICATE_FILTER_KEY:-ingestor:seen.articles}
       - OUTPUT_STREAM=${INGESTOR_OUTPUT_STREAM:-background:to.be.scraped}
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
@@ -188,6 +183,7 @@ services:
 
     <<: *common-env
     environment:
+      - LOG_MODE=${WEB_SCRAPER_LOG_MODE:-10}
 
       - INPUT_STREAMS=${WEB_SCRAPER_INPUT_STREAMS:-user:to.be.scraped,background:to.be.scraped}
       - USER_OUTPUT_STREAM=${WEB_SCRAPER_USER_OUTPUT_STREAM:-user:to.be.nlp}
@@ -195,7 +191,6 @@ services:
       - FAILURE_OUTPUT_STREAM=${WEB_SCRAPER_FAILURE_OUTPUT_STREAM:-failure:to.be.scraped}
       - GROUP_NAME=${WEB_SCRAPER_GROUP_NAME:-default}
       - CONSUMER_NAME=${WEB_SCRAPER_CONSUMER_NAME:-web-scraper-1}
-      - LOG_MODE=${WEB_SCRAPER_LOG_MODE:-10}
       - MAX_SCREENSHOT_FOLDER_SIZE=${WEB_SCRAPER_MAX_SCREENSHOT_FOLDER_SIZE:-10000000}
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
@@ -239,6 +234,7 @@ services:
 
     <<: *common-env
     environment:
+      - LOG_MODE=${NLP_LOG_MODE:-10}
       - INPUT_STREAMS=${NLP_INPUT_STREAMS:-user:to.be.nlp,background:to.be.nlp}
       - USER_OUTPUT_STREAM=${NLP_USER_OUTPUT_STREAM:-user:to.be.retrieval}
       - BACKGROUND_OUTPUT_STREAM=${NLP_BACKGROUND_OUTPUT_STREAM:-background:to.be.retrieval}
@@ -253,6 +249,7 @@ services:
       - NLP_EMBEDDING_MODEL=${NLP_EMBEDDING_MODEL}
       - NLP_NER_MODEL=${NLP_NER_MODEL}
       - NLP_BIAS_MODEL=${NLP_BIAS_MODEL}
+      - NLP_SENTIMENT_MODEL=${NLP_SENTIMENT_MODEL}
       - ENABLE_DECONTEXTUALIZATION=${NLP_CPU_ENABLE_DECONTEXTUALIZATION:-false}
       - USE_GPU=false
 
@@ -288,6 +285,7 @@ services:
 
     <<: *common-env
     environment:
+      - LOG_MODE=${NLP_LOG_MODE:-10}
       - INPUT_STREAMS=${NLP_INPUT_STREAMS:-user:to.be.nlp,background:to.be.nlp}
       - USER_OUTPUT_STREAM=${NLP_USER_OUTPUT_STREAM:-user:to.be.retrieval}
       - BACKGROUND_OUTPUT_STREAM=${NLP_BACKGROUND_OUTPUT_STREAM:-background:to.be.retrieval}
@@ -302,6 +300,7 @@ services:
       - NLP_EMBEDDING_MODEL=${NLP_EMBEDDING_MODEL}
       - NLP_NER_MODEL=${NLP_NER_MODEL}
       - NLP_BIAS_MODEL=${NLP_BIAS_MODEL}
+      - NLP_SENTIMENT_MODEL=${NLP_SENTIMENT_MODEL}
       - ENABLE_DECONTEXTUALIZATION=${NLP_GPU_ENABLE_DECONTEXTUALIZATION:-true}
       - USE_GPU=true
       - NVIDIA_VISIBLE_DEVICES=all
@@ -318,7 +317,7 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
+              capabilities: [ gpu ]
   retrieval-layer-service-gpu:
     container_name: sentinel-retrieval-layer-service-container
     shm_size: '${RETRIEVAL_LAYER_SHM_SIZE:-2gb}'
@@ -342,6 +341,7 @@ services:
     <<: *common-env
 
     environment:
+      - LOG_MODE=${RETRIEVAL_LOG_MODE:-10}
       - INPUT_STREAMS=${RETRIEVAL_INPUT_STREAMS:-user:to.be.retrieval}
       - FAILURE_OUTPUT_STREAM=${RETRIEVAL_FAILURE_OUTPUT_STREAM:-failure:to.be.retrieval}
 
@@ -360,7 +360,7 @@ services:
 
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
-      
+
       - HASH_STORE_NAMESPACE=${HASH_STORE_NAMESPACE}
 
     deploy:
@@ -395,6 +395,7 @@ services:
     <<: *common-env
 
     environment:
+      - LOG_MODE=${RETRIEVAL_LOG_MODE:-10}
       - INPUT_STREAMS=${RETRIEVAL_INPUT_STREAMS:-user:to.be.retrieval}
       - FAILURE_OUTPUT_STREAM=${RETRIEVAL_FAILURE_OUTPUT_STREAM:-failure:to.be.retrieval}
 

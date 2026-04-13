@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Callable
 
 import requests
 
-from microservices.web_scraper.config import MAX_PROXY_VALIDATION_WORKERS, WEBSHARIO_URL
+from microservices.web_scraper.config import  WEBSHARIO_URL
 from microservices.web_scraper.proxy_sources.base_classes import HttpProxySource, ProxyUtils
 
 # --- Type Hinting for Clarity ---
@@ -44,7 +44,7 @@ class WebshareIOHttpSource(HttpProxySource):
 
     def update_mappings(self, proxies:List[str]) -> None:
         with concurrent.futures.ThreadPoolExecutor(
-            max_workers=MAX_PROXY_VALIDATION_WORKERS
+            max_workers=20
         ) as executor:
             
             if proxies is None:

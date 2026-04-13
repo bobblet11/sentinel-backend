@@ -5,7 +5,7 @@ from logging import Logger, getLogger
 
 from common.redis_client.connection import redis_connection
 
-
+MAX_TTL_S = 7 * 86_400 #days
 class RedisHashStore:
     """
     A high-level Redis interface for managing collections of dictionaries
@@ -61,6 +61,7 @@ class RedisHashStore:
             # Serialize all values to JSON for consistency.
             serialized_data = {k: json.dumps(v) for k, v in data.items()}
             self.client.hset(self._key(uid), mapping=serialized_data)
+            self.client.expire(self._key(uid), MAX_TTL_S)
             self.logger.debug(f"Stored data for UID: {uid}")
         except Exception as e:
             self.logger.error(f"Failed to store data for UID '{uid}': {e}")

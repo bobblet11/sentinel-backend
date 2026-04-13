@@ -2,6 +2,10 @@
 from typing import List
 from logging import getLogger
 import random
+<<<<<<< HEAD
+=======
+from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_nlp
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 import torch
 
 from common.models.api.redis_models import (
@@ -71,7 +75,10 @@ def _build_dummy_result() -> NLPResult:
     )
     bias_profile = BiasProfile(
         bias_category="center",
+<<<<<<< HEAD
         bias_score=0.7,
+=======
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
         bias_analysis_confidence=0.7,
         sentiment_category="neutral",
         sentiment_analysis_confidence=0.8,
@@ -161,6 +168,12 @@ class NLPService(ServiceTemplate):
         #     result = message.create_nlp_result()
         #     result.sentences = sentences
         #     message.set_nlp_result(result)
+<<<<<<< HEAD
+=======
+        
+        validate_after_nlp(message)
+        self.logger.debug(get_pretty_print_stream_message(message))
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
         return message
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:

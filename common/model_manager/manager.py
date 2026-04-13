@@ -71,18 +71,22 @@ class ModelManager:
                 key="BIAS_POLITICAL",
                 model_name=os.environ.get(
                     "NLP_BIAS_MODEL",
-                    "typeform/distilbert-base-uncased-mnli",
+                    "premsa/political-bias-prediction-allsides-BERT",
                 ),
-                task_type="zero_shot_classification",
+                task_type="text_classification",
                 owner_component="BiasDetector",
                 loader="transformers_pipeline",
                 device_policy=DevicePolicy.PREFER_GPU,
                 required=False,
-                estimated_memory_mb=260,
+                estimated_memory_mb=440,
+                loader_kwargs={"top_k": None, "truncation": True, "max_length": 512},
             ),
             ModelEntry(
                 key="BIAS_SENTIMENT",
-                model_name="cardiffnlp/twitter-roberta-base-sentiment-latest",
+                model_name=os.environ.get(
+                    "NLP_SENTIMENT_MODEL",
+                    "cardiffnlp/twitter-roberta-base-sentiment-latest",
+                ),
                 task_type="sentiment_analysis",
                 owner_component="BiasDetector",
                 loader="transformers_pipeline",
@@ -224,30 +228,26 @@ class ModelManager:
             self._events[key].set()
 
     def load_all(self, keys: Optional[List[str]] = None) -> None:
-        """Load all (or specified) models. Sequential on GPU, parallel on CPU."""
+        """Load all (or specified) models. Always sequential.
+
+        Parallel CPU loading was removed because transformers >= 4.38 uses
+        init_empty_weights() (meta device) internally during pipeline()
+        construction. This meta-device state is global within a process and
+        bleeds across threads, leaving model weights on the meta device at
+        inference time even when loading appears to succeed. Sequential loading
+        eliminates this entirely with no correctness risk.
+        """
         if self._dummy_mode:
             logger.info("ModelManager: dummy mode — skipping all model loading.")
             return
 
-        entries = [self._registry[k] for k in (keys or list(self._registry.keys()))]
+        all_entries = [self._registry[k] for k in (keys or list(self._registry.keys()))]
+        # Skip models that are already loaded successfully.
+        entries = [e for e in all_entries if e.state != ModelState.READY]
 
-        if self._device == "cuda":
-            # Sequential on GPU to avoid OOM — load smallest first.
-            for entry in sorted(entries, key=lambda e: e.estimated_memory_mb):
-                self.load(entry.key)
-        else:
-            # Parallel on CPU.
-            max_workers = min(4, len(entries)) if entries else 1
-            with ThreadPoolExecutor(max_workers=max_workers) as pool:
-                futures = {pool.submit(self.load, e.key): e.key for e in entries}
-                for future in as_completed(futures):
-                    key = futures[future]
-                    try:
-                        future.result()
-                    except Exception as exc:
-                        logger.error(
-                            "ModelManager: Unhandled error loading '%s': %s", key, exc
-                        )
+        # Load smallest first to surface OOM failures early on memory-limited devices.
+        for entry in sorted(entries, key=lambda e: e.estimated_memory_mb):
+            self.load(entry.key)
 
     # ------------------------------------------------------------------
     # Retrieval
@@ -405,13 +405,6 @@ class ModelManager:
 
     def _resolve_hf_task(self, entry: ModelEntry) -> str:
         """Map a ModelEntry's task_type to the HuggingFace pipeline task string."""
-        if entry.key in ("BIAS", "BIAS_POLITICAL"):
-            if "mnli" in entry.model_name.lower():
-                return "zero-shot-classification"
-            else:
-                entry.loader_kwargs["return_all_scores"] = True
-                return "text-classification"
-
         _TASK_MAP = {
             "zero_shot_classification": "zero-shot-classification",
             "token_classification": "token-classification",
@@ -446,11 +439,12 @@ class ModelManager:
             from transformers import pipeline
 
             hf_device = 0 if device == "cuda" else -1
-            _dtype = _torch.float16 if device == "cuda" else _torch.float32
             task = self._resolve_hf_task(entry)
+            kwargs = dict(entry.loader_kwargs)
+            if device == "cuda":
+                kwargs["dtype"] = _torch.float16
             return pipeline(
-                task, model=entry.model_name, device=hf_device,
-                dtype=_dtype, **entry.loader_kwargs,
+                task, model=entry.model_name, device=hf_device, **kwargs
             )
 
         elif entry.loader == "auto_model_seq2seq":

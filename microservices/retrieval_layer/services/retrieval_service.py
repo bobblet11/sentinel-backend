@@ -105,8 +105,7 @@ class RetrievalService(ServiceTemplate):
         return verdict, confidence
 
     def _save_data_into_postgres(self, db: Session, message: StreamMessage):
-        self.logger.info("Saving article: url=%s", message.link)
-        self.logger.info("bias_profile raw value: %s", message.bias_profile)  
+        
         claims: List[Claim] = message.all_claims or []
         
         self.logger.debug(
@@ -137,7 +136,7 @@ class RetrievalService(ServiceTemplate):
             self.logger.warning("bias_profile is None for uid=%s, using defaults", message.uid)
             sentiment_dto = CreateOrModifySentiment(
                 bias_category="center",
-                bias_score=0.0,
+                # bias_score=0.0,
                 bias_analysis_confidence=0.0,
                 sentiment_category="neutral",
                 sentiment_analysis_confidence=0.0,
@@ -145,7 +144,7 @@ class RetrievalService(ServiceTemplate):
         else:
             sentiment_dto = CreateOrModifySentiment(
                 bias_profile.bias_category,
-                bias_profile.bias_score,
+                # bias_profile.bias_score,
                 bias_profile.bias_analysis_confidence,
                 bias_profile.sentiment_category,
                 bias_profile.sentiment_analysis_confidence,

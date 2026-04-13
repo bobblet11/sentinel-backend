@@ -55,7 +55,7 @@ def launch_gpu_jupyter(portal_id="farhan", gateway="gpu2gate1.cs.hku.hk"):
 
         config_cmd = """cat > ~/.jupyter/jupyter_server_config.py << 'EOF'
 c = get_config()
-c.ServerApp.token = 'my-fixed-token-12345'
+c.ServerApp.token = ''
 c.ServerApp.password = ''
 c.ServerApp.open_browser = False
 EOF"""
@@ -122,7 +122,7 @@ EOF"""
                 print()
                 print("Then open this URL in browser or VS Code:")
                 print()
-                print("http://localhost:8888/lab?token=my-fixed-token-12345")
+                print("http://localhost:8888/lab?token=your-jupyter-token-here")
                 print()
                 print("=" * 50)
                 print("⚠️  IMPORTANT: Keep THIS terminal open!")

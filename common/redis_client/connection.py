@@ -25,8 +25,8 @@ def _build_connection_kwargs() -> dict[str, Any]:
         "port": REDIS_PORT,
         "db": 0,
         "decode_responses": True,
-        "socket_timeout": 30,
-        "socket_connect_timeout": 30,
+        "socket_timeout": 500,
+        "socket_connect_timeout": 500,
         "retry_on_timeout": True,
     }
 

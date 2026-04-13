@@ -54,7 +54,7 @@ def get_jobs(cur, uid=None):
     query = """
         SELECT j.id, j.uid, j.status, j.type, j.created_at,
                a.id AS article_id, a.url, a.title,
-               sa.bias_category, sa.bias_score,
+               sa.bias_category, sa.bias_analysis_confidence,
                sa.sentiment_category, sa.sentiment_analysis_confidence
         FROM job j
         JOIN article a ON j.article_id = a.id
@@ -85,7 +85,7 @@ def get_claims(cur, article_id):
 
 def print_job(job, claims):
     j_id, uid, status, j_type, created_at, article_id, url, title, \
-        bias_cat, bias_score, sentiment_cat, sentiment_conf = job
+        bias_cat, bias_conf, sentiment_cat, sentiment_conf = job
 
     print(SEP)
     print(f"JOB #{j_id}  |  {uid}")
@@ -94,7 +94,7 @@ def print_job(job, claims):
     print(f"  Created   : {created_at}")
     print(f"  Title     : {title or '(none)'}")
     print(f"  URL       : {url}")
-    print(f"  Bias      : {bias_cat or 'N/A'}  (score={bias_score:.3f})" if bias_score is not None else f"  Bias      : N/A")
+    print(f"  Bias      : {bias_cat or 'N/A'}  (conf={bias_conf:.3f})" if bias_conf is not None else f"  Bias      : N/A")
     print(f"  Sentiment : {sentiment_cat or 'N/A'}" + (f"  (conf={sentiment_conf:.3f})" if sentiment_conf else ""))
 
     print()

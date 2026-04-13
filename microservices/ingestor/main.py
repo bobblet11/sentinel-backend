@@ -4,6 +4,7 @@ import traceback
 from pydantic import TypeAdapter
 from typing import Dict, List
 from pathlib import Path
+from microservices.ingestor.config import LOG_MODE
 from microservices.ingestor.rss_ingestor import RssIngestor
 from common.io.logging import TimeDeltaConfig, setup_logging
 from dataclasses import field 
@@ -47,7 +48,7 @@ def categorise_rss_sources_by_payment_tier(sources:List[RssSourceEntry]) -> Dict
 if __name__ == "__main__":
     try:
         
-        setup_logging(execution_mode="cron", max_age_of_log_file=TimeDeltaConfig(days=3), level=logging.DEBUG,container_name=SERVICE_NAME)
+        setup_logging(execution_mode="cron", max_age_of_log_file=TimeDeltaConfig(days=3), level=LOG_MODE,container_name=SERVICE_NAME)
         main_logger: logging.Logger = logging.getLogger("__main__")
         
         try:

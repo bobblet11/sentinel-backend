@@ -4,13 +4,21 @@ from common.io.logging import setup_logging
 from common.models.api.dtos.job import JobType
 from common.redis_client.prioritised_consumer_combiner import BlockPrioritisationLevel
 from common.service.service_template import ServiceConfig
+<<<<<<< HEAD
 from microservices.nlp.config import BACKGROUND_OUTPUT_STREAM, BATCH_SIZE, FAILURE_OUTPUT_STREAM, INPUT_STREAMS, GROUP_NAME, CONSUMER_NAME, USER_OUTPUT_STREAM
+=======
+from microservices.nlp.config import BACKGROUND_OUTPUT_STREAM, BATCH_SIZE, FAILURE_OUTPUT_STREAM, INPUT_STREAMS, GROUP_NAME, CONSUMER_NAME, USER_OUTPUT_STREAM, LOG_MODE
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 from microservices.nlp.nlp_service import NLPService
 
 SERVICE_NAME = "NLP"
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     setup_logging(level=INFO, container_name="nlp")
+=======
+    setup_logging(level=LOG_MODE, container_name="nlp")
+>>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
     main_logger: Logger = getLogger("__main__")
     
     config = ServiceConfig(

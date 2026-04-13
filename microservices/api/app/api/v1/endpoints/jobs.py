@@ -39,15 +39,13 @@ def _build_bias_analysis(bias_profile: Dict[str, Any] | None) -> Dict[str, Any]:
     bias_category = str(bias_profile.get("bias_category") or "center").lower()
     sentiment_category = str(bias_profile.get("sentiment_category") or "neutral").lower()
 
-    bias_score_01 = float(bias_profile.get("bias_score") or 0.0)
     confidence_01 = float(bias_profile.get("bias_analysis_confidence") or 0.0)
 
     # Frontend schema expects percentage-like ints.
     # Preserve tiny but non-zero signals (e.g. 0.001 -> 1 instead of 0).
-    bias_score_pct = max(0.0, min(1.0, bias_score_01)) * 100
     confidence_pct = max(0.0, min(1.0, confidence_01)) * 100
-    bias_score = 1 if 0.0 < bias_score_pct < 1.0 else int(round(bias_score_pct))
-    confidence = 1 if 0.0 < confidence_pct < 1.0 else int(round(confidence_pct))
+    bias_score = 1 if 0.0 < confidence_pct < 1.0 else int(round(confidence_pct))
+    confidence = bias_score
 
     return {
         "overallBias": bias_category,
