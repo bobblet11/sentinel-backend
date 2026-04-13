@@ -75,7 +75,6 @@ class BenchmarkResults:
     jobs_submitted: int
     submit_successes: int
     submit_failures: int
-    mode: str
     failure_processed_results: List[Dict[str,Any]]
     successfully_processed_results: List[Dict[str, Any]]
     valid_processed_results: List[Dict[str, Any]]
@@ -176,7 +175,7 @@ class BenchmarkResults:
     def save_json(self, filepath: str) -> Path:
         """Save complete benchmark results + statistics as JSON."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"benchmark_{self.mode}_{timestamp}.json"
+        filename = f"benchmark_{timestamp}.json"
         output_path = Path(filepath or "./benchmarks").resolve()
         output_path.mkdir(parents=True, exist_ok=True)
         
@@ -211,7 +210,6 @@ class BenchmarkResults:
         return full_path
     
     def print_report(self) -> None:
-        print(f"Mode: {self.mode}")
         print(f"Jobs submitted: {self.jobs_submitted}")
         print(f"Submit successes: {self.submit_successes}")
         print(f"Submit failures: {self.submit_failures}")
@@ -246,6 +244,7 @@ class BenchmarkResults:
                 for subtask_name, metric in top_subtasks:
                     service = subtask_name.split('.')[0]
                     print(f"  {service:12} | {subtask_name:25}: {metric.avg:5.2f}s / p95:{metric.p95:5.2f}s")
+                    
 class BenchmarkTemplate(ABC):
     """
     A reusable benchmark framework that can:
@@ -256,7 +255,7 @@ class BenchmarkTemplate(ABC):
     """
 
     # Default configuration
-    API_URL = "http://localhost:8001/api/v1/jobs"
+    API_URL = "http://api-service:8001/api/v1/jobs"
     REDIS_HOST = "redis"
     REDIS_PORT = 6379
     
@@ -279,16 +278,13 @@ class BenchmarkTemplate(ABC):
     r"(aljazeera\.com|www\.aljazeera\.com)": "Al Jazeera",
     }
     
-    def __init__(self, input_stream:str, output_stream:str, failure_streams: List[str], mode: str = "api", max_workers: int = 20):
-        assert mode in ("api", "redis")
-        self.mode = mode
+    def __init__(self, input_stream:str, output_stream:str, failure_streams: List[str], max_workers: int = 20):
         self.max_workers = max_workers
         self.input_stream = input_stream
         self.output_stream = output_stream
         self.failure_streams = failure_streams
         self.consumer_group = "benchmark-consumer"
         print(f"--- Running {self.__class__.__name__} ---")
-        print(f"Mode: {self.mode}")
 
         self.session = requests.Session()
         self.redis = redis.Redis(host=self.REDIS_HOST, port=self.REDIS_PORT, decode_responses=True)
@@ -395,23 +391,28 @@ class BenchmarkTemplate(ABC):
             resp.raise_for_status()
             return {"job_create" : job_create, "response" : resp.json()}
         except Exception as e:
+            print("Failed api job submission")
             return {"error": str(e), "job_create": job_create}
 
     def _submit_job_redis(self, payload: Message) -> Dict[str, Any]:
         try:
-            payload_str = json.dumps(payload)
+            payload_str = json.dumps(payload.model_dump())
             redis_id = self.redis.xadd(self.input_stream, {"payload": payload_str}, approximate=True)
             return {"redis_id": redis_id, "payload": payload}
         except Exception as e:
+            print("Failed redis job submission")
             return {"error": str(e), "payload": payload}
 
     def _submit_jobs_concurrently(self, jobs: List[Dict[str, Any]]) -> Tuple[List[Any], List[Any]]:
-        submit_fn = self._submit_job_api if self.mode == "api" else self._submit_job_redis
-        # jobs created using the _create_... function
         successes, failures = [], []
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {executor.submit(submit_fn, job): job for job in jobs}
+            futures = {}
+            for job in jobs:
+                if job["submission_type"] == "redis":
+                    futures[executor.submit(self._submit_job_redis, job["payload"])] = job
+                else:
+                    futures[executor.submit(self._submit_job_api, job["payload"])] = job
 
             for i, future in enumerate(as_completed(futures)):
                 try:
@@ -431,15 +432,16 @@ class BenchmarkTemplate(ABC):
     # RESULT COLLECTION
     # ----------------------------------------------------------------------
     def _extract_uid(self, submission_result: Dict[str, Any]) -> Optional[str]:
-        """
-        Extract UID from API or Redis submission result.
-        """
-        if self.mode == "api":
-            return submission_result.get("uid")
+        print(submission_result)
+        # Redis submissions carry a Message payload
+        if "payload" in submission_result and isinstance(submission_result["payload"], Message):
+            return submission_result["payload"].header.uid
+        
+        # API submissions return a response dict
+        if "response" in submission_result and "uid" in submission_result["response"]:
+            return submission_result["response"]["uid"]
+        return None
 
-        # Redis mode: UID must be inside the job payload
-        job = submission_result.get("payload", {})
-        return job.get("header", {}).get("uid")
 
     def _decode_one_message(self, stream_name:str, redis_message_id:str, fields:Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -556,7 +558,11 @@ class BenchmarkTemplate(ABC):
         expected_uids = [self._extract_uid(s) for s in submit_successes if self._extract_uid(s)]
         print("Expected UIDs:", expected_uids)
 
-
+        if len(expected_uids) == 0:
+            print("TEST FAILED")
+            self.setup()
+            return
+        
         # Poll Redis for results
         print("Polling Redis for results...")
         results = self._poll_results(expected_uids)
@@ -574,7 +580,6 @@ class BenchmarkTemplate(ABC):
             jobs_submitted=len(jobs),
             submit_successes=len(submit_successes),
             submit_failures=len(submit_failures),
-            mode=self.mode,
             successfully_processed_results = successfully_processed_jobs,
             failure_processed_results = failure_processed_jobs,
             valid_processed_results = valid_jobs,

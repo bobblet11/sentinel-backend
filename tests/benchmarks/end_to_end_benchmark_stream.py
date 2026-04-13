@@ -2,11 +2,12 @@ import time
 from typing import Any, Dict, List, Tuple
 from pydantic import ValidationError
 
-from common.models.api.redis_models import Message
+from common.models.api.redis_models import Message, StreamMessage
+from common.models.api.validation_helpers import validate_after_ingestor, validate_after_nlp, validate_after_retrieval, validate_after_webscraper
 from tests.benchmarks.benchmark_base import BenchmarkResults, BenchmarkTemplate
 
 
-URL_SPREAD = {
+URL_SPREAD_BACKGROUND = {
     "bbc": "https://www.bbc.com/news/articles/c937gd1vq7xo",
     "abc": "https://abcnews.com/Politics/senate-passes-bill-fund-dhs-except-ice-parts/story?id=131461819",
     "cbc": "https://www.cbc.ca/news/world/iran-strikes-military-base-us-troops-wounded-9.7145616",
@@ -17,16 +18,27 @@ URL_SPREAD = {
     "guardian": "https://www.theguardian.com/world/2026/mar/30/egypt-pakistan-saudi-arabia-turkey-talks-embryo-new-order",
 }
 
-class EndToEndBenchmarkBackground(BenchmarkTemplate):
+URL_SPREAD_USER = {
+    "bbc": "https://www.bbc.com/news/articles/cn0wzxqyx17o",
+    "abc": "https://abcnews.com/International/live-updates/iran-live-updates-us-blockade-irans-strait-hormuz/?id=131983647",
+    "cbc": "https://www.cbc.ca/news/health/canadian-cancer-projections-9.7159535",
+    "cbs": "https://www.cbsnews.com/live-updates/iran-war-us-iran-ports-blockade-strait-of-hormuz-trump/",
+    "npr": "https://www.npr.org/2026/04/13/nx-s1-5777582/many-private-colleges-at-risk-of-closing",
+    "nbc": "https://www.nbcnews.com/business/markets/oil-prices-surge-trump-says-us-will-blockade-strait-hormuz-rcna330824",
+    "euronews": "https://www.euronews.com/my-europe/2026/04/13/magyar-victory-will-bring-more-european-unity-former-european-council-chief-michel-says",
+    "guardian": "https://www.theguardian.com/business/2026/apr/13/oil-price-tops-100-dollars-barrel-us-blockade-strait-of-hormuz",
+}
+
+
+class EndToEndMixed(BenchmarkTemplate):
     """
     Benchmark to validate full Message schema and measure latency across services.
     """
 
     def __init__(self):
         super().__init__(
-            mode="redis",
             input_stream="background:to.be.scraped",
-            output_stream="background:to.be.retrieval",
+            output_stream="all:benchmark.output",
             failure_streams=["failure:to.be.scraped", "failure:to.be.nlp", "failure:to.be.retrieval"],
         )
 
@@ -35,42 +47,46 @@ class EndToEndBenchmarkBackground(BenchmarkTemplate):
         jobs = []
         # Use the same URL_SPREAD as in the good benchmark
         i = 0
-        for url in URL_SPREAD.values():
-            if i < len(URL_SPREAD.values())/2:
-                is_background = True
-            else:
-                is_background = False
-                
-            message = self._create_redis_job(url, is_background=is_background)
-            jobs.append(message.model_dump())
+        for url in URL_SPREAD_BACKGROUND.values():                
+            message = self._create_redis_job(url, is_background=True)
+            jobs.append({"submission_type": "redis", "payload": message})
+            
+        for url in URL_SPREAD_USER.values():                
+            request = self._create_api_job(url, is_background=False)
+            jobs.append({"submission_type": "api", "payload": request})
         return jobs
+
 
     def validate_results(
         self, successfully_processed_jobs: List[Dict[str, Any]]
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Validate that all fields in Message are non-None."""
         valid, invalid = [], []
+
         for job in successfully_processed_jobs:
             try:
+                # Wrap into Message for schema validation
                 message = Message(**job["data"])
-                # Check every field in header and payload
-                header_ok = all(getattr(message.header, f.name) is not None for f in message.header.__fields__.values())
-                payload_ok = all(
-                    getattr(message.payload, f.name) is not None
-                    for f in message.payload.__fields__.values()
-                    if f.name not in ["sentences", "claims_in_article", "entities_in_article", "bias_profile",
-                                      "save_data_result", "save_job_result", "matches", "related_articles"]
-                )
-                if header_ok and payload_ok:
-                    valid.append(job)
-                else:
-                    invalid.append(job)
+
+                # Run stage‑specific validators
+                try:
+                    validate_after_ingestor(message=message)
+                    validate_after_webscraper(stream_message=None, message=message)
+                    validate_after_nlp(stream_message=None, message=message)
+                    validate_after_retrieval(stream_message=None, message=message)
+                except ValueError as ve:
+                    # Stage validation failed
+                    invalid.append({"job": job, "error": str(ve)})
+                    continue
+
+                # If all validators pass, mark as valid
+                valid.append(job)
+
             except ValidationError as e:
                 invalid.append({"job": job, "error": str(e)})
+
         return valid, invalid
 
-
 if __name__ == "__main__":
-    benchmark = EndToEndBenchmarkBackground()
+    benchmark = EndToEndMixed()
     benchmark.run()
 

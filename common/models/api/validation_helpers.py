@@ -3,6 +3,14 @@ from pydantic import ValidationError
 import json
 from common.models.api.redis_models import Message, MessagePayload, StreamMessage
 
+import re
+
+HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
+
+def contains_html(text: str) -> bool:
+    return bool(text and HTML_TAG_PATTERN.search(text))
+
+
 # --- Validation helpers ---
 def validate_fields(payload: MessagePayload, required_fields: List[str], stage: str) -> None:
     """
@@ -16,29 +24,64 @@ def validate_fields(payload: MessagePayload, required_fields: List[str], stage: 
 
 # --- Stage-specific validators ---
 def validate_after_ingestor(message: Message) -> None:
-    required = ["news_outlet", "article_url", "title"]
-    validate_fields(message.payload, required, "Ingestor")
+    errors = []
+    payload = message.payload
+
+    if not payload.news_outlet or not isinstance(payload.news_outlet, str):
+        errors.append("Missing or invalid news_outlet")
+    if not payload.article_url or not payload.article_url.startswith("http"):
+        errors.append("Missing or invalid article_url")
+    if not payload.title or len(payload.title.strip()) < 5:
+        errors.append("Title too short or missing")
+
+    if errors:
+        raise ValueError(f"[Ingestor Validation Failed] {len(errors)} issues:\n - " + "\n - ".join(errors))
 
 
-def validate_after_webscraper(stream_message: StreamMessage) -> None:
-    message = stream_message.data
-    required = [
-        "news_outlet",
-        "article_url",
-        "publish_date",
-        "author",
-        "parsed_text",   
-        "raw_html"      
-    ]
-    validate_fields(message.payload, required, "WebScraper")
+
+def validate_after_webscraper(stream_message: StreamMessage, message: Message = None) -> None:
+    if not message and not stream_message:
+        raise ValueError("Nothing passed to validate_after_webscraper")
+    
+    if not message:
+        message = stream_message.data
+
+    payload = message.payload
+    errors = []
+
+    if not payload.news_outlet:
+        errors.append("Missing news_outlet")
+    if not payload.article_url or not payload.article_url.startswith("http"):
+        errors.append("Invalid article_url")
+    if not payload.publish_date:
+        errors.append("Missing publish_date")
+    if not payload.author:
+        errors.append("Missing author")
+    if not payload.parsed_text or len(payload.parsed_text) < 50:
+        errors.append("Parsed text too short or missing")
+    if not payload.raw_html or "<html" not in payload.raw_html.lower():
+        errors.append("Raw HTML missing or malformed")
+    if contains_html(payload.parsed_text):
+        errors.append("Parsed text contains HTML tags")
+    if contains_html(payload.title):
+        errors.append("Title contains HTML tags")
+
+    if errors:
+        raise ValueError(f"[WebScraper Validation Failed] {len(errors)} issues:\n - " + "\n - ".join(errors))
 
 
-def validate_after_nlp(stream_message: StreamMessage) -> None:
+
+def validate_after_nlp(stream_message: StreamMessage, message: Message=None) -> None:
     """
     Validate that NLP stage has produced well-formed claims, entities, and bias profile.
     Raises ValueError if any required field is missing or malformed.
     """
-    message = stream_message.data
+    if not message and not stream_message:
+        raise("Nothing passed to validate_after_webscraper")
+    
+    if not message:
+        message = stream_message.data
+
     required = [
         "claims_in_article",
         "entities_in_article",
@@ -96,15 +139,27 @@ def validate_after_nlp(stream_message: StreamMessage) -> None:
         raise ValueError(f"[NLP Validation Failed] {len(errors)} issues:\n - " + "\n - ".join(errors))
 
 
-def validate_after_retrieval(stream_message: StreamMessage) -> None:
-    message = stream_message.data
-    required = [
-        "save_data_result",
-        "save_job_result",
-        "matches",
-        "related_articles"
-    ]
-    validate_fields(message.payload, required, "Retrieval")
+def validate_after_retrieval(stream_message: StreamMessage, message: Message = None) -> None:
+    if not message and not stream_message:
+        raise ValueError("Nothing passed to validate_after_retrieval")
+    if not message:
+        message = stream_message.data
+
+    payload = message.payload
+    errors = []
+
+    if not payload.save_data_result or payload.save_data_result != "SUCCESS":
+        errors.append("save_data_result missing or not SUCCESS")
+    if not payload.save_job_result or payload.save_job_result != "SUCCESS":
+        errors.append("save_job_result missing or not SUCCESS")
+    if not isinstance(payload.matches, list) or not payload.matches:
+        errors.append("matches missing or not a list")
+    if not isinstance(payload.related_articles, list):
+        errors.append("related_articles missing or not a list")
+
+    if errors:
+        raise ValueError(f"[Retrieval Validation Failed] {len(errors)} issues:\n - " + "\n - ".join(errors))
+
     
 
 def get_pretty_print_message(message: Message, text_snippet_len: int = 10) -> str:
