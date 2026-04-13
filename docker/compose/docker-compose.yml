@@ -150,6 +150,8 @@ services:
 
     <<: *common-env
     environment:
+      - LOG_MODE=${INGESTOR_LOG_MODE:-10}
+
       - REDIS_DUPLICATE_FILTER_KEY=${INGESTOR_REDIS_DUPLICATE_FILTER_KEY:-ingestor:seen.articles}
       - OUTPUT_STREAM=${INGESTOR_OUTPUT_STREAM:-background:to.be.scraped}
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
@@ -188,6 +190,7 @@ services:
 
     <<: *common-env
     environment:
+      - LOG_MODE=${WEB_SCRAPER_LOG_MODE:-10}
 
       - INPUT_STREAMS=${WEB_SCRAPER_INPUT_STREAMS:-user:to.be.scraped,background:to.be.scraped}
       - USER_OUTPUT_STREAM=${WEB_SCRAPER_USER_OUTPUT_STREAM:-user:to.be.nlp}
@@ -195,7 +198,7 @@ services:
       - FAILURE_OUTPUT_STREAM=${WEB_SCRAPER_FAILURE_OUTPUT_STREAM:-failure:to.be.scraped}
       - GROUP_NAME=${WEB_SCRAPER_GROUP_NAME:-default}
       - CONSUMER_NAME=${WEB_SCRAPER_CONSUMER_NAME:-web-scraper-1}
-      - LOG_MODE=${WEB_SCRAPER_LOG_MODE:-10}
+
       - MAX_SCREENSHOT_FOLDER_SIZE=${WEB_SCRAPER_MAX_SCREENSHOT_FOLDER_SIZE:-10000000}
       - WARNING_NOTIFICATION_STREAM=${WARNING_NOTIFICATION_STREAM:-sentinel_warning_alerts}
       - CRITICAL_NOTIFICATION_STREAM=${CRITICAL_NOTIFICATION_STREAM:-sentinel_critical_alerts}
@@ -239,6 +242,7 @@ services:
 
     <<: *common-env
     environment:
+      - LOG_MODE=${NLP_LOG_MODE:-10}
       - INPUT_STREAMS=${NLP_INPUT_STREAMS:-user:to.be.nlp,background:to.be.nlp}
       - USER_OUTPUT_STREAM=${NLP_USER_OUTPUT_STREAM:-user:to.be.retrieval}
       - BACKGROUND_OUTPUT_STREAM=${NLP_BACKGROUND_OUTPUT_STREAM:-background:to.be.retrieval}
@@ -289,6 +293,7 @@ services:
 
     <<: *common-env
     environment:
+      - LOG_MODE=${NLP_LOG_MODE:-10}
       - INPUT_STREAMS=${NLP_INPUT_STREAMS:-user:to.be.nlp,background:to.be.nlp}
       - USER_OUTPUT_STREAM=${NLP_USER_OUTPUT_STREAM:-user:to.be.retrieval}
       - BACKGROUND_OUTPUT_STREAM=${NLP_BACKGROUND_OUTPUT_STREAM:-background:to.be.retrieval}
@@ -344,6 +349,7 @@ services:
     <<: *common-env
 
     environment:
+      - LOG_MODE=${RETRIEVAL_LOG_MODE:-10}
       - INPUT_STREAMS=${RETRIEVAL_INPUT_STREAMS:-user:to.be.retrieval}
       - FAILURE_OUTPUT_STREAM=${RETRIEVAL_FAILURE_OUTPUT_STREAM:-failure:to.be.retrieval}
 
@@ -397,6 +403,7 @@ services:
     <<: *common-env
 
     environment:
+      - LOG_MODE=${RETRIEVAL_LOG_MODE:-10}
       - INPUT_STREAMS=${RETRIEVAL_INPUT_STREAMS:-user:to.be.retrieval}
       - FAILURE_OUTPUT_STREAM=${RETRIEVAL_FAILURE_OUTPUT_STREAM:-failure:to.be.retrieval}
 

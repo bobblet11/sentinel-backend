@@ -1,5 +1,5 @@
 import signal
-from logging import INFO
+from logging import DEBUG, INFO
 
 from common.io.logging import setup_logging
 from common.models.api.dtos.job import JobType
@@ -14,6 +14,7 @@ from microservices.retrieval_layer.config import (
     CONSUMER_NAME,
     BATCH_SIZE,
     RETRY_FAILURE_MODE,
+    LOG_MODE
 )
 from microservices.retrieval_layer.db.session import ensure_schema_compatibility
 
@@ -21,7 +22,7 @@ SERVICE_NAME = "retrieval"
 CONTAINER_NAME = "retrieval-layer"
 
 if __name__ == "__main__":
-    setup_logging(level=INFO, container_name=CONTAINER_NAME)
+    setup_logging(level=LOG_MODE, container_name=CONTAINER_NAME)
 
     config = ServiceConfig(
         service_name=SERVICE_NAME,
