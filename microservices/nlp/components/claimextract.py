@@ -7,11 +7,7 @@ from typing import List
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
 from microservices.nlp.components.device import DeviceConfig
-<<<<<<< HEAD
-from common.models.api.redis_models import Article, Claim, NLPOptions, NLPResult, SentenceScore, StreamMessage
-=======
 from common.models.api.redis_models import Article, BiasProfile, Claim, NLPOptions, NLPResult, SentenceScore, StreamMessage
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 
 # Pipeline stage imports
 from microservices.nlp.components.preprocess import Preprocessor
@@ -87,14 +83,10 @@ class ClaimExtraction(ArticleProcessor):
             logger.info("ClaimExtraction: Decontextualizer disabled via service configuration.")
         self.checkworthiness = CheckWorthinessFilter(device_config=device_config)
         self.embedder = Embedder(device_config=device_config, model_manager=model_manager)
-<<<<<<< HEAD
-        self.bias_detector = BiasDetector(device_config=device_config, model_manager=model_manager)
-=======
         # Store args for lazy BiasDetector initialization (Stage 8)
         self._bias_device_config = device_config
         self._bias_model_manager = model_manager
         self._bias_detector = None
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 
         logger.info(
             "ClaimExtraction: All models ready in %.2fs.",
@@ -149,8 +141,6 @@ class ClaimExtraction(ArticleProcessor):
             logger.warning(
                 "ClaimExtraction: No sentences after preprocessing — aborting."
             )
-<<<<<<< HEAD
-=======
             if not message.data.payload.bias_profile:
                 message.data.payload.bias_profile = BiasProfile(
                     bias_category="Center",
@@ -158,7 +148,6 @@ class ClaimExtraction(ArticleProcessor):
                     sentiment_category="Neutral",
                     sentiment_analysis_confidence=0.0,
                 )
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
             return
 
         # ── Stage 2 — Named Entity Recognition ──────────────────────────────
@@ -221,17 +210,9 @@ class ClaimExtraction(ArticleProcessor):
             sentences = self.checkworthiness.run(
                 article, message, options, sentences
             )
-<<<<<<< HEAD
-            # Clear claims built by CheckWorthinessFilter; Stage 7 rebuilds them.
-            
-            result = message.create_nlp_result()
-            result.claims_in_article = []
-            message.set_nlp_result(result)
-=======
             # Clear claims built by CheckWorthinessFilter; Stage 7 rebuilds them
             # after embeddings and entity mapping are complete.
             message.data.payload.claims_in_article = []
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
             message.add_timestamp(JobStage.CHECK_WORTHY_OUT)
         except Exception as e:
             logger.error(
@@ -286,13 +267,8 @@ class ClaimExtraction(ArticleProcessor):
                 fallback_limit,
             )
 
-<<<<<<< HEAD
-        result = message.create_nlp_result()
-        result.claims_in_article = [
-=======
         # Write directly to payload — set_nlp_result won't overwrite a non-empty list.
         message.data.payload.claims_in_article = [
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
             Claim(
                 confidence=s.confidence,
                 source_sentence_indices=[s.index],
@@ -302,28 +278,15 @@ class ClaimExtraction(ArticleProcessor):
             )
             for s in selected_sentences
         ]
-<<<<<<< HEAD
-        message.set_nlp_result(result)
-        logger.info(
-            "[Stage 7 | Sentence→Claim] %d claims in %.2fs",
-            len(result.claims_in_article),
-=======
         logger.info(
             "[Stage 7 | Sentence→Claim] %d claims in %.2fs",
             len(message.data.payload.claims_in_article),
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
             time.time() - t,
         )
         message.add_timestamp(JobStage.CONVERT_TO_CLAIM_OUT)
 
         # ── Stage 8 — Bias Detection (optional) ──────────────────────────────
         if options.enable_bias_detection:
-<<<<<<< HEAD
-            t = time.time()
-            try:
-                message.add_timestamp(JobStage.BIAS_ANAL_IN)
-                self.bias_detector.run(article, message, options)
-=======
             if self._bias_detector is None:
                 self._bias_detector = BiasDetector(
                     device_config=self._bias_device_config,
@@ -333,7 +296,6 @@ class ClaimExtraction(ArticleProcessor):
             try:
                 message.add_timestamp(JobStage.BIAS_ANAL_IN)
                 self._bias_detector.run(article, message, options)
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
                 logger.info(
                     "[Stage 8 | BiasDetector] complete in %.2fs", time.time() - t
                 )
@@ -344,9 +306,6 @@ class ClaimExtraction(ArticleProcessor):
                     time.time() - t,
                     e,
                 )
-<<<<<<< HEAD
-                # Non-critical — do not re-raise; claims are already committed
-=======
                 # Non-critical — do not re-raise; claims are already committed.
                 # Write a neutral fallback so downstream never sees None.
                 if not message.data.payload.bias_profile:
@@ -356,7 +315,6 @@ class ClaimExtraction(ArticleProcessor):
                         sentiment_category="Neutral",
                         sentiment_analysis_confidence=0.0,
                     )
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 
         # Expose processed sentences so set_nlp_result() can copy them
         # to the MessagePayload for downstream services.
@@ -368,13 +326,8 @@ class ClaimExtraction(ArticleProcessor):
             "--- ClaimExtraction Pipeline complete in %.2fs | "
             "claims=%d entities=%d ---",
             time.time() - pipeline_start,
-<<<<<<< HEAD
-            len(result.claims_in_article),
-            len(result.entities_in_article),
-=======
             len(message.data.payload.claims_in_article),
             len(message.data.payload.entities_in_article),
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
         )
         
         message.add_timestamp(JobStage.NLP_END)

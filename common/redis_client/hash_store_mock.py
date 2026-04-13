@@ -31,8 +31,6 @@ class RedisHashStoreMock:
         # self.client: redis.Redis = redis_connection.get_client()
         self.logger: Logger = getLogger(f"{hash_namespace}.redis_hash_store")
 
-        self.logger.info(f"--- Initialized RedisHashStore for namespace: '{self.hash_namespace}' ---")
-
     def _key(self, uid: str) -> str:
         """
         Internal helper to compute the Redis key for a given UID.
@@ -54,7 +52,6 @@ class RedisHashStoreMock:
             # Serialize all values to JSON for consistency.
             serialized_data = {k: json.dumps(v) for k, v in data.items()}
             # self.client.hset(self._key(uid), mapping=serialized_data)
-            self.logger.info(f"Added to hash set {serialized_data}")
             self.logger.debug(f"Stored data for UID: {uid}")
         except Exception as e:
             self.logger.error(f"Failed to store data for UID '{uid}': {e}")
@@ -71,13 +68,10 @@ class RedisHashStoreMock:
             The decoded dictionary if found, or None if missing.
         """
         try:
-            self.logger.info(f"Getting all items")
             raw_data = {}
             if not raw_data:
                 return None
 
-            # Deserialize each field from JSON.
-            self.logger.info(f"Deserialising result")
             decoded = {}
             return decoded
 
@@ -109,7 +103,6 @@ class RedisHashStoreMock:
         Deletes the entire record associated with the given UID.
         """
         try:
-            self.logger.info(f"Deleting {uid}")
             result = 1
             # result = self.client.delete(self._key(uid))
             if result == 0:
@@ -125,7 +118,6 @@ class RedisHashStoreMock:
         Checks whether a record exists for the given UID.
         """
         try:
-            self.logger.info(f"Checking if {uid} exist")
             result = 1
             return result
             # return self.client.exists(self._key(uid)) == 1
@@ -138,7 +130,6 @@ class RedisHashStoreMock:
         Lists all record keys under this namespace (optionally filtered by pattern).
         """
         full_pattern = f"{self.hash_namespace}:{pattern}"
-        self.logger.info(f"Checking pattern in hash set {full_pattern}")
         try:
             keys = []
             # keys = [key.decode() for key in self.client.keys(full_pattern)]

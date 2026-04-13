@@ -31,8 +31,6 @@ class RedisHashStore:
         self.client: redis.Redis = redis_connection.get_client()
         self.logger: Logger = getLogger(f"{hash_namespace}.redis_hash_store")
 
-        self.logger.info(f"--- Initialized RedisHashStore for namespace: '{self.hash_namespace}' ---")
-
     def _key(self, uid: str) -> str:
         """
         Internal helper to compute the Redis key for a given UID.

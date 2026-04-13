@@ -20,14 +20,9 @@ class RedisDuplicateFilter:
             raise ValueError("key_name must be a non-empty string.")
         
         self.logger = getLogger(f"{key_name}.redis_duplicate_filter")
-        self.logger.info("--- Initializing RedisDuplicateFilter ---")
-        
-
         self.key_name:str = key_name
         self.ttl_s:int = ttl_s
         self.client: redis.Redis = redis_connection.get_client()
-
-        self.logger.info(f"--- Initialized RedisDuplicateFilter at {key_name} ---")
 
     def has_one(self, item: str) -> bool:
         """

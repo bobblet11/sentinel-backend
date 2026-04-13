@@ -20,10 +20,7 @@ import os
 import sys
 import time
 import traceback
-<<<<<<< HEAD
-=======
 import uuid
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 from pathlib import Path
 
 import numpy as np
@@ -75,11 +72,7 @@ os.environ.setdefault("TRANSFORMERS_CACHE", str(_NLP_TEST_CACHE / "hub"))
 
 os.environ["NLP_EMBEDDING_MODEL"] = "sentence-transformers/all-mpnet-base-v2"
 os.environ["NLP_NER_MODEL"] = "dslim/bert-base-NER-uncased"
-<<<<<<< HEAD
-os.environ["NLP_BIAS_MODEL"] = "typeform/distilbert-base-uncased-mnli"
-=======
 os.environ["NLP_BIAS_MODEL"] = "premsa/political-bias-prediction-allsides-BERT"
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 
 _STUB_ENV = {
     "INPUT_STREAMS": "user:to.be.nlp",
@@ -109,21 +102,13 @@ log = logging.getLogger("test_components")
 # ---------------------------------------------------------------------------
 # Project imports (after sys.path and env vars are set)
 # ---------------------------------------------------------------------------
-<<<<<<< HEAD
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore  # noqa: E402
-=======
 from common.models.api.redis_models import Article, Message, MessageHeader, MessagePayload, NLPOptions, NLPResult, SentenceScore, StreamMessage  # noqa: E402
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 from microservices.nlp.components.bias import BiasDetector  # noqa: E402
 from microservices.nlp.components.checkworthy import CheckWorthinessFilter  # noqa: E402
 from microservices.nlp.components.embedder import Embedder  # noqa: E402
 from microservices.nlp.components.ner import EntityRecognizer  # noqa: E402
 from microservices.nlp.components.preprocess import Preprocessor  # noqa: E402
-<<<<<<< HEAD
-from microservices.nlp.config import model_manager  # noqa: E402
-=======
 from microservices.nlp.config import DEVICE_CONFIG, model_manager  # noqa: E402
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 
 # Prime heavy library imports in the main thread before load_all() spawns worker
 # threads — avoids a huggingface_hub circular import that occurs when
@@ -163,15 +148,9 @@ COMPONENT_MODEL_KEYS = {
     "preprocessor": ["SPACY_SENT"],
     "embedder": ["SPACY_SENT", "EMBEDDING"],
     "ner": ["SPACY_SENT", "EMBEDDING", "NER"],
-<<<<<<< HEAD
-    "bias": ["SPACY_SENT", "EMBEDDING", "BIAS"],
-    "checkworthy": ["SPACY_SENT", "EMBEDDING", "NER", "CHECKWORTHY"],
-    "all": ["SPACY_SENT", "EMBEDDING", "NER", "BIAS", "CHECKWORTHY"],
-=======
     "bias": ["SPACY_SENT", "EMBEDDING", "BIAS_POLITICAL", "BIAS_SENTIMENT"],
     "checkworthy": ["SPACY_SENT", "EMBEDDING", "NER", "CHECKWORTHY"],
     "all": ["SPACY_SENT", "EMBEDDING", "NER", "BIAS_POLITICAL", "BIAS_SENTIMENT", "CHECKWORTHY"],
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 }
 
 # Component type tags for dispatch (matching run_pipeline_tests.py)
@@ -261,10 +240,6 @@ def print_bias(result: NLPResult, sentences: list) -> None:
         print("  No bias profile generated.")
         return
     print(f"  bias_category:               {bp.bias_category}")
-<<<<<<< HEAD
-    print(f"  bias_score:                  {bp.bias_score:.4f}")
-=======
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
     print(f"  bias_analysis_confidence:    {bp.bias_analysis_confidence:.4f}")
     print(f"  sentiment_category:          {bp.sentiment_category}")
     print(f"  sentiment_analysis_confidence: {bp.sentiment_analysis_confidence:.4f}")
@@ -324,8 +299,6 @@ def print_section_header(stage_name: str, elapsed: float) -> None:
 # ---------------------------------------------------------------------------
 
 
-<<<<<<< HEAD
-=======
 def _make_test_stream_message(article: Article) -> StreamMessage:
     """Create a minimal StreamMessage wrapping the given article for testing."""
     header = MessageHeader(
@@ -345,7 +318,6 @@ def _make_test_stream_message(article: Article) -> StreamMessage:
     return StreamMessage(stream="test", redis_id="0-0", priority=1, data=message)
 
 
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
 def run_component(
     name: str,
     article: Article,
@@ -355,19 +327,6 @@ def run_component(
 ):
     """Instantiate and run a single component. Returns (elapsed, sentences)."""
     cls = COMPONENT_CLASSES[name]
-<<<<<<< HEAD
-    component = cls()
-    ctype = COMPONENT_TYPES[name]
-    t0 = time.monotonic()
-    if ctype == "SentenceGenerator":
-        sentences = component.run(article, result, options)
-    elif ctype == "SentenceProcessor":
-        sentences = component.run(article, result, options, sentences)
-    elif ctype == "SentenceConsumer":
-        component.run(article, result, options, sentences)
-    else:  # ArticleProcessor
-        component.run(article, result, options)
-=======
     ctype = COMPONENT_TYPES[name]
 
     # Instantiate with correct constructor args per component
@@ -412,7 +371,6 @@ def run_component(
     if msg_result.bias_profile:
         result.bias_profile = msg_result.bias_profile
 
->>>>>>> 029c55eb28ec7683a93e17d0ad574b6aff998cac
     return time.monotonic() - t0, sentences
 
 

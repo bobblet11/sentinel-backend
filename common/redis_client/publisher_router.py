@@ -48,19 +48,14 @@ class RedisPublisherRouter:
 
         unique_handle: str = hashlib.md5(str(routing_map).encode("utf-8")).hexdigest()[:5]
         self.logger: Logger = getLogger(f"{unique_handle}.redis_publisher_router")
-        self.logger.info("--- Initializing RedisPublisherRouter ---")
-        
         self.routing_map:Dict[str,str] = routing_map
         self.routing_key:List[str] = routing_key
         self.publishers: Dict[str, RedisPublisher] = {}
 
         for message_type, stream_name in self.routing_map.items():
-            self.logger.info(
-                f"Mapping messages of type '{message_type}' -> stream '{stream_name}'"
-            )
             self.publishers[message_type] = RedisPublisher(stream_name)
-            
-        self.logger.info(f"--- Initialized RedisPublisherRouter ---")
+
+        self.logger.info(f"PublisherRouter ready: {routing_map}")
 
 
     def _get_nested_value(self, payload:Dict[str,Any], keys: List[str]) -> Any:
@@ -100,7 +95,6 @@ class RedisPublisherRouter:
         # 1. Determine the route
         routing_value:str = self._get_nested_value(message_payload, self.routing_key)
         if not routing_value:
-            self.logger.info(f"Routing map is {self.routing_map}")
             raise Exception(f"Routing key '{self.routing_key}' not found in message. Message not published.")
 
         # 2. Find the correct publisher for that route

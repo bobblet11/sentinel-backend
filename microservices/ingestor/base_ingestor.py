@@ -109,23 +109,22 @@ class BaseIngestor:
         """
 
         # Step 1: Fetch articles from source
-        self.logger.info("--- Starting new ingestion cycle ---")
         raw_articles: List[Article] = list(self.fetch_articles())
         if len(raw_articles) == 0:
-            self.logger.info("--- Ingestion cycle finished. No articles found. ---\n\n")
+            self.logger.info("Ingestion cycle: no articles found.")
             return
-                
+
         # Step 2: Get rid of any duplicates and malformed articles
         unique_articles: Set[Article] = set([a for a in raw_articles if a.link])
         if not unique_articles:
-            self.logger.info("--- Ingestion cycle finished. All urls are malformed or all duplicates. ---\n\n")
+            self.logger.info("Ingestion cycle: all URLs malformed or duplicate.")
             return
         
 
         # Step 3: Filter out articles that have been seen
         unseen_urls: Set[str] = set(self.duplicate_filter.has_many(list([a.link for a in unique_articles])))
         if not unseen_urls:
-            self.logger.info("--- Ingestion cycle finished. Seen all articles already. ---\n\n")
+            self.logger.info("Ingestion cycle: all articles already seen.")
             return
         unseen_articles: List[Article] = [article for article in unique_articles if article.link in unseen_urls]
             
@@ -156,7 +155,7 @@ class BaseIngestor:
             
             messages_to_publish.append(message.model_dump())
         if len(messages_to_publish) == 0:
-            self.logger.info("--- Ingestion cycle finished. No messages to publish. ---\n\n")
+            self.logger.info("Ingestion cycle: no messages to publish.")
             return
         published_ids:List[str] = self.publisher.publish_many(messages_to_publish)
 
@@ -174,9 +173,9 @@ class BaseIngestor:
         
 
         # Step 7: Log results
-        self.logger.info("--- Ingestion cycle finished ---")
-        self.logger.info(f"\tNew articles encountered: {no_unseen_articles}")
-        self.logger.info(f"\tPreviously seen articles encountered: {no_seen_articles}")
-        self.logger.info(f"\tTotal fetched: {no_raw_articles_fetched} (deduplicated count: {no_raw_deduplicated_articles_fetched})")
-        self.logger.info(f"\tCachce size after: {self.duplicate_filter.client.scard(self.duplicate_filter.key_name)}")
-        self.logger.info("-" * 10)
+        self.logger.info(
+            "Ingestion cycle done: new=%d seen=%d total_fetched=%d",
+            no_unseen_articles,
+            no_seen_articles,
+            no_raw_articles_fetched,
+        )

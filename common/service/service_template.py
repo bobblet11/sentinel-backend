@@ -81,7 +81,6 @@ class ServiceTemplate(ABC):
 			self.fail_publisher = RedisPublisher(config.failure_output_stream)
    
 		self.is_cut_and_paste_mode = config.is_cut_and_paste_mode
-		self.logger.info(f"config of service: {config}")
 
 	def shutdown(self, *args) -> None:
 		"""Signal handler to initiate a graceful shutdown."""
@@ -96,17 +95,15 @@ class ServiceTemplate(ABC):
 		redis_id = message.redis_id if is_stream_message else message.get("redis_message_id", "N/A")
 		stream_name = message.stream if is_stream_message else message.get("stream", "N/A")
 		self.logger.error(f"Failed to process message {redis_id}: {error}")
-		
+
 		payload = message.data.model_dump(mode='json') if is_stream_message else message.get("data", {})
   		# Acknowledge the original message before publishing to failure queue
-		self.fail_publisher.publish_one(payload)	
+		self.fail_publisher.publish_one(payload)
 
 		if self.is_cut_and_paste_mode:
 			self.message_consumer.acknowledge_and_delete(stream_name=stream_name, redis_message_id=redis_id)
 		else:
 			self.message_consumer.acknowledge(stream_name=stream_name, redis_message_id=redis_id)
-   
-		self.logger.info(f"Message {redis_id} acknowledged and moved to failure stream.")
   
 	def _handle_failure_batch(self, messages: List[StreamMessage | Dict[str, Any]], error: Exception):
 		"""Logs the error and publishes the message to the failure stream."""
@@ -171,7 +168,6 @@ class ServiceTemplate(ABC):
 			raise
 	
 	def _process_batch_sequentially(self, raw_messages: List[Dict[str, Any]]) -> None:
-		self.logger.info(f"Fetched {len(raw_messages)} messages. Processing...")
   
 		stream_messages: List[StreamMessage] = [msg for m in raw_messages if (msg := self._parse_message(m))]
 		payloads_to_publish: List[Dict[str, Any]] = []
@@ -190,7 +186,6 @@ class ServiceTemplate(ABC):
 				self._handle_failure(message, e)
 
 		if not payloads_to_publish:
-			self.logger.info("No messages were successfully processed to be published.")
 			return
 
 		publish_results = self.success_publish_router.publish_many(payloads_to_publish)
@@ -215,16 +210,10 @@ class ServiceTemplate(ABC):
 
 				ack_count += 1
 		
-		if ack_count > 0:
-			self.logger.info(f"Successfully published and acknowledged {ack_count} routable messages.")
-		
 		if failure_count > 0:
-			# The logging for this is handled inside _handle_failure, 
-			# but a summary log is good practice.
-			self.logger.info(f"Handled {failure_count} unroutable messages by sending to failure stream.")
+			self.logger.warning(f"Sent {failure_count} unroutable messages to failure stream.")
 
 	def _process_batch_concurrently(self, executor: ThreadPoolExecutor, raw_messages: List[Dict[str,Any]]):
-		self.logger.info(f"Fetched {len(raw_messages)} messages. Processing...")
 		stream_messages = [msg for m in raw_messages if (msg := self._parse_message(m))]
 
 		future_to_message = {
@@ -246,7 +235,6 @@ class ServiceTemplate(ABC):
 			raw_messages = self.message_consumer.consume_many(num_to_consume=self.batch_size)
 			if raw_messages:
 				return raw_messages
-			self.logger.debug("No new messages, waiting...")
 		return [] 
 	
 	def _process_a_batch(self, executor: Optional[ThreadPoolExecutor]):
