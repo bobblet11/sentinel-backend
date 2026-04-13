@@ -150,22 +150,23 @@ def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
     try:
         requested_job_type = JobType.BACKGROUND.value if job_in.is_background else JobType.USER.value
 
-        # Seen article fast path: reuse most recent job for this URL and skip republishing.
-        existing_article = get_article_by_url(db=db, article_url=job_in.article_url)
-        if existing_article:
-            existing_job = get_latest_job_for_article(
-                db=db,
-                article_id=cast(int, existing_article.id),
-                job_type=requested_job_type,
-            )
-            if existing_job:
-                logger.info(
-                    "Seen article detected. Reusing existing job id=%s uid=%s for url=%s",
-                    existing_job.id,
-                    existing_job.uid,
-                    existing_article.url,
-                )
-                return existing_job
+        # # Seen article fast path: reuse most recent job for this URL and skip republishing.
+        # existing_article = get_article_by_url(db=db, article_url=job_in.article_url)
+        # if existing_article:
+        #     print("WTF WHY IT EXIST!")
+        #     existing_job = get_latest_job_for_article(
+        #         db=db,
+        #         article_id=cast(int, existing_article.id),
+        #         job_type=requested_job_type,
+        #     )
+        #     if existing_job:
+        #         logger.info(
+        #             "Seen article detected. Reusing existing job id=%s uid=%s for url=%s",
+        #             existing_job.id,
+        #             existing_job.uid,
+        #             existing_article.url,
+        #         )
+        #         return existing_job
 
         # Start of the "Unit of Work"
         job_in.news_outlet = get_news_outlet(job_in)
