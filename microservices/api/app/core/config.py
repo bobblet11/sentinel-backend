@@ -37,7 +37,6 @@ env_variables: List[EnvVariable] = [
     EnvVariable("HASH_STORE_NAMESPACE", HASH_STORE_NAMESPACE),
 ]
 
-output_streams = [OUTPUT_STREAM]
 
 print_env(Config(env_variables, None, None), config_logger)
 

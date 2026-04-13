@@ -1,5 +1,6 @@
 import datetime
 import hashlib
+import json
 from common.models.api.dtos.job import JobStage, JobStatus
 from common.models.api.redis_models import Message, MessageHeader, MessagePayload, MessageTimestamp, add_timestamp_to_message
 from common.redis_client.consumer import RedisConsumer
@@ -12,12 +13,11 @@ from typing import Optional
 
 
 
-
-routing_map = {JobType.USER.value: OUTPUT_STREAM, JobType.BACKGROUND.value: OUTPUT_STREAM}
-
-publisher = RedisPublisherRouter(
+routing_map = RedisPublisherRouter.generate_router_mapping([OUTPUT_STREAM,"background:to.be.scraped"], [JobType.USER.value, JobType.BACKGROUND.value])
+publisher_router = RedisPublisherRouter(
 	routing_key=["header","type"], routing_map=routing_map
 )
+
 
 def publish_job(job: Job, article: Article, job_dto: JobCreate)->None:
 	try:	
@@ -37,8 +37,8 @@ def publish_job(job: Job, article: Article, job_dto: JobCreate)->None:
 		message = add_timestamp_to_message(message=message, stage_name=JobStage.INGESTED)
 
   
-		message_as_dict = message.model_dump()
-		publisher.publish_one(message_as_dict)
+		message_payload = message.model_dump(mode='json')
+		publisher_router.publish_one(message_payload)
 
 	except Exception as e:
          
