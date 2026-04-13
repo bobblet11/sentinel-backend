@@ -2,7 +2,7 @@
 from typing import List
 from logging import getLogger
 import random
-from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_nlp
+from common.models.api.validation_helpers import get_pretty_print_stream_message, validate_after_nlp
 import torch
 
 from common.models.api.redis_models import (
@@ -155,8 +155,7 @@ class NLPService(ServiceTemplate):
         # Expose processed sentences for downstream services.
         # ClaimExtraction sets result.sentences internally; only override
         # if the dispatch loop produced its own sentence list.
-        
-        
+
         # if sentences:
         #     result = message.create_nlp_result()
         #     result.sentences = sentences
@@ -169,7 +168,7 @@ class NLPService(ServiceTemplate):
     def _process_message(self, message: StreamMessage) -> StreamMessage:
         try:
             if message.data.header.type == "user":
-                logger.info("Received user message for NLP: %s", message.data.payload)
+                logger.info("Processing user article: %s", message.data.payload.link if hasattr(message.data, 'payload') else "unknown")
 
             if DUMMY_NLP_MODE:
                 dummy_result = _build_dummy_result()

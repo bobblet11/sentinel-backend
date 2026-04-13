@@ -32,16 +32,12 @@ class RedisConsumerCombiner:
             raise ValueError("group_name must be a non-empty string.")
 
         self.logger: Logger = getLogger(f"{consumer_name}.redis_consumer_combiner")
-        self.logger.info("--- Initializing RedisConsumerCombiner ---")
-        
         self.streams:List[str] = streams
         self.group_name:str = group_name
         self.consumer_name:str = consumer_name
         self.client:redis.Redis = redis_connection.get_client()
-        
-        self.logger.info(f"Stream Names: '{self.streams}', Group Name: '{self.group_name}', Consumer Name: '{self.consumer_name}'")
         self._create_groups()
-        self.logger.info("--- Initialized RedisConsumerCombiner ---")
+        self.logger.info(f"RedisConsumerCombiner ready: streams={self.streams}, group='{self.group_name}'")
 
     def _create_groups(self) -> None:
         """
@@ -56,11 +52,11 @@ class RedisConsumerCombiner:
                     stream, self.group_name, id="0", mkstream=True
                 )
                 self.logger.info(f"Created group '{self.group_name}' on stream '{stream}'.")
-                
+
             except redis.exceptions.ResponseError as e:
                 if "BUSYGROUP" not in str(e):
                     raise e
-                self.logger.error(f"Group '{self.group_name}' already exists on stream '{stream}'.")
+                self.logger.debug(f"Group '{self.group_name}' already exists on stream '{stream}'.")
 
     def _decode_one_message(self, stream_name:str, redis_message_id:str, fields:Dict[str, Any]) -> Dict[str, Any]:
         """

@@ -12,9 +12,7 @@ class RedisPublisherMock:
     def __init__(self):
 
         self.logger: Logger = getLogger("mock.redis_publisher")
-        self.logger.info("--- Initializing RedisPublisher ---")
         self.queue = []
-        self.logger.info(f"--- Initialized RedisPublisher ---")
 
     def publish_one(self, message_payload: Dict[Any, Any]) -> str:
         """

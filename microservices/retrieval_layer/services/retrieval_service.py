@@ -1,5 +1,6 @@
 from asyncio import as_completed
 from concurrent.futures import ThreadPoolExecutor
+from email.mime import message
 from typing import Any, Dict, List, Tuple
 from datetime import datetime, timedelta
 from requests import Session
@@ -109,39 +110,32 @@ class RetrievalService(ServiceTemplate):
         return verdict, confidence
 
     def _save_data_into_postgres(self, db: Session, message: StreamMessage):
-        
+
         claims: List[Claim] = message.all_claims or []
-        
-        self.logger.debug(
-                "=== SAVING JOB FOR ARTICLE ===\n"
-                "\tuid=%s, title=%s\n"
-                "\tNumber of claims: %d",
-                message.uid,
-                message.title,
-                len(claims),
-        )
-        
-        self.logger.debug("\t3 Claims from job")
-        for i in range(min(3, len(claims))):
-            self.logger.debug(
-                "\tClaim %d: %s\n"
-                "\t\tEmbedding sample (first 3 values): %s\n"
-                "\t\tCentrality score: %.2f",
-                i,
-                claims[i].decontextualised_claim_text,
-                claims[i].decontextualised_claim_embedding[:3],
-                claims[i].confidence,
-            )
-        
+
+        self.logger.debug("Saving article uid=%s claims=%d", message.uid, len(claims))
         bias_profile = message.bias_profile
 
+        # Guard against None bias_profile when NLP bias detection fails
+        if bias_profile is None:
+            self.logger.warning("bias_profile is None for uid=%s, using defaults", message.uid)
+            sentiment_dto = CreateOrModifySentiment(
+                bias_category="center",
+                # bias_score=0.0,
+                bias_analysis_confidence=0.0,
+                sentiment_category="neutral",
+                sentiment_analysis_confidence=0.0,
+            )
+        else:
+            sentiment_dto = CreateOrModifySentiment(
+                bias_profile.bias_category,
+                # bias_profile.bias_score,
+                bias_profile.bias_analysis_confidence,
+                bias_profile.sentiment_category,
+                bias_profile.sentiment_analysis_confidence,
+            )
+        
         article_dto = CreateOrModifyArticle(message.link, message.title, message.text, message.html, message.publish_date, message.data.payload.author)
-        sentiment_dto = CreateOrModifySentiment(
-            bias_profile.bias_category if bias_profile else None,
-            bias_profile.bias_analysis_confidence if bias_profile else None,
-            bias_profile.sentiment_category if bias_profile else None,
-            bias_profile.sentiment_analysis_confidence if bias_profile else None,
-        )
         outlet_dto = CreateOrModifyOutlet(message.news_outlet_name)
         
         article_entry = get_or_create_article(db, article_dto, sentiment_dto, outlet_dto)
@@ -171,12 +165,7 @@ class RetrievalService(ServiceTemplate):
             all_entities_added.extend(entities_added)
             all_claims_added.append(new_claim_entry)
             
-        self.logger.info(
-            "DB write result article=%s claims=%s entities=%s (limited to 3 rows)",
-            article_entry,
-            all_entities_added[:3],
-            all_claims_added[:3],
-        )
+        self.logger.debug("Saved article id=%s claims=%d entities=%d", article_entry.id, len(all_claims_added), len(all_entities_added))
         
         return {
             "article_entry_id": article_entry.id,
@@ -185,16 +174,14 @@ class RetrievalService(ServiceTemplate):
         }
         
     def _retrieve_evidence_for_claim(self, db: Session, claim: Claim, original_article_id: int, publish_date: str | None = None) -> Dict[str, Any]:
-        self.logger.debug("=== FINDING EVIDENCE ===\n")
         input_claim_text = claim.decontextualised_claim_text or ""
         claim_candidates = set()
         
         def filter_step() -> List[int | str]:
-            self.logger.debug("FILTERING")
             # Parse article publish date for ±30 day window
             published_after = None
             published_before = None
-            
+
             if publish_date:
                 try:
                     article_date = datetime.fromisoformat(
@@ -205,8 +192,6 @@ class RetrievalService(ServiceTemplate):
                 except Exception:
                     pass
 
-            # low limit because the matches are going to be low.
-            self.logger.debug("FILTERING BY KEYWORD")
             keyword_candidates = find_evidence_by_keyword_match(
                 db,
                 input_claim_text,
@@ -217,8 +202,6 @@ class RetrievalService(ServiceTemplate):
             )
             claim_candidates.update(keyword_candidates)
             entities_in_claim = [entity.entity_text for entity in claim.NER_entities]
-            # higher limit because the matches are going to be higher.
-            self.logger.debug("FILTERING BY ENTITY")
             entity_candidates = find_evidence_by_entity_match(
                 db,
                 entities_in_claim,
@@ -238,7 +221,6 @@ class RetrievalService(ServiceTemplate):
             return capped_filter_step_candidate_ids
         
         def similarity_step(capped_filter_step_candidate_ids) -> List[Tuple[Dict[str, str | int], float]]:
-            self.logger.debug("SIMILARITY STEP")
             claim_text_embedding = self._normalize_embedding(claim.decontextualised_claim_embedding)
             if claim_text_embedding is None:
                 self.logger.warning("Skipping similarity step due to invalid claim embedding for claim=%r", (input_claim_text or "")[:80])
@@ -265,7 +247,6 @@ class RetrievalService(ServiceTemplate):
             return capped_similarity_step_candidate_list
         
         def classification_step(capped_similarity_step_candidate_list) -> List[Tuple[Dict, float, str, float]]:
-            self.logger.debug("CLASSIFICATION STEP")
             classified_evidence = []
             
             for evidence_claim, similarity_score in capped_similarity_step_candidate_list:
@@ -331,14 +312,9 @@ class RetrievalService(ServiceTemplate):
                 original_article_id=original_article_id,
                 publish_date=message.publish_date,
             )
-            self.logger.debug("EVIDENCE RETRIEVED")
-
             claim_results.append(input_claim_evaluation)
-
             evidence_claim_ids.extend([evidence_claim.get("claim_id") for evidence_claim in input_claim_evaluation.get("matches", [])])
-        
-        # Extend evidence claims into articles
-        self.logger.debug("EXTENDING CLAIMS INTO ARTICLES")
+
         related_articles = extend_evidence_claims_into_articles(
             db=db,
             claim_ids=evidence_claim_ids,
@@ -357,10 +333,7 @@ class RetrievalService(ServiceTemplate):
     def _save_job_into_postgres(self, db:Session, message:StreamMessage):
         job_dto = UpdateJob(message.header.id, message.header.uid, JobStatus.COMPLETE, message.stage_timestamps)
         job_entry = finalise_and_complete_job(db, job_dto)        
-        self.logger.info(
-            "DB write result job=%s",
-            job_entry
-        )
+        self.logger.debug("Saved job id=%s uid=%s status=%s", job_entry.id, job_entry.uid, job_entry.status)
         # return job_entry 
         return {
             "job_id": job_entry.id,
@@ -387,18 +360,8 @@ class RetrievalService(ServiceTemplate):
                 new_id = message.uid
                 matches = payload.get("matches") or []
                 related_articles = payload.get("related_articles") or []
-                self.logger.info(
-                    "Stored retrieval result for job_uid=%s:\\n"
-                    "  save_data_result keys: %s\\n"
-                    "  save_job_result keys: %s\\n"
-                    "  matches: %d\\n"
-                    "  related_articles: %d",
-                    message.uid,
-                    list(payload.get("save_data_result", {}).keys()) if payload.get("save_data_result") else [],
-                    list(payload.get("save_job_result", {}).keys()) if payload.get("save_job_result") else [],
-                    len(matches),
-                    len(related_articles)
-                )
+                self.logger.info("Stored result uid=%s matches=%d related_articles=%d", message.uid, len(matches), len(related_articles))
+                
             self.uid_store.add_one(str(message.uid))
             if self.is_cut_and_paste_mode:
                 self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
@@ -414,7 +377,6 @@ class RetrievalService(ServiceTemplate):
             raise
 	
     def _process_batch_sequentially(self, raw_messages: List[Dict[str, Any]]) -> None:
-        self.logger.info(f"Fetched {len(raw_messages)} messages. Processing...")
 
         stream_messages: List[StreamMessage] = [msg for m in raw_messages if (msg := self._parse_message(m))]
         ack_count = 0
@@ -437,19 +399,8 @@ class RetrievalService(ServiceTemplate):
                     new_id = message.uid
                     matches = payload.get("matches") or []
                     related_articles = payload.get("related_articles") or []
-                    self.logger.info(
-                        "Stored retrieval result for user job_uid=%s:\n"
-                        "  save_data_result keys: %s\n"
-                        "  save_job_result keys: %s\n"
-                        "  matches: %d\n"
-                        "  related_articles: %d",
-                        message.uid,
-                        list(payload.get("save_data_result", {}).keys()) if payload.get("save_data_result") else [],
-                        list(payload.get("save_job_result", {}).keys()) if payload.get("save_job_result") else [],
-                        len(matches),
-                        len(related_articles)
-                    )                    
-                    
+                    self.logger.info("Stored result uid=%s matches=%d related_articles=%d", message.uid, len(matches), len(related_articles))
+                
                 self.uid_store.add_one(str(message.uid))
                 if self.is_cut_and_paste_mode:
                     self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
@@ -465,16 +416,10 @@ class RetrievalService(ServiceTemplate):
                 failure_count+=1
  
         
-        if ack_count > 0:
-            self.logger.info(f"Successfully saved and acknowledged {ack_count} messages.")
-        
         if failure_count > 0:
-            # The logging for this is handled inside _handle_failure, 
-            # but a summary log is good practice.
-            self.logger.info(f"Handled {failure_count} failed messages by sending to failure stream.")
+            self.logger.warning(f"Sent {failure_count} failed messages to failure stream.")
 
     def _process_batch_concurrently(self, executor: ThreadPoolExecutor, raw_messages: List[Dict[str,Any]]):
-        self.logger.info(f"Fetched {len(raw_messages)} messages. Processing...")
         stream_messages = [msg for m in raw_messages if (msg := self._parse_message(m))]
 
         future_to_message = {
@@ -491,23 +436,22 @@ class RetrievalService(ServiceTemplate):
                 self.logger.warning(f"A worker for message {original_message.redis_id} failed. See previous error logs for details.")
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
-        # one db session to make sure the entire thing is 1 transcation
+        # one db session to make sure the entire thing is 1 transaction
         # just raise an exception and it will roll back everything
         with get_db_transaction() as db:
             message.add_timestamp(JobStage.SAVE_DATA_IN)
             save_data_result = self._save_data_into_postgres(db, message)
             message.add_timestamp(JobStage.SAVE_DATA_OUT)
+
             if message.type == JobType.BACKGROUND:
-                self.logger.info("BACKGROUND JOB, end of line")
+                self.logger.info("Background job complete uid=%s", message.header.uid)
                 return message
-            
-            #continue to retrieval
-            # retrieval stuff is only for user jobs
+
             original_article_id = save_data_result.get("article_entry_id") or 0
             message.add_timestamp(JobStage.RETRIEVE_EVIDENCE_IN)
             claim_evidence_matches, related_articles = self._retrieve_evidence(db, message, original_article_id)
             message.add_timestamp(JobStage.RETRIEVE_EVIDENCE_OUT)
-            
+
             message.add_timestamp(JobStage.UPDATE_JOB_IN)
             save_job_result = self._save_job_into_postgres(db, message)
             message.add_timestamp(JobStage.UPDATE_JOB_OUT)
@@ -518,10 +462,7 @@ class RetrievalService(ServiceTemplate):
                 claim_evidence_matches,
                 related_articles
             )
-            # hashstore inside transaction block — if this fails, DB rolls back too
-            # if message.type == JobType.USER:
-            #     self.hash_store.set(message.uid, retrieval_result.__dict__)
-        
+
             message.set_retrieval_result(retrieval_result)
             validate_after_retrieval(stream_message=message, message=None)
             self.logger.debug(get_pretty_print_stream_message(message))

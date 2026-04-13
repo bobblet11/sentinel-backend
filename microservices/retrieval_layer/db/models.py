@@ -71,6 +71,7 @@ class SentimentAnalysis(Base):
     __tablename__ = "sentiment_analysis"
     id = Column(Integer, primary_key=True, autoincrement=True)
     bias_category = Column(String(50), nullable=True)
+    bias_score = Column(Float, nullable=True)
     bias_analysis_confidence = Column(Float, nullable=True)
     sentiment_category = Column(String(50), nullable=True)
     sentiment_analysis_confidence = Column(Float, nullable=True)

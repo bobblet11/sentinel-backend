@@ -77,7 +77,7 @@ SENTENCE_EXTRACT_TOP_K = 15
 # =============================================================================
 try:
     LOG_MODE: int = get_env_var("LOG_MODE",int, config_logger)
-    
+
     INPUT_STREAMS: List[str] = [
         x.strip(" ,")
         for x in get_env_var("INPUT_STREAMS", str, config_logger).split(",")
@@ -136,7 +136,7 @@ try:
 
     env_variables: List[EnvVariable] = [
         EnvVariable("LOG_MODE", LOG_MODE),
-        
+
         EnvVariable("INPUT_STREAMS", INPUT_STREAMS),
         EnvVariable("USER_OUTPUT_STREAM", USER_OUTPUT_STREAM),
         EnvVariable("BACKGROUND_OUTPUT_STREAM", BACKGROUND_OUTPUT_STREAM),

@@ -81,7 +81,7 @@ COMMENT ON COLUMN job.status IS 'The current status of the job, e.g., pending, c
 CREATE TABLE IF NOT EXISTS job_timestamp (
 	id SERIAL PRIMARY KEY,
 	job_id INTEGER NOT NULL,
-	stage_name VARCHAR(50) NOT NULL,
+	stage_name TEXT NOT NULL,
     	timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 
 	CONSTRAINT fk_job

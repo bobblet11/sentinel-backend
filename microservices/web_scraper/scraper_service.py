@@ -36,7 +36,7 @@ OUTLET_PATTERNS = {
     r"(euronews\.com|www\.euronews\.com)": "Euronews",
     r"(abcnews\.go\.com|abcnews\.com)": "ABC",
     r"(cbsnews\.com|www\.cbsnews\.com)": "CBS",
-    r"(nbcnews\.com|www\.nbcnews\.com)": "NBC",
+    r"(nbcnews\.com|www\.nbcnews\.com|feeds\.nbcnews\.com)": "NBC",
     r"(npr\.org|www\.npr\.org)": "NPR",
     r"(foxnews\.com|www\.foxnews\.com)": "Fox News",
     r"(reuters\.com|www\.reuters\.com)": "Reuters",
@@ -160,7 +160,7 @@ class ScraperService(ServiceTemplate):
             return message
         
         except Exception as e:
-            self.logger.error(f"\nFailed to fetch HTML of message. Publishing to failure queue. {e}")
+            self.logger.error(f"Failed to fetch HTML: {e}")
             raise 
 
     def _parse_article_and_update(self, message: StreamMessage) -> StreamMessage:
@@ -182,7 +182,7 @@ class ScraperService(ServiceTemplate):
             message.set_parsed_result(parsed_result)
             return message
         except Exception as e:
-            self.logger.error(f"\nFailed to parse HTML of message. Publishing to failure queue. {e}")
+            self.logger.error(f"Failed to parse HTML: {e}")
             raise e
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
