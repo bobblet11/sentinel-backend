@@ -187,7 +187,7 @@ def get_pretty_print_message(message: Message, text_snippet_len: int = 10) -> st
     return json.dumps(msg_dict, indent=4, ensure_ascii=False)
 
 
-def get_pretty_print_stream_message(stream_message: StreamMessage, snippet_len: int = 200) -> str:
+def get_pretty_print_stream_message(stream_message: StreamMessage, snippet_len: int = 50) -> str:
     """
     Pretty prints a StreamMessage object for inspection.
     Uses Pydantic's model_dump for safe serialization.
@@ -202,13 +202,13 @@ def get_pretty_print_stream_message(stream_message: StreamMessage, snippet_len: 
 
     # Truncate long text/html fields
     if msg_dict["payload"].get("parsed_text"):
-        msg_dict["payload"]["parsed_text_snippet"] = (
+        msg_dict["payload"]["parsed_text"] = (
             msg_dict["payload"]["parsed_text"][:snippet_len] + "..."
             if len(msg_dict["payload"]["parsed_text"]) > snippet_len
             else msg_dict["payload"]["parsed_text"]
         )
     if msg_dict["payload"].get("raw_html"):
-        msg_dict["payload"]["raw_html_snippet"] = (
+        msg_dict["payload"]["raw_html"] = (
             msg_dict["payload"]["raw_html"][:snippet_len] + "..."
             if len(msg_dict["payload"]["raw_html"]) > snippet_len
             else msg_dict["payload"]["raw_html"]
