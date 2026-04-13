@@ -44,7 +44,7 @@ def _build_connection_kwargs() -> dict[str, Any]:
             kwargs["ssl_cert_reqs"] = "optional"
         else:
             kwargs["ssl_cert_reqs"] = "required"
-
+    # print(kwargs)
     return kwargs
 
 
