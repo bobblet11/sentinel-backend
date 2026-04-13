@@ -70,9 +70,20 @@ DUMMY_SEED_MODE: bool = get_env_var(
 )
 
 HASH_STORE_NAMESPACE: str = get_env_var("HASH_STORE_NAMESPACE",str, config_logger)
+UID_STORE_NAMESPACE: str = get_env_var("UID_STORE_NAMESPACE",str, config_logger)
 TEST_MODE: bool = False
 
+IS_BENCHMARK: bool = get_env_var(
+    "IS_BENCHMARK",
+    lambda x: str(x).lower() in {"1", "true", "yes", "y"},
+    config_logger,
+    default=False,
+)
+BENCHMARK_OUTPUT_STREAM: str = get_env_var("BENCHMARK_OUTPUT_STREAM",str, config_logger)
+
 env_variables: List[EnvVariable] = [
+    EnvVariable("IS_BENCHMARK", IS_BENCHMARK),
+    EnvVariable("BENCHMARK_OUTPUT_STREAM", BENCHMARK_OUTPUT_STREAM),
     EnvVariable("LOG_MODE", LOG_MODE),
     
     EnvVariable("POSTGRES_HOST", POSTGRES_HOST),
@@ -86,6 +97,7 @@ env_variables: List[EnvVariable] = [
     EnvVariable("GROUP_NAME", GROUP_NAME),
     EnvVariable("CONSUMER_NAME", CONSUMER_NAME),
     EnvVariable("HASH_STORE_NAMESPACE", HASH_STORE_NAMESPACE),
+    EnvVariable("UID_STORE_NAMESPACE", UID_STORE_NAMESPACE),
     
     EnvVariable("BATCH_SIZE", BATCH_SIZE),
     EnvVariable("RETRIEVAL_RETRY_FAILURE_MODE", RETRY_FAILURE_MODE),
