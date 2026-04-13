@@ -6,6 +6,7 @@ from requests import Session
 
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
 from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_nlp, validate_after_retrieval
+from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.hash_store import RedisHashStore
 from common.service.service_template import ServiceTemplate
 from common.models.api.redis_models import BiasProfile, Claim, Message, RetrievalResult, StreamMessage
@@ -18,6 +19,8 @@ from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, Cr
 
 from microservices.retrieval_layer.config import (
     HASH_STORE_NAMESPACE,
+    UID_STORE_NAMESPACE,
+    IS_BENCHMARK
 )
 
 from microservices.retrieval_layer.db.session import get_db_session, get_db_transaction
@@ -40,6 +43,7 @@ class RetrievalService(ServiceTemplate):
     def __init__(self, config):
         super().__init__(config)
         self.hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
+        self.uid_store = RedisDuplicateFilter(key_name=UID_STORE_NAMESPACE,ttl_s=0)
 
     @staticmethod
     def _normalize_embedding(embedding: List[float] | None) -> List[float] | None:
@@ -369,9 +373,13 @@ class RetrievalService(ServiceTemplate):
         """Worker for concurrent mode. Processes, then publishes."""
         try:
             processed_message:StreamMessage = self._process_message(message)
-                       
-            payload = processed_message.retrieval_results or {}
+                                
+            if IS_BENCHMARK:
+                payload = processed_message.data.model_dump(mode='json')
+                new_redis_id = self.success_publish_router.publish_one(payload)
+                return message.redis_id, new_redis_id 
             
+            payload = processed_message.retrieval_results or {}
             new_id = "END OF PIPELINE"
             if message.type == JobType.USER:
                 self.hash_store.set(message.uid, payload)
@@ -389,6 +397,12 @@ class RetrievalService(ServiceTemplate):
                     list(payload.get("save_job_result", {}).keys()) if payload.get("save_job_result") else [],
                     len(matches),
                     len(related_articles)
+                )
+            else:
+                self.uid_store.add_one(str(message.uid))
+                self.logger.info(
+                    "Stored retrieval result for background job_uid=%s:\n",
+                    message.uid
                 )
 
             if self.is_cut_and_paste_mode:
@@ -415,6 +429,12 @@ class RetrievalService(ServiceTemplate):
             try:
                 processed_message = self._process_message(message)
                 
+                if IS_BENCHMARK:
+                    payload = processed_message.data.model_dump(mode='json')
+                    new_redis_id = self.success_publish_router.publish_one(payload)
+                    self.logger.debug(f"Successfully published Msg {message.redis_id} -> {new_redis_id} in hashset")
+                    ack_count+=1
+                
                 payload = processed_message.retrieval_results or {}
                 new_id = "END OF PIPELINE"
                 if message.type == JobType.USER:
@@ -423,7 +443,7 @@ class RetrievalService(ServiceTemplate):
                     matches = payload.get("matches") or []
                     related_articles = payload.get("related_articles") or []
                     self.logger.info(
-                        "Stored retrieval result for job_uid=%s:\n"
+                        "Stored retrieval result for user job_uid=%s:\n"
                         "  save_data_result keys: %s\n"
                         "  save_job_result keys: %s\n"
                         "  matches: %d\n"
@@ -433,6 +453,12 @@ class RetrievalService(ServiceTemplate):
                         list(payload.get("save_job_result", {}).keys()) if payload.get("save_job_result") else [],
                         len(matches),
                         len(related_articles)
+                    )
+                else:
+                    self.uid_store.add_one(str(message.uid))
+                    self.logger.info(
+                        "Stored retrieval result for background job_uid=%s:\n",
+                        message.uid
                     )
                 
                 if self.is_cut_and_paste_mode:
@@ -475,8 +501,6 @@ class RetrievalService(ServiceTemplate):
                 self.logger.warning(f"A worker for message {original_message.redis_id} failed. See previous error logs for details.")
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
-        validate_after_nlp(message)
-        self.logger.debug(get_pretty_print_stream_message(message))
         # one db session to make sure the entire thing is 1 transcation
         # just raise an exception and it will roll back everything
         with get_db_transaction() as db:
@@ -509,7 +533,7 @@ class RetrievalService(ServiceTemplate):
             #     self.hash_store.set(message.uid, retrieval_result.__dict__)
         
             message.set_retrieval_result(retrieval_result)
-            validate_after_retrieval(message)
+            validate_after_retrieval(stream_message=message, message=None)
             self.logger.debug(get_pretty_print_stream_message(message))
             return message
                     

@@ -238,7 +238,7 @@ class ScraperService(ServiceTemplate):
             
             message.add_timestamp(JobStage.WEB_SCRAPE_END)
             
-            validate_after_webscraper(message)
+            validate_after_webscraper(stream_message=message, message=None)
             self.logger.debug(get_pretty_print_stream_message(message))
             
             return message

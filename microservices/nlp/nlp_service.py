@@ -162,7 +162,7 @@ class NLPService(ServiceTemplate):
         #     result.sentences = sentences
         #     message.set_nlp_result(result)
         
-        validate_after_nlp(message)
+        validate_after_nlp(stream_message=message, message=None)
         self.logger.debug(get_pretty_print_stream_message(message))
         return message
 

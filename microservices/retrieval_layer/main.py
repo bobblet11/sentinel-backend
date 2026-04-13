@@ -14,7 +14,9 @@ from microservices.retrieval_layer.config import (
     CONSUMER_NAME,
     BATCH_SIZE,
     RETRY_FAILURE_MODE,
-    LOG_MODE
+    LOG_MODE,
+    BENCHMARK_OUTPUT_STREAM,
+    IS_BENCHMARK
 )
 from microservices.retrieval_layer.db.session import ensure_schema_compatibility
 
@@ -23,13 +25,14 @@ CONTAINER_NAME = "retrieval-layer"
 
 if __name__ == "__main__":
     setup_logging(level=LOG_MODE, container_name=CONTAINER_NAME)
-
+    print([BENCHMARK_OUTPUT_STREAM,BENCHMARK_OUTPUT_STREAM] if IS_BENCHMARK else [])
+    
     config = ServiceConfig(
         service_name=SERVICE_NAME,
                 
         input_streams=INPUT_STREAMS, # user:to.be.retrieval, background:to.be.retrieval
         failure_output_stream=FAILURE_OUTPUT_STREAM,
-        output_streams=[],  
+        output_streams=[BENCHMARK_OUTPUT_STREAM,BENCHMARK_OUTPUT_STREAM] if IS_BENCHMARK else [],  
         
         routing_key=["header","type"],     
         router_key_values=[JobType.USER.value, JobType.BACKGROUND.value],
