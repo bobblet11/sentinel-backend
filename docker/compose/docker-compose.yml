@@ -365,6 +365,7 @@ services:
       - UID_STORE_NAMESPACE=${UID_STORE_NAMESPACE}
       - IS_BENCHMARK=${IS_BENCHMARK:-False}
       - BENCHMARK_OUTPUT_STREAM=${BENCHMARK_OUTPUT_STREAM}
+      - MAX_WORKERS=${RETRIEVAL_MAX_WORKERS:-1}
 
     deploy:
       resources:
@@ -423,6 +424,7 @@ services:
 
       - IS_BENCHMARK=${IS_BENCHMARK:-False}
       - BENCHMARK_OUTPUT_STREAM=${BENCHMARK_OUTPUT_STREAM}
+      - MAX_WORKERS=${RETRIEVAL_MAX_WORKERS:-1}
 
     deploy:
       resources:

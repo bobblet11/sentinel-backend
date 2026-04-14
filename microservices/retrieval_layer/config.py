@@ -69,6 +69,13 @@ DUMMY_SEED_MODE: bool = get_env_var(
     default=False,
 )
 
+MAX_WORKERS: int = get_env_var(
+    "MAX_WORKERS",
+    int,
+    config_logger,
+    default=1
+)
+
 HASH_STORE_NAMESPACE: str = get_env_var("HASH_STORE_NAMESPACE",str, config_logger)
 UID_STORE_NAMESPACE: str = get_env_var("UID_STORE_NAMESPACE",str, config_logger)
 TEST_MODE: bool = False
@@ -100,6 +107,7 @@ env_variables: List[EnvVariable] = [
     EnvVariable("UID_STORE_NAMESPACE", UID_STORE_NAMESPACE),
     
     EnvVariable("BATCH_SIZE", BATCH_SIZE),
+    EnvVariable("MAX_WORKERS", MAX_WORKERS),
     EnvVariable("RETRIEVAL_RETRY_FAILURE_MODE", RETRY_FAILURE_MODE),
     
     EnvVariable("DUMMY_NLP_MODE", DUMMY_NLP_MODE),

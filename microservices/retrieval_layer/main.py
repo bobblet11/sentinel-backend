@@ -16,7 +16,8 @@ from microservices.retrieval_layer.config import (
     RETRY_FAILURE_MODE,
     LOG_MODE,
     BENCHMARK_OUTPUT_STREAM,
-    IS_BENCHMARK
+    IS_BENCHMARK,
+    MAX_WORKERS
 )
 from microservices.retrieval_layer.db.session import ensure_schema_compatibility
 
@@ -40,8 +41,8 @@ if __name__ == "__main__":
         group_name=GROUP_NAME,
         consumer_name=CONSUMER_NAME,
         
-        is_concurrent=False,
-        max_workers=1,                 
+        is_concurrent=True if MAX_WORKERS > 1 else False,
+        max_workers=MAX_WORKERS,                 
         batch_size=BATCH_SIZE,
         is_cut_and_paste_mode=True,
         retry_failure_mode=RETRY_FAILURE_MODE

@@ -36,7 +36,7 @@ if __name__ == "__main__":
         failure_output_stream=FAILURE_OUTPUT_STREAM, 
         routing_key=["header","type"],
         
-        is_concurrent=True, 
+        is_concurrent=True if SCRAPER_MAX_WORKERS > 1 else False, 
         max_workers=SCRAPER_MAX_WORKERS, 
         batch_size=BATCH_SIZE,
         is_cut_and_paste_mode=False,
