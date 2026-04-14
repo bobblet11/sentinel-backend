@@ -90,7 +90,7 @@ try:
 
     GROUP_NAME: str = get_env_var("GROUP_NAME", str, config_logger)
     CONSUMER_NAME: str = get_env_var("CONSUMER_NAME", str, config_logger)
-    NLP_MAX_WORKERS: int = get_env_var("NLP_MAX_WORKERS", str, config_logger)
+    NLP_MAX_WORKERS: int = get_env_var("NLP_MAX_WORKERS", int, config_logger)
     BATCH_SIZE: int = get_env_var("BATCH_SIZE", int, config_logger)
 
     DUMMY_NLP_MODE: bool = get_env_var(
