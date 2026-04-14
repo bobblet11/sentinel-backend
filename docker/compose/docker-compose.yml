@@ -366,6 +366,9 @@ services:
       - IS_BENCHMARK=${IS_BENCHMARK:-False}
       - BENCHMARK_OUTPUT_STREAM=${BENCHMARK_OUTPUT_STREAM}
       - MAX_WORKERS=${RETRIEVAL_MAX_WORKERS:-1}
+      - USE_GPU=true
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
     deploy:
       resources:
@@ -375,6 +378,10 @@ services:
         reservations:
           cpus: '${RETRIEVAL_CPU_RESERVATION:-0.25}'
           memory: '${RETRIEVAL_MEMORY_RESERVATION:-1G}'
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
 
   retrieval-layer-service-cpu:
     container_name: sentinel-retrieval-layer-service-container
