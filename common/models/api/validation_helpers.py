@@ -187,11 +187,14 @@ def get_pretty_print_message(message: Message, text_snippet_len: int = 10) -> st
     return json.dumps(msg_dict, indent=4, ensure_ascii=False)
 
 
-def get_pretty_print_stream_message(stream_message: StreamMessage, snippet_len: int = 50) -> str:
+def get_pretty_print_stream_message(
+    stream_message: StreamMessage,
+    snippet_len: int = 50,
+    list_snippet_len: int = 3
+) -> str:
     """
     Pretty prints a StreamMessage object for inspection.
-    Uses Pydantic's model_dump for safe serialization.
-    Long text/html fields are truncated to a snippet.
+    Summarizes large lists instead of dumping them.
     """
     msg_dict = stream_message.data.model_dump()
 
@@ -200,41 +203,62 @@ def get_pretty_print_stream_message(stream_message: StreamMessage, snippet_len: 
     msg_dict["RedisID"] = stream_message.redis_id
     msg_dict["Priority"] = stream_message.priority
 
+    payload = msg_dict.get("payload", {})
+
     # Truncate long text/html fields
-    if msg_dict["payload"].get("parsed_text"):
-        msg_dict["payload"]["parsed_text"] = (
-            msg_dict["payload"]["parsed_text"][:snippet_len] + "..."
-            if len(msg_dict["payload"]["parsed_text"]) > snippet_len
-            else msg_dict["payload"]["parsed_text"]
-        )
-    if msg_dict["payload"].get("raw_html"):
-        msg_dict["payload"]["raw_html"] = (
-            msg_dict["payload"]["raw_html"][:snippet_len] + "..."
-            if len(msg_dict["payload"]["raw_html"]) > snippet_len
-            else msg_dict["payload"]["raw_html"]
-        )
-            
-    if msg_dict["payload"].get("claims_in_article"):
-        truncated_claims = []
-        for claim in msg_dict["payload"]["claims_in_article"]:
-            # claims are dicts after model_dump
-            truncated_claims.append({
-                "confidence": claim.get("confidence"),
-                "source_sentence_indices": (
-                    str(claim.get("source_sentence_indices"))[:snippet_len] +
-                    ("..." if len(str(claim.get("source_sentence_indices"))) > snippet_len else "")
-                ),
-                "decontextualised_claim_text": (
-                    str(claim.get("decontextualised_claim_text"))[:snippet_len] +
-                    ("..." if len(str(claim.get("decontextualised_claim_text"))) > snippet_len else "")
-                ),
-                "decontextualised_claim_embedding": f"[{len(claim.get('decontextualised_claim_embedding') or [])} dims]",
-                "NER_entities": (
-                    str(claim.get("NER_entities"))[:snippet_len] +
-                    ("..." if len(str(claim.get("NER_entities"))) > snippet_len else "")
-                )
-            })
-        msg_dict["payload"]["claims_in_article"] = truncated_claims
+    for field in ("parsed_text", "raw_html"):
+        if payload.get(field):
+            text = str(payload[field])
+            payload[field] = text[:snippet_len] + "..." if len(text) > snippet_len else text
 
+    # Helper to summarize lists
+    def summarize_list(items, formatter, label):
+        total_count = len(items)
+        summarized = [formatter(item) for item in items[:list_snippet_len]]
+        if total_count > list_snippet_len:
+            summarized.append({"note": f"... {total_count - list_snippet_len} more {label} omitted"})
+        return summarized, total_count
 
+    # Sentences
+    if payload.get("sentences"):
+        def fmt_sentence(s):
+            return {
+                "index": s.get("index"),
+                "text_snippet": s.get("text", "")[:snippet_len] + (
+                    "..." if len(s.get("text", "")) > snippet_len else ""
+                ),
+                "score": s.get("score"),
+                "is_checkworthy": s.get("is_checkworthy"),
+                "entities_count": len(s.get("entities") or []),
+            }
+        payload["sentences"], payload["number_sentences_in_article"] = summarize_list(
+            payload["sentences"], fmt_sentence, "sentences"
+        )
+
+    # Claims
+    if payload.get("claims_in_article"):
+        def fmt_claim(c):
+            return {
+                "confidence": c.get("confidence"),
+                "source_sentence_indices": str(c.get("source_sentence_indices"))[:snippet_len],
+                "claim_text_snippet": str(c.get("decontextualised_claim_text"))[:snippet_len],
+                "embedding_dims": len(c.get("decontextualised_claim_embedding") or []),
+                "entities_count": len(c.get("NER_entities") or []),
+            }
+        payload["claims_in_article"], payload["number_claims_in_article"] = summarize_list(
+            payload["claims_in_article"], fmt_claim, "claims"
+        )
+
+    # Entities
+    if payload.get("entities_in_article"):
+        def fmt_entity(e):
+            return {
+                "entity_text": e.get("entity_text"),
+                "type": e.get("type_of_entity"),
+            }
+        payload["entities_in_article"], payload["number_entities_in_article"] = summarize_list(
+            payload["entities_in_article"], fmt_entity, "entities"
+        )
+
+    msg_dict["payload"] = payload
     return json.dumps(msg_dict, indent=4, ensure_ascii=False)
