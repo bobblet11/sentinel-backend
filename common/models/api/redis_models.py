@@ -172,8 +172,8 @@ class RetrievalResult:
     """The aggregate object containing all insights produced by the pipeline."""
     save_data_result: Dict[str, Any]
     save_job_result: Dict[str, Any]
-    matches: Any
-    related_articles: Any
+    matches: List[Dict[str,Any]]
+    related_articles: List[str]
 
 
 class MessagePayload(BaseModel):
@@ -294,16 +294,16 @@ class StreamMessage:
     def set_parsed_result(self, parsed_result: ParseResult) -> None:
         """Unpacks a ParseResult object and updates the message payload."""
         # Use dot notation on the ParseResult object for clarity and safety
-        if not self.data.payload.parsed_text and parsed_result.text:
+        if parsed_result.text:
             self.data.payload.parsed_text = parsed_result.text
             
-        if not self.data.payload.title and parsed_result.title:
+        if parsed_result.title:
             self.data.payload.title = parsed_result.title
             
-        if not self.data.payload.author and parsed_result.author:
+        if parsed_result.author:
             self.data.payload.author = parsed_result.author
             
-        if not self.data.payload.publish_date and parsed_result.published_at:
+        if parsed_result.published_at:
             self.data.payload.publish_date = parsed_result.published_at
     
     def create_nlp_result(self) -> NLPResult:
@@ -319,26 +319,26 @@ class StreamMessage:
         # if not self.data.payload.sentences and nlp_result.sentences:
         #     self.data.payload.sentences = nlp_result.sentences
 
-        if not self.data.payload.claims_in_article and nlp_result.claims_in_article:
+        if nlp_result.claims_in_article:
             self.data.payload.claims_in_article = nlp_result.claims_in_article
             
-        if not self.data.payload.entities_in_article and nlp_result.entities_in_article:
+        if nlp_result.entities_in_article:
             self.data.payload.entities_in_article = nlp_result.entities_in_article
             
-        if not self.data.payload.bias_profile and nlp_result.bias_profile:
+        if nlp_result.bias_profile:
             self.data.payload.bias_profile = nlp_result.bias_profile
 
     def set_retrieval_result(self, retrieval_result: RetrievalResult) -> None:
-        if not self.data.payload.save_data_result and retrieval_result.save_data_result:
+        if retrieval_result.save_data_result:
             self.data.payload.save_data_result = retrieval_result.save_data_result
             
-        if not self.data.payload.save_job_result and retrieval_result.save_job_result:
+        if retrieval_result.save_job_result:
             self.data.payload.save_job_result = retrieval_result.save_job_result
         
-        if not self.data.payload.matches and retrieval_result.matches:
+        if isinstance(retrieval_result.matches, list):
             self.data.payload.matches = retrieval_result.matches
         
-        if not self.data.payload.related_articles and retrieval_result.related_articles:
+        if isinstance(retrieval_result.related_articles, list):
             self.data.payload.related_articles = retrieval_result.related_articles
 
     def add_timestamp(self, stage_name: JobStage) -> None:

@@ -464,7 +464,7 @@ class RetrievalService(ServiceTemplate):
             )
 
             message.set_retrieval_result(retrieval_result)
-            validate_after_retrieval(stream_message=message, message=None)
             self.logger.debug(get_pretty_print_stream_message(message))
+            validate_after_retrieval(stream_message=message, message=None)
             return message
                     

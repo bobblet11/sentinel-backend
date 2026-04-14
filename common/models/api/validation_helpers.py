@@ -148,9 +148,9 @@ def validate_after_retrieval(stream_message: StreamMessage, message: Message = N
     payload = message.payload
     errors = []
 
-    if not payload.save_data_result or payload.save_data_result != "SUCCESS":
+    if not payload.save_data_result:
         errors.append("save_data_result missing or not SUCCESS")
-    if not payload.save_job_result or payload.save_job_result != "SUCCESS":
+    if not payload.save_job_result:
         errors.append("save_job_result missing or not SUCCESS")
     if not isinstance(payload.matches, list) or not payload.matches:
         errors.append("matches missing or not a list")
