@@ -1,4 +1,4 @@
-from asyncio import as_completed
+from concurrent.futures import as_completed
 from concurrent.futures import ThreadPoolExecutor
 from email.mime import message
 from typing import Any, Dict, List, Tuple
