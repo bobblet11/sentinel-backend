@@ -157,8 +157,10 @@ class NLPService(ServiceTemplate):
 
         # Update global bias profile counts
         if bias_profile:
-            entry["bias_profiles"][bias_profile.bias_category] += 1
-            entry["bias_profiles"][bias_profile.sentiment_category] += 1
+            if bias_profile.bias_category.lower() not in entry["bias_profiles"]:
+                entry["bias_profiles"][bias_profile.bias_category.lower()] =1
+            entry["bias_profiles"][bias_profile.bias_category.lower()] += 1
+            entry["bias_profiles"][bias_profile.sentiment_category.lower()] += 1
 
         # Errors
         if error_type:
