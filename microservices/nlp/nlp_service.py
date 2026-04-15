@@ -192,6 +192,8 @@ class NLPService(ServiceTemplate):
 
         # Outlet bias profiles
         if bias_profile:
+            if bias_profile.bias_category.lower() not in outlet_entry["bias_profiles"]:
+                outlet_entry["bias_profiles"][bias_profile.bias_category.lower()] =1
             outlet_entry["bias_profiles"][bias_profile.bias_category] += 1
             outlet_entry["bias_profiles"][bias_profile.sentiment_category] += 1
 
