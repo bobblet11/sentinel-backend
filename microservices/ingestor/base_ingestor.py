@@ -118,7 +118,7 @@ class BaseIngestor:
             for old_date in dates[:-MAX_DAYS]:
                 del file_data[old_date]
 
-        self.snapshot_json_handler.write_json(file_data)
+        self.db_json_snapshot_handler.write_json(file_data)
 
     def _log_stats(self, newly_seen_articles:int =0, non_new_articles:int=0, total_deduplicated_articles_processed:int=0, total_raw_articles_fetched:int=0, outlet_counts:Dict[str, Any] = {}, cycle_duration_s:int = 0 ) -> None:
         file_data = self.stats_json_handler.read_json()
