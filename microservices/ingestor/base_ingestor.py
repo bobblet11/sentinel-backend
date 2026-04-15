@@ -2,6 +2,11 @@ from datetime import datetime
 import hashlib
 import logging
 
+from psycopg2 import OperationalError
+from sqlalchemy import text
+
+
+
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
 from common.models.api.redis_models import Article, Message, MessageHeader, MessagePayload, MessageTimestamp, add_timestamp_to_message
 from common.models.api.validation_helpers import get_pretty_print_message, validate_after_ingestor
@@ -9,9 +14,11 @@ from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 from common.io.json_updater import JsonHandler
 from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
-from typing import Iterator, Dict, Set, List, Any, Optional
+from typing import Iterator, Dict, Set, List, Any, Optional, Tuple
 from datetime import datetime
 import re
+
+from microservices.ingestor.db import get_db
 
 OUTLET_PATTERNS = {
     r"(bbc\.com|bbc\.co\.uk|www\.bbc\.com)": "BBC",
@@ -35,6 +42,9 @@ def match_outlet_name(article_url: str) -> Optional[str]:
     return None
 
 
+
+
+
 class BaseIngestor:
     """
     A base class that defines the template for an ingestion workflow.
@@ -56,7 +66,59 @@ class BaseIngestor:
             
         self.logger: logging.Logger = logging.getLogger("base_ingestor")
         self.stats_json_handler = JsonHandler(filename="stats.json")
+        self.db_snapshot_json_handler = JsonHandler(filename="db_snapshots.json")
 
+    def _take_redis_snapshot(self) -> Tuple[int]:
+        num_keys = self.publisher.client.dbsize()
+        memory_info = self.publisher.client.info("memory")
+        memory_used_bytes = memory_info.get("used_memory", 0)
+        memory_used_human = memory_info.get("used_memory_human", "0B")
+
+        num_keys, memory_used_bytes, memory_used_human
+
+    def _take_postgres_snapshot(self) -> int:
+        """Return the size of the current Postgres database in bytes."""
+        try:
+            db = next(get_db())  # grab a session from your generator
+            result = db.execute(text("SELECT pg_database_size(current_database())"))
+            return result.scalar() or 0
+        except OperationalError as e:
+            logging.error(f"Failed to get Postgres size: {e}")
+            return 0
+        finally:
+            db.close()
+        
+        
+    
+    def _log_snapshot(self) -> None:
+        file_data = self.snapshot_json_handler.read_json()
+        cycle_key = datetime.now().strftime("%Y-%m-%d %H:%M")
+        
+        entry = file_data.setdefault(cycle_key, {
+            "snapshots": []
+        })
+
+        num_keys, memory_used_bytes, memory_used_human = self._take_redis_snapshot
+        postgres_size = self._take_postgres_snapshot
+        
+        snapshot = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "redis_keys": num_keys,
+            "redis_memory_used": memory_used_bytes,
+            "redis_memory_used_readable" : memory_used_human,
+            "postgres_size": postgres_size
+        }
+
+        entry["snapshots"].append(snapshot)
+
+        # Prune to last 30 days
+        MAX_DAYS = 30
+        dates = sorted(file_data.keys())
+        if len(dates) > MAX_DAYS*24:
+            for old_date in dates[:-MAX_DAYS]:
+                del file_data[old_date]
+
+        self.snapshot_json_handler.write_json(file_data)
 
     def _log_stats(self, newly_seen_articles:int =0, non_new_articles:int=0, total_deduplicated_articles_processed:int=0, total_raw_articles_fetched:int=0, outlet_counts:Dict[str, Any] = {}, cycle_duration_s:int = 0 ) -> None:
         file_data = self.stats_json_handler.read_json()
@@ -79,7 +141,7 @@ class BaseIngestor:
         # Step 3: Prune to last 30 days
         MAX_DAYS = 30
         dates = sorted(file_data.keys())
-        if len(dates) > MAX_DAYS:
+        if len(dates) > MAX_DAYS*24:
             for old_date in dates[:-MAX_DAYS]:
                 del file_data[old_date]
 
@@ -106,6 +168,8 @@ class BaseIngestor:
         """
         Main cycle of ingestor service. Fetches, Filters, and Publishes articles from source of urls.
         """
+        self._log_snapshot()
+        
         start_time = datetime.now()
         # Step 1: Fetch articles from source
         raw_articles: List[Article] = list(self.fetch_articles())
@@ -199,3 +263,5 @@ class BaseIngestor:
             no_seen_articles,
             no_raw_articles_fetched,
         )
+        
+        
