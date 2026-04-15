@@ -1,10 +1,10 @@
-from asyncio import as_completed
-from concurrent.futures import ThreadPoolExecutor
-from email.mime import message
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+from time import time
 from typing import Any, Dict, List, Tuple
 from datetime import datetime, timedelta
-from requests import Session
 
+from requests import Session
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
 from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_nlp, validate_after_retrieval
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
@@ -21,7 +21,8 @@ from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, Cr
 from microservices.retrieval_layer.config import (
     HASH_STORE_NAMESPACE,
     UID_STORE_NAMESPACE,
-    IS_BENCHMARK
+    IS_BENCHMARK,
+    MAX_WORKERS
 )
 
 from microservices.retrieval_layer.db.session import get_db_session, get_db_transaction
@@ -109,6 +110,29 @@ class RetrievalService(ServiceTemplate):
         confidence = int(evidence_ratio * 100)
         return verdict, confidence
 
+    def _retrieve_evidence_for_claim_thread(
+        self,
+        claim: Claim,
+        original_article_id: int,
+        publish_date: str | None = None,
+        ) -> Dict[str, Any]:
+        thread_id = threading.get_ident()
+        start = time()
+        self.logger.info(f"[THREAD START] claim='{claim.decontextualised_claim_text[:30]}' thread={thread_id}")
+
+        db = get_db_session()
+        try:
+            return self._retrieve_evidence_for_claim(
+                db=db,
+                claim=claim,
+                original_article_id=original_article_id,
+                publish_date=publish_date,
+            )
+        finally:
+            end = time()
+            self.logger.info(f"[THREAD END] thread={thread_id} duration={end-start:.2f}s")
+            db.close()
+            
     def _save_data_into_postgres(self, db: Session, message: StreamMessage):
 
         claims: List[Claim] = message.all_claims or []
@@ -256,7 +280,6 @@ class RetrievalService(ServiceTemplate):
                         input_claim_text,
                         evidence_claim.get("decontextualised_claim")
                     )
-                    self.logger.debug(f"NLI claim {claim_id}: {label} (confidence: {confidence:.2f})")
                 except (RuntimeError, ValueError, KeyError, TypeError) as e:
                     self.logger.error(f"NLI failed for claim {claim_id}: {type(e).__name__}: {e}")
                     label, confidence = "irrelevant", 0.0
@@ -300,30 +323,59 @@ class RetrievalService(ServiceTemplate):
         return claim_evidence_results
     
     def _retrieve_evidence(self, db:Session, message:StreamMessage, original_article_id: int):
-        # Evaluate each input claim to get evidence matches, verdict, and confidence.
-        # Keep one output row per input claim (do not merge by claim text).
-        claim_results: List[Dict[str, Any]] = []
-        evidence_claim_ids = []
+        claims: List[Claim] = list(message.all_claims or [])
+        if not claims:
+            return [], []
 
-        for input_claim in (message.all_claims or []):
-            input_claim_evaluation = self._retrieve_evidence_for_claim(
-                db=db,
-                claim=input_claim,
-                original_article_id=original_article_id,
-                publish_date=message.publish_date,
+        if MAX_WORKERS > 1:
+            worker_count = min(MAX_WORKERS, len(claims))
+            results_by_index: List[Tuple[int, Dict[str, Any]]] = []
+
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                future_to_index = {
+                    executor.submit(
+                        self._retrieve_evidence_for_claim_thread,
+                        claim,
+                        original_article_id,
+                        message.publish_date,
+                    ): idx
+                    for idx, claim in enumerate(claims)
+                }
+
+                for future in as_completed(future_to_index):
+                    idx = future_to_index[future]
+                    results_by_index.append((idx, future.result()))
+
+            results_by_index.sort(key=lambda item: item[0])
+            claim_results = [result for _, result in results_by_index]
+        else:
+            claim_results = [
+                self._retrieve_evidence_for_claim(
+                    db=db,
+                    claim=claim,
+                    original_article_id=original_article_id,
+                    publish_date=message.publish_date,
+                )
+                for claim in claims
+            ]
+
+        evidence_claim_ids: List[int] = []
+        for input_claim_evaluation in claim_results:
+            evidence_claim_ids.extend(
+                [
+                    evidence_claim.get("claim_id")
+                    for evidence_claim in input_claim_evaluation.get("matches", [])
+                ]
             )
-            claim_results.append(input_claim_evaluation)
-            evidence_claim_ids.extend([evidence_claim.get("claim_id") for evidence_claim in input_claim_evaluation.get("matches", [])])
 
         related_articles = extend_evidence_claims_into_articles(
             db=db,
             claim_ids=evidence_claim_ids,
-            current_article_id=original_article_id
+            current_article_id=original_article_id,
         )
-        
+
         self.logger.info(
             "Retrieval matches on job uid=%s claim_matches=%s",
-            # message.data.header.uid,
             message.header.uid,
             len(evidence_claim_ids),
         )
@@ -464,7 +516,12 @@ class RetrievalService(ServiceTemplate):
             )
 
             message.set_retrieval_result(retrieval_result)
-            self.logger.debug(get_pretty_print_stream_message(message))
+            self.logger.info(
+                "Completed retrieval for uid=%s type=%s claims=%d",
+                message.header.uid,
+                message.type,
+                len(message.all_claims or []),
+            )   
             validate_after_retrieval(stream_message=message, message=None)
             return message
                     

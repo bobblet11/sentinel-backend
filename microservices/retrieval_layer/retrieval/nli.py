@@ -1,36 +1,32 @@
 from transformers import pipeline
 import os
+import threading
 import torch
 
-_nli = None
-
-def get_nli():
-    global _nli
-    if _nli is None:
-        use_gpu = os.environ.get("USE_GPU", "false").lower() == "true"
-        device_id = 0 if (use_gpu and torch.cuda.is_available()) else -1
-        _nli = pipeline(
-            "text-classification",
-            model="typeform/distilbert-base-uncased-mnli",
-            device=device_id,
-        )
-        
-    return _nli
+_thread_local = threading.local()
 
 LABEL_ALIASES = {
-    # Common textual labels
     "entailment": "support",
     "neutral": "irrelevant",
     "contradiction": "contradict",
-    # Some checkpoints use this spelling
     "contradict": "contradict",
-    # Fallback label IDs (ordering can differ by checkpoint)
-    # Keep common MNLI default here; textual labels are preferred when present.
     "label_0": "entailment",
     "label_1": "neutral",
     "label_2": "contradiction",
 }
 
+def get_nli():
+    nli = getattr(_thread_local, "_nli", None)
+    if nli is None:
+        use_gpu = os.environ.get("USE_GPU", "false").lower() == "true"
+        device_id = 0 if (use_gpu and torch.cuda.is_available()) else -1
+        nli = pipeline(
+            "text-classification",
+            model="typeform/distilbert-base-uncased-mnli",
+            device=device_id,
+        )
+        _thread_local._nli = nli
+    return nli
 
 def _normalize_label(raw_label: str) -> str:
     normalized = str(raw_label or "").strip().lower()
@@ -47,17 +43,9 @@ def _normalize_label(raw_label: str) -> str:
 
 def classify_claim_relation(user_claim: str, candidate_claim: str):
     nli = get_nli()
-    #             premise            hypothesis
     text_pair = f"{user_claim} [SEP] {candidate_claim}"
-    raw_result = nli(
-        text_pair,
-        truncation=True
-    )
+    raw_result = nli(text_pair, truncation=True)
 
-    # Handle output shape differences across transformers versions:
-    # - [[{label, score}, ...]]
-    # - [{label, score}, ...]
-    # - {label, score}
     score_items = []
     if isinstance(raw_result, list) and raw_result:
         first = raw_result[0]

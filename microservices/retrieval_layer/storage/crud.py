@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import distinct, select
@@ -36,7 +36,7 @@ def get_or_create_all_entities(db: Session, entities: List[Entity]) -> List[Enti
         if type_:
             query_to_find_entity = query_to_find_entity.where(Entity.type == type_)
             
-        existing_entity = db.execute(query_to_find_entity).scalar_one_or_none()
+        existing_entity = db.execute(query_to_find_entity).scalars().first()
         
         if existing_entity:
             existing_entities.append(existing_entity)

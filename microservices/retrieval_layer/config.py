@@ -10,7 +10,7 @@ load_dotenv()
 config_logger: Logger = getLogger("config")
 
 # Service Configuration
-LOG_MODE: int = get_env_var("LOG_MODE", int, config_logger, default=10)
+LOG_MODE: int = get_env_var("RETRIEVAL_LOG_MODE", int, config_logger, default=10)
 
 # Postgres Connection Configuration
 POSTGRES_HOST: str = get_env_var("POSTGRES_HOST", str, config_logger)
@@ -42,7 +42,7 @@ CONSUMER_NAME: str = get_env_var(
 )
 
 BATCH_SIZE: int = get_env_var(
-    "BATCH_SIZE",
+    "RETRIEVAL_BATCH_SIZE",
     int,
     config_logger,
     default=10
@@ -70,7 +70,7 @@ DUMMY_SEED_MODE: bool = get_env_var(
 )
 
 MAX_WORKERS: int = get_env_var(
-    "MAX_WORKERS",
+    "RETRIEVAL_MAX_WORKERS",
     int,
     config_logger,
     default=1
