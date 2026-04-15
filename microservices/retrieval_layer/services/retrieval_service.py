@@ -450,9 +450,9 @@ class RetrievalService(ServiceTemplate):
                 self.logger.info("Stored result uid=%s matches=%d related_articles=%d", message.uid, len(matches), len(related_articles))
                 
             minimum_message:Message = Message(
-                message.data.header,
-                MessagePayload(article_url=message.link),
-                message.stage_timestamps
+                header = message.data.header,
+                payload = MessagePayload(article_url=message.link),
+                stage_timestamps = message.stage_timestamps
             )
             
             self.uid_store.add_one(str(message.uid))
