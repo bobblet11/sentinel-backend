@@ -155,12 +155,15 @@ class NLPService(ServiceTemplate):
                 entry["entity_distribution"].get(ent.type_of_entity, 0) + 1
             )
 
-        # Update global bias profile counts
-        if bias_profile:
-            if bias_profile.bias_category.lower() not in entry["bias_profiles"]:
-                entry["bias_profiles"][bias_profile.bias_category.lower()] =1
-            entry["bias_profiles"][bias_profile.bias_category.lower()] += 1
-            entry["bias_profiles"][bias_profile.sentiment_category.lower()] += 1
+        if bias_profile and bias_profile.bias_category:
+            bias_cat = bias_profile.bias_category.lower()
+            entry["bias_profiles"].setdefault(bias_cat, 0)
+            entry["bias_profiles"][bias_cat] += 1
+
+        if bias_profile and bias_profile.sentiment_category:
+            sent_cat = bias_profile.sentiment_category.lower()
+            entry["bias_profiles"].setdefault(sent_cat, 0)
+            entry["bias_profiles"][sent_cat] += 1
 
         # Errors
         if error_type:
@@ -180,7 +183,7 @@ class NLPService(ServiceTemplate):
             "errors": {}
         })
 
-        outlet_entry["jobs"] += 1
+        outlet_entry["jobs_processed"] += 1
         outlet_entry["claims_extracted"] += len_claims_extracted
         outlet_entry["entities_extracted"] += len(entities_extracted)
 
@@ -191,9 +194,15 @@ class NLPService(ServiceTemplate):
             )
 
         # Outlet bias profiles
-        if bias_profile:
-            outlet_entry["bias_profiles"][bias_profile.bias_category] += 1
-            outlet_entry["bias_profiles"][bias_profile.sentiment_category] += 1
+        if bias_profile and bias_profile.bias_category:
+            bias_cat = bias_profile.bias_category.lower()
+            outlet_entry["bias_profiles"].setdefault(bias_cat, 0)
+            outlet_entry["bias_profiles"][bias_cat] += 1
+
+        if bias_profile and bias_profile.sentiment_category:
+            sent_cat = bias_profile.sentiment_category.lower()
+            outlet_entry["bias_profiles"].setdefault(sent_cat, 0)
+            outlet_entry["bias_profiles"][sent_cat] += 1
 
         # Outlet errors
         if error_type:
