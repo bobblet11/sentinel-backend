@@ -27,7 +27,7 @@ class RedisConsumer:
             raise ValueError("group_name must be a non-empty string.")
 
         self.logger: Logger = getLogger(f"{consumer_name}.redis_consumer")
-        self.stream_name:List[str] = stream_name
+        self.stream_name:str = stream_name
         self.group_name:str = group_name
         self.consumer_name:str = consumer_name
         self.client:redis.Redis = redis_connection.get_client()
@@ -213,6 +213,7 @@ class RedisConsumer:
             )
             if result == 0:
                 raise Exception("Failed to ack")
+            self.client.hincrby(f"stream:{self.stream_name}:group:{self.group_name}:acks", self.consumer_name, 1)
             self.logger.debug(f"Successfully acknowledged {redis_message_id}")
             
         except Exception as e:
@@ -230,7 +231,7 @@ class RedisConsumer:
             ack_result = self.client.xack(stream_name, self.group_name, redis_message_id)
             if ack_result == 0:
                 raise Exception("Failed to ack")
-            
+            self.client.hincrby(f"stream:{self.stream_name}:group:{self.group_name}:acks", self.consumer_name, 1)
             del_result = self.client.xdel(stream_name, redis_message_id)
             if del_result == 0:
                 raise Exception("Failed to del")
