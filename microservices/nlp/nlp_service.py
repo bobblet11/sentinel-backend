@@ -183,7 +183,7 @@ class NLPService(ServiceTemplate):
             "errors": {}
         })
 
-        outlet_entry["jobs"] += 1
+        outlet_entry["jobs_processed"] += 1
         outlet_entry["claims_extracted"] += len_claims_extracted
         outlet_entry["entities_extracted"] += len(entities_extracted)
 
