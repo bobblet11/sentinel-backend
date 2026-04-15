@@ -23,6 +23,7 @@ def inspect_redis():
         for key in keys:
             key_type = r.type(key)
             key_name = key.decode() if isinstance(key, bytes) else key
+            print(key_name, key_type)
             if key_type == "stream":
                 stream_stats[key_name] = r.xlen(key)
             elif key_type == "set":
@@ -81,16 +82,32 @@ def inspect_redis():
         try:
             groups = r.xinfo_groups(stream)
             for group in groups:
-                group_name = group['name']
+                group_name = group["name"]
+
+                # Load per-consumer ack counters for this stream/group
+                ack_key = f"stream:{stream}:group:{group_name}:acks"
+                ack_stats = r.hgetall(ack_key)  # {b'consumer_name': b'count', ...}
+
                 consumers = r.xinfo_consumers(stream, group_name)
-                max_pending = max([c['pending'] for c in consumers]) if consumers else 0
+                max_pending = max([c["pending"] for c in consumers]) if consumers else 0
+
                 print(f"\nStream: {stream} | Group: {group_name}")
                 for consumer in consumers:
-                    cname = consumer['name']
-                    pending_count = consumer['pending']
-                    delivered = consumer.get('delivered', 0)  # acknowledged jobs
-                    print(f"  {cname:<20} {bar(pending_count, max_pending)} {pending_count} pending | {delivered} delivered")
+                    cname = consumer["name"]
+                    pending_count = consumer["pending"]
+
+                    # Redis returns hash keys/vals as bytes if decode_responses=False
+                    raw_acked = ack_stats.get(
+                        cname if isinstance(next(iter(ack_stats.keys()), None), str) else cname.encode()
+                    )
+                    acked = int(raw_acked) if raw_acked is not None else 0
+
+                    print(
+                        f"  {cname:<20} {bar(pending_count, max_pending)} "
+                        f"{pending_count} pending | {acked} acked"
+                    )
         except redis.exceptions.ResponseError:
+            # Not a stream with groups, or no groups defined
             pass
 
     print("\n====================================\n")

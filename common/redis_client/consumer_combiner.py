@@ -1,4 +1,5 @@
 import json
+from tokenize import group
 import redis
 from typing import Any, Dict, List, Optional
 from logging import Logger, getLogger
@@ -102,6 +103,7 @@ class RedisConsumerCombiner:
                     continue
 
                 redis_message_id, fields = messages[0]
+
                 return self._decode_one_message(stream_name, redis_message_id, fields)
 
             return None
@@ -204,7 +206,8 @@ class RedisConsumerCombiner:
             result = self.client.xack(stream_name, self.group_name, redis_message_id)
             if result == 0:
                 raise Exception("Failed to ack")
-            
+                
+            self.client.hincrby(f"stream:{stream_name}:group:{self.group_name}:acks", self.consumer_name, 1)
             self.logger.debug(f"Successfully acknowledged {redis_message_id}")
         except Exception as e:
             self.logger.error(
@@ -222,7 +225,7 @@ class RedisConsumerCombiner:
             ack_result = self.client.xack(stream_name, self.group_name, redis_message_id)
             if ack_result == 0:
                 raise Exception("Failed to ack")
-            
+            self.client.hincrby(f"stream:{stream_name}:group:{self.group_name}:acks", self.consumer_name, 1)
             del_result = self.client.xdel(stream_name, redis_message_id)
             if del_result == 0:
                 raise Exception("Failed to del")
