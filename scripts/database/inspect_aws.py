@@ -23,6 +23,7 @@ def inspect_redis():
         for key in keys:
             key_type = r.type(key)
             key_name = key.decode() if isinstance(key, bytes) else key
+            print(key_name, key_type)
             if key_type == "stream":
                 stream_stats[key_name] = r.xlen(key)
             elif key_type == "set":
