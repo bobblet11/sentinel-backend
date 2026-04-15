@@ -4,7 +4,7 @@ from email.mime import message
 from typing import Any, Dict, List, Tuple
 from datetime import datetime, timedelta
 from requests import Session
-
+import torch
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
 from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_nlp, validate_after_retrieval
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
@@ -36,7 +36,7 @@ from microservices.retrieval_layer.storage.crud import (
 
 MAX_CANDIDATES_BEFORE_SIMILARITY = 100
 MAX_CANDIDATES_BEFORE_NLI = 10
-MIN_SIMILARITY = 0.25
+MIN_SIMILARITY = 0.7
 EMBEDDING_DIM = 768
 
 
@@ -45,6 +45,10 @@ class RetrievalService(ServiceTemplate):
         super().__init__(config)
         self.hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
         self.uid_store = RedisDuplicateFilter(key_name=UID_STORE_NAMESPACE,ttl_s=0)
+        if torch.cuda.is_available():
+            self.logger.info("GPU DETECTED")
+        else:
+            self.logger.info("GPU NOT DETECTED")
 
     @staticmethod
     def _normalize_embedding(embedding: List[float] | None) -> List[float] | None:

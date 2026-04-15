@@ -7,8 +7,7 @@ _nli = None
 def get_nli():
     global _nli
     if _nli is None:
-        use_gpu = os.environ.get("USE_GPU", "false").lower() == "true"
-        device_id = 0 if (use_gpu and torch.cuda.is_available()) else -1
+        device_id = 0 if (torch.cuda.is_available()) else -1
         _nli = pipeline(
             "text-classification",
             model="typeform/distilbert-base-uncased-mnli",

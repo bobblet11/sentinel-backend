@@ -319,7 +319,7 @@ services:
               count: all
               capabilities: [ gpu ]
   retrieval-layer-service-gpu:
-    container_name: sentinel-retrieval-layer-service-container
+    container_name: sentinel-retrieval-layer-GPU-service-container
     shm_size: '${RETRIEVAL_LAYER_SHM_SIZE:-2gb}'
     image: sentinel/retrieval-layer-service:latest
     build:
@@ -375,9 +375,12 @@ services:
         reservations:
           cpus: '${RETRIEVAL_CPU_RESERVATION:-0.25}'
           memory: '${RETRIEVAL_MEMORY_RESERVATION:-1G}'
-
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
   retrieval-layer-service-cpu:
-    container_name: sentinel-retrieval-layer-service-container
+    container_name: sentinel-retrieval-layer-CPU-service-container
     shm_size: '${RETRIEVAL_LAYER_SHM_SIZE:-2gb}'
     image: sentinel/retrieval-layer-service:latest
     build:
