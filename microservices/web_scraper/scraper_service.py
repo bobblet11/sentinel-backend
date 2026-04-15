@@ -75,7 +75,7 @@ class ScraperService(ServiceTemplate):
         super().__init__(config)
         self.stats_json_handler = JsonHandler(filename="stats.json")
 
-    def _log_stats(self, outlet:str, html_len:int, text_len:int, fetch_time: Optional[float], parse_time: Optional[float], error_type: Optional[str]) -> None:
+    def _log_stats(self, outlet:str, html_len:int, text_len:int, fetch_time: Optional[float], parse_time: Optional[float], error_type: Optional[str] = None) -> None:
         data = self.stats_json_handler.read_json()
 
         # Normalize times

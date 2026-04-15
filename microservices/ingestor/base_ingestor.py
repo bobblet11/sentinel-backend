@@ -254,7 +254,12 @@ class BaseIngestor:
         for outlet, stats in outlet_counts.items():
             stats["seen_skipped"] = stats["total"] - stats["unseen"]
         duration = (datetime.now() - start_time).total_seconds()
-        self._log_stats(no_unseen_articles, no_seen_articles, no_raw_deduplicated_articles_fetched, total_articles_ingested, outlet_counts, duration)
+        self._log_stats(no_unseen_articles, 
+                        no_seen_articles, 
+                        no_raw_deduplicated_articles_fetched, 
+                        total_articles_ingested, 
+                        outlet_counts, 
+                        duration)
         
         # Step 7: Log results
         self.logger.info(
