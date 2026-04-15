@@ -18,14 +18,33 @@ from microservices.web_scraper.managers.fetch_manager_selenium import fetch_mana
 from microservices.web_scraper.managers.parse_manager import parse_manager, ParseResult
 import traceback
 import re
-class FailedToFetch(Exception):
-    def __init__(self, message):
-        self.message = message
-        super().__init__(self.message)
-class FailedToParse(Exception):
-    def __init__(self, message):
-        self.message = message
-        super().__init__(self.message)
+
+class ScraperError(Exception):
+    def __init__(self, message, url=None, stage=None, details=None):
+        super().__init__(message)
+        self.url = url
+        self.stage = stage
+        self.details = details
+    
+    def __str__(self):
+        base = super().__str__()
+        extras = []
+        if self.url:
+            extras.append(f"url={self.url}")
+        if self.stage:
+            extras.append(f"stage={self.stage}")
+        if self.details:
+            extras.append(f"details={self.details}")
+        return f"{base} ({', '.join(extras)})"
+
+class FailedToFetch(ScraperError):
+    def __init__(self, message, url=None, stage=None, details=None):
+        new_message = message + "(Failed to fetch)"
+        super().__init__(new_message, url, stage, details)
+class FailedToParse(ScraperError):
+    def __init__(self, message, url=None, stage=None, details=None):
+        new_message = message + "(Failed to parse)"
+        super().__init__(new_message, url, stage, details)
 
 
 
@@ -147,14 +166,13 @@ class ScraperService(ServiceTemplate):
         try:
             article_url:Optional[str] = message.link
             if not article_url:
-                raise FailedToFetch("No link on this message")
+                raise FailedToFetch("No link on this message", message.link, "fetching", f"message url is {article_url}")
         
             self.logger.debug(f"Attempting to fetch HTML for {article_url}")
             article_html:str = fetch_manager.fetch_article_html(article_url)
-            if not article_html:
-                raise FailedToFetch("Successful fetch but returned HTML was empty")
-            
-            
+            if not article_html.strip():
+                raise FailedToFetch("Fetch returned empty HTML (likely anti-bot or timing issue)", message.link, "fetching", f"extracted html is {article_html}")
+
             self.logger.debug(f"Successfully fetched HTML for {article_url}, length: {len(article_html)}")
             message.set_raw_html(article_html)
             return message
@@ -168,15 +186,15 @@ class ScraperService(ServiceTemplate):
             article_url:Optional[str] = message.link
             article_html:Optional[str] = message.html
             if not article_url:
-                raise FailedToParse("No link on this message")
+                raise FailedToParse("No link on this message", message.link, "parsing", f"message url is {article_url}")
             if not article_html:
-                raise FailedToParse("No html on this message")
+                raise FailedToParse("No html on this message", message.link, "parsing", f"message html is {article_html}")
             
             self.logger.debug(f"Attempting to parse TEXT for {article_url}")
             parsed_result:ParseResult= parse_manager.parse_article_raw_html(article_html, article_url, None)
             
             if not parsed_result:
-                raise FailedToParse("Successful parse but returned text was empty")
+                raise FailedToParse("Successful parse but returned text was empty", message.link, "parsing", f"article text is {parsed_result}")
             
             self.logger.debug(f"Successfully parsed HTML for {article_url}, length: {len(parsed_result.text or '')}")
             message.set_parsed_result(parsed_result)
@@ -243,10 +261,7 @@ class ScraperService(ServiceTemplate):
             
             return message
         
-        except FailedToFetch as e:
-            raise ProcessingError(f"Failed to fetch {message.link}: {e}")
-        
-        except FailedToParse as e:
-            raise ProcessingError(f"Failed to parse {message.link}: {e}")
-    
+        except Exception as e:
+            raise 
+
    
