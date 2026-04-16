@@ -576,8 +576,8 @@ class RetrievalService(ServiceTemplate):
             #     "match_count": len(evidence_matches),
             # }
             
-            len_input_claims = sum(message.all_claims or [])
-            len_related_articles = sum(related_articles or [])
+            len_input_claims = len(message.all_claims or [])
+            len_related_articles = len(related_articles or [])
             len_evidence_claims_found = sum(x.get("match_count", 0) for x in claim_evidence_matches)
             verdicts = [x.get("verdict", "unverified") for x in claim_evidence_matches]
             confidences = [x.get("confidence", 0) for x in claim_evidence_matches]
