@@ -117,7 +117,8 @@ class ScraperService(ServiceTemplate):
         entry["total_parse_time_s"] += parse_time
         entry["total_html_size"] += html_len
         entry["total_text_size"] += text_len
-    
+        
+        entry["parse_strategies_used"][parse_strat_used] = entry["parse_strategies_used"].get(parse_strat_used, 0) + 1
             
         
         # Update min max
@@ -152,11 +153,7 @@ class ScraperService(ServiceTemplate):
         outlet_entry["total_parse_time_s"] += parse_time
         outlet_entry["total_html_size"] += html_len
         outlet_entry["total_text_size"] += text_len
-        
-        
-        if parse_strat_used:
-            entry["parse_strategies_used"][parse_strat_used] = entry["parse_strategies_used"].get(parse_strat_used, 0) + 1
-            outlet_entry["parse_strategies_used"][parse_strat_used] = outlet_entry["parse_strategies_used"].get(parse_strat_used, 0) + 1
+        outlet_entry["parse_strategies_used"][parse_strat_used] = outlet_entry["parse_strategies_used"].get(parse_strat_used, 0) + 1
 
         if error_type:
             outlet_entry["errors"][error_type] = outlet_entry["errors"].get(error_type, 0) + 1
