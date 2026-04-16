@@ -189,11 +189,10 @@ class RetrievalService(ServiceTemplate):
         else:
             verdict = "false"
         
-        # Calculate confidence (0-100) based on:
-        avg_quality = sum(m["similarity"] * m["confidence"] for m in relevant) / len(relevant)
-        perfect_evidence = len(relevant) * 1.0  # Max quality = 1.0
-        evidence_ratio = ( avg_quality * len(relevant) ) / perfect_evidence
-        confidence = int(evidence_ratio * 100)
+        # Calculate confidence (0-100) based on NLI confidence and evidence count.
+        avg_nli_confidence = sum(m["confidence"] for m in relevant) / len(relevant)
+        evidence_count_factor = min(1.0, len(relevant) / 5.0)
+        confidence = int(avg_nli_confidence * evidence_count_factor * 100)
         return verdict, confidence
 
     def _save_data_into_postgres(self, db: Session, message: StreamMessage):

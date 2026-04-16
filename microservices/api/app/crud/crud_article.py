@@ -23,6 +23,22 @@ def create_article(db: Session, job_in: JobCreate)->Article:
     if job_in.news_outlet:
         outlet = get_or_create_outlet(db, job_in.news_outlet)
 
+    existing_article = get_article_by_url(db, job_in.article_url)
+    if existing_article:
+        if job_in.article_title and not existing_article.title:
+            existing_article.title = job_in.article_title
+        if job_in.article_html and not existing_article.html:
+            existing_article.html = job_in.article_html
+        if job_in.article_text and not existing_article.text:
+            existing_article.text = job_in.article_text
+        if outlet and existing_article.outlet_id is None:
+            existing_article.outlet_id = outlet.id
+
+        db.flush()
+        db.refresh(existing_article)
+        logger.info(f"Reusing existing article: {existing_article}")
+        return existing_article
+
     db_obj = Article(
         url = job_in.article_url,
         title = job_in.article_title,
