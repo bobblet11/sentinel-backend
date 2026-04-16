@@ -9,6 +9,8 @@ import time
 import traceback
 import uuid
 import subprocess
+from OpenSSL.SSL import SysCallError
+
 
 from typing import Any, Dict, List, Tuple, Callable, Optional
 
@@ -575,7 +577,7 @@ class FetchManagerSelenium:
         initial_delay_s=INITIAL_FETCH_DELAY_S,
         growth_rate=FETCH_DELAY_GROWTH_RATE,
         jitter=True,
-        on_exceptions=(RequestException, WebDriverException, Exception),
+        on_exceptions=(RequestException, WebDriverException, SysCallError, Exception),
     )
     def fetch_article_html(self, article_url: str) -> str:
         """
@@ -609,10 +611,17 @@ class FetchManagerSelenium:
         except WebDriverException as e:
             self.logger.error(f"[ERROR] Potential proxy error on {article_url}: {e}")
             self.proxy_manager.report_bad_proxy(driver_config.proxy_url)
+        except SysCallError as e:
+            self.logger.error(f"[ERROR] SSL connection reset on {article_url}: {e}")
+            if driver_config:
+                self.proxy_manager.report_bad_proxy(driver_config.proxy_url)
+            raise e
         except Exception as e:
             self.logger.error(f"[ERROR] Could not fetch {article_url}: {e}")
             self.proxy_manager.report_bad_proxy(driver_config.proxy_url)
             raise e
+        
+        
 
         finally:
             if driver:

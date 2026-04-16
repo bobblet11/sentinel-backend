@@ -9,6 +9,9 @@ from microservices.web_scraper.parsers.base_parser import BaseParser, ParseResul
 
 class NBCParser(BaseParser):
     def extract(self, soup: BeautifulSoup, article_url: str) -> Optional[ParseResult]:
+        if '/video/' in article_url:
+            return None
+
         container = (
             soup.find("article", {"class":"article"}) or soup
         )

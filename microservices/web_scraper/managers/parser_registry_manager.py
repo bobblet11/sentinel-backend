@@ -1,4 +1,4 @@
-
+#parser_registry_manager.py
 import threading
 from typing import Dict, List, Optional
 from microservices.web_scraper.parsers.base_parser import BaseParser

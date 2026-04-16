@@ -1,103 +1,102 @@
 import requests
-from bs4 import BeautifulSoup
+import time
 
-from microservices.web_scraper.parsers.BBC_parser import BBCParser
-# from microservices.web_scraper.parsers.CNN_parser import CNNParser  # if exists
-from microservices.web_scraper.parsers.ABC_parser import ABCParser
-from microservices.web_scraper.parsers.CBC_parser import CBCParser
-from microservices.web_scraper.parsers.CBS_parser import CBSParser
-from microservices.web_scraper.parsers.NPR_parser import NPRParser
-from microservices.web_scraper.parsers.NBC_parser import NBCParser
-from microservices.web_scraper.parsers.Euronews_parser import EuronewsParser
-from microservices.web_scraper.parsers.The_Guardian_parser import TheGuardianParser
+API_BASE = "http://sentinel-api-service-container:8001"
 
+TEST_URLS = [
+    "https://www.bbc.com/sport/football/articles/c4g84l14e5eo",
+    "https://www.bbc.com/news/live/c20dd5ynxz9t",   
+        "https://www.bbc.com/news/articles/c4g44gj7rgno",
+    "https://www.bbc.com/news/articles/cdxkk1vnp57o",
+    "https://www.bbc.com/news/articles/cly0vk77vdko",
+    "https://www.bbc.com/news/articles/cvg0z3n5e5jo",
+    "https://www.bbc.com/news/articles/c5yj796plqmo",
+    "https://www.bbc.com/news/articles/czjw2kz0l22o",
+    "https://www.bbc.com/culture/article/20260414-10-of-the-most-iconic-images-of-pariss-secret-night-time-world",
+    "https://www.bbc.com/news/articles/cm29plylqnvo",
 
-PARSER_MAP = {
-    "bbc": BBCParser(),
-    "abc": ABCParser(),
-    "cbc": CBCParser(),
-    "cbs": CBSParser(),
-    "npr": NPRParser(),
-    "nbc": NBCParser(),
-    "euronews": EuronewsParser(),
-    "guardian": TheGuardianParser(),
-}
+]
 
 
-TEST_URLS = {
-    "bbc": "https://www.bbc.com/news/articles/c937gd1vq7xo",
-    "abc": "https://abcnews.com/Politics/senate-passes-bill-fund-dhs-except-ice-parts/story?id=131461819",
-    "cbc": "https://www.cbc.ca/news/world/iran-strikes-military-base-us-troops-wounded-9.7145616",
-    "cbs": "https://www.cbsnews.com/news/michael-jordan-nascar-lawsuit-vision-for-sport-gayle-king-interview/",
-    "npr": "https://www.npr.org/2026/03/26/nx-s1-5762974/education-department-building",
-    "nbc": "https://www.nbcnews.com/politics/trump-administration/trump-johnson-dhs-house-rebels-senate-bill-ice-cbp-rcna265507",
-    "euronews": "https://www.euronews.com/2026/03/30/trump-threatens-to-obliterate-irans-kharg-island-oil-hub-if-no-deal-reached-shortly",
-    "guardian": "https://www.theguardian.com/world/2026/mar/30/egypt-pakistan-saudi-arabia-turkey-talks-embryo-new-order",
-}
+def submit_job(url):
+    payload = {
+        "url": url
+    }
 
-
-def fetch_html(url):
-    headers = {"User-Agent": "Mozilla/5.0"}
-    res = requests.get(url, headers=headers, timeout=10)
+    res = requests.post(
+        f"{API_BASE}/api/v1/jobs",
+        json={"article_url": url},
+        timeout=30,
+    )
     res.raise_for_status()
-    return res.text
+
+    data = res.json()
+    uid = data.get("uid") or data.get("job_id")
+
+    print(f"🚀 Submitted job for URL: {url}")
+    print(f"UID: {uid}")
+    return uid
 
 
-def validate_result(result, url):
-    errors = []
+def poll_result(uid, timeout=60):
+    start = time.time()
 
-    if not result:
-        errors.append("❌ No result returned")
-        return errors
+    while time.time() - start < timeout:
+        res = requests.get(f"{API_BASE}/jobs/{uid}")
 
-    if not result.text or len(result.text) < 200:
-        errors.append("❌ Text too short")
+        if res.status_code == 200:
+            data = res.json()
 
-    if not result.title:
-        errors.append("❌ Missing title")
+            # adjust depending on your schema
+            if data.get("status") == "complete" or data.get("retrieval_results"):
+                print(f"✅ Completed job {uid}")
+                return data
 
-    if not result.author:
-        errors.append("❌ Missing author")
+        time.sleep(2)
 
-    if not result.published_at:
-        errors.append("❌ Missing published_at")
-
-    return errors
+    print(f"⏰ Timeout waiting for job {uid}")
+    return None
 
 
-def run_tests():
-    for outlet, parser in PARSER_MAP.items():
-        url = TEST_URLS[outlet]
+def print_result(data):
+    if not data:
+        print("❌ No data")
+        return
 
+    print("\n--- RESULT ---")
+
+    # Adjust keys based on your actual response
+    article = data.get("article") or {}
+    claims = data.get("claims") or []
+    results = data.get("retrieval_results") or {}
+
+    print("Title:", article.get("title"))
+    print("Author:", article.get("author"))
+    print("Published:", article.get("published_at"))
+
+    if article.get("text"):
+        print("Text preview:", article["text"][:300])
+
+    print("\nClaims:")
+    for c in claims:
+        print("-", c.get("text"))
+
+    print("\nMatches:", len(results.get("matches", [])))
+
+
+def run_e2e_tests():
+    for url in TEST_URLS:
         print("\n" + "=" * 80)
-        print(f"🧪 Testing: {outlet.upper()}")
-        print(f"URL: {url}")
 
         try:
-            html = fetch_html(url)
-            soup = BeautifulSoup(html, "html.parser")
+            uid = submit_job(url)
+            result = poll_result(uid)
 
-            result = parser.extract(soup, url)
-
-            errors = validate_result(result, url)
-
-            if errors:
-                print("⚠️ Issues found:")
-                for e in errors:
-                    print("   ", e)
-            else:
-                print("✅ PASSED")
-
-            if result:
-                print("\n--- OUTPUT PREVIEW ---")
-                print("Title:", result.title)
-                print("Author:", result.author)
-                print("Published:", result.published_at)
-                print("Text preview:", result.text[:300])
+            print_result(result)
 
         except Exception as e:
-            print("💥 CRASHED:", str(e))
+            print("💥 ERROR:", str(e))
 
 
 if __name__ == "__main__":
-    run_tests()
+    run_e2e_tests()
