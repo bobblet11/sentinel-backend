@@ -5,7 +5,7 @@ from unittest import result
 import trafilatura
 import threading 
 
-from typing import Any, Dict, List, Optional, Callable, Tuple
+from typing import Any, Dict, List, Optional, Callable
 from bs4 import BeautifulSoup
 from microservices.web_scraper.managers.parser_registry_manager import ParserRegistryManager
 from microservices.web_scraper.parsers.base_parser import BaseParser
@@ -181,7 +181,7 @@ class ParseManager:
     def parse_article_raw_html(self, 
         raw_html: str,
         article_url: Optional[str] = None,
-        article_metadata: Optional[Dict[str, Any]] = None) -> Tuple[ParseResult, str]:
+        article_metadata: Optional[Dict[str, Any]] = None) -> ParseResult:
         
         if not raw_html or len(raw_html) < 20:
             raise ValueError("raw_html content too short or empty during parsing")
@@ -196,20 +196,20 @@ class ParseManager:
             lambda: self._strategy_fallback(soup)
         ]
         
-        strategy_used:str = None
         for strategy in strategies:
             result: ParseResult = strategy()
-            strategy_used = strategy.__name__()
+            
             if result:
                 self.logger.debug(f"Strategy {strategy.__name__} returned result")
 
             if result and self._is_sufficient(result):
                 self.logger.debug(f"Using strategy: {strategy.__name__}")
                 self._hydrate_missing_fields(result, soup) 
-                return result, strategy_used
+                return result
                 
-        self._hydrate_missing_fields(result, soup)
-        return result, strategy_used
+        fallback_result: ParseResult = self._strategy_fallback(soup)
+        self._hydrate_missing_fields(fallback_result, soup)
+        return fallback_result
 
     def _extract_text_with_trafilatura(self, raw_html: str) -> Optional[str]:
         """

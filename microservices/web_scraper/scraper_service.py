@@ -75,7 +75,7 @@ class ScraperService(ServiceTemplate):
         super().__init__(config)
         self.stats_json_handler = JsonHandler(filename="stats.json")
 
-    def _log_stats(self, outlet:str, html_len:int, text_len:int, fetch_time: Optional[float], parse_time: Optional[float], parse_strat_used: str, error_type: Optional[str] = None) -> None:
+    def _log_stats(self, outlet:str, html_len:int, text_len:int, fetch_time: Optional[float], parse_time: Optional[float], error_type: Optional[str] = None) -> None:
         data = self.stats_json_handler.read_json()
 
         # Normalize times
@@ -102,7 +102,7 @@ class ScraperService(ServiceTemplate):
             
             "errors": {},
             "outlet_stats": {},
-            "parse_strategies_used" : {},
+
             "min_fetch_time_s": None,
             "max_fetch_time_s": None,
             "min_parse_time_s": None,
@@ -117,9 +117,6 @@ class ScraperService(ServiceTemplate):
         entry["total_parse_time_s"] += parse_time
         entry["total_html_size"] += html_len
         entry["total_text_size"] += text_len
-        
-        entry["parse_strategies_used"][parse_strat_used] = entry["parse_strategies_used"].get(parse_strat_used, 0) + 1
-            
         
         # Update min max
         if fetch_time > 0:
@@ -138,7 +135,6 @@ class ScraperService(ServiceTemplate):
             "total_parse_time_s": 0.0,
             "total_html_size": 0,
             "total_text_size": 0,
-            "parse_strategies_used" : {},
             "errors": {},
             
             "min_fetch_time_s": None,
@@ -153,7 +149,6 @@ class ScraperService(ServiceTemplate):
         outlet_entry["total_parse_time_s"] += parse_time
         outlet_entry["total_html_size"] += html_len
         outlet_entry["total_text_size"] += text_len
-        outlet_entry["parse_strategies_used"][parse_strat_used] = outlet_entry["parse_strategies_used"].get(parse_strat_used, 0) + 1
 
         if error_type:
             outlet_entry["errors"][error_type] = outlet_entry["errors"].get(error_type, 0) + 1
@@ -192,12 +187,13 @@ class ScraperService(ServiceTemplate):
 
             self.logger.debug(f"Successfully fetched HTML for {article_url}, length: {len(article_html)}")
             message.set_raw_html(article_html)
+            return message
         
         except Exception as e:
             self.logger.error(f"Failed to fetch HTML: {e}")
             raise 
 
-    def _parse_article_and_update(self, message: StreamMessage) -> str:
+    def _parse_article_and_update(self, message: StreamMessage) -> StreamMessage:
         try:
             article_url:Optional[str] = message.link
             article_html:Optional[str] = message.html
@@ -207,22 +203,21 @@ class ScraperService(ServiceTemplate):
                 raise FailedToParse("No html on this message", message.link, "parsing", f"message html is {article_html}")
             
             self.logger.debug(f"Attempting to parse TEXT for {article_url}")
-            parsed_result, strat_used = parse_manager.parse_article_raw_html(article_html, article_url, None)
+            parsed_result:ParseResult= parse_manager.parse_article_raw_html(article_html, article_url, None)
             
             if not parsed_result:
                 raise FailedToParse("Successful parse but returned text was empty", message.link, "parsing", f"article text is {parsed_result}")
             
             self.logger.debug(f"Successfully parsed HTML for {article_url}, length: {len(parsed_result.text or '')}")
             message.set_parsed_result(parsed_result)
-            return strat_used
-
+            return message
         except Exception as e:
             self.logger.error(f"Failed to parse HTML: {e}")
             raise e
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
         
-        fetch_time, parse_time, html_len, text_len, parse_strat_used, error_type = None, None, None, None, None, None
+        fetch_time, parse_time, html_len, text_len, error_type = None, None, None, None, None
         matched_outlet = message.data.payload.news_outlet
         if not matched_outlet:
             matched_outlet = match_outlet_name(message.link or "") or "Unknown"
@@ -236,7 +231,7 @@ class ScraperService(ServiceTemplate):
             if not message.html:
                 fetch_start = time.perf_counter()
                 message.add_timestamp(JobStage.FETCHED_IN)
-                self._fetch_article_and_update(message)
+                message:StreamMessage = self._fetch_article_and_update(message)
                 message.add_timestamp(JobStage.FETCHED_OUT)
                 fetch_end = time.perf_counter()
                 fetch_time = fetch_end - fetch_start
@@ -246,7 +241,7 @@ class ScraperService(ServiceTemplate):
             if not message.text:
                 parse_start = time.perf_counter()
                 message.add_timestamp(JobStage.PARSED_IN)
-                parse_strat_used = self._parse_article_and_update(message)
+                message:StreamMessage = self._parse_article_and_update(message)
                 message.add_timestamp(JobStage.PARSED_OUT)
                 parse_end = time.perf_counter()
                 parse_time = parse_end - parse_start
@@ -271,12 +266,12 @@ class ScraperService(ServiceTemplate):
             validate_after_webscraper(stream_message=message, message=None)
             
             self.logger.debug(get_pretty_print_stream_message(message))
-            self._log_stats(matched_outlet, html_len, text_len, fetch_time, parse_time, parse_strat_used, None)    
+            self._log_stats(matched_outlet, html_len, text_len, fetch_time, parse_time)    
             return message
         
         except Exception as e:
             error_type = type(e).__name__
-            self._log_stats(matched_outlet, html_len, text_len, fetch_time, parse_time, parse_strat_used, error_type)    
+            self._log_stats(matched_outlet, html_len, text_len, fetch_time, parse_time, error_type)    
             raise 
 
    
