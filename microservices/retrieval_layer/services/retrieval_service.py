@@ -10,13 +10,13 @@ from common.models.api.validation_helpers import get_pretty_print_message, get_p
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.hash_store import RedisHashStore
 from common.service.service_template import ServiceTemplate
-from common.models.api.redis_models import BiasProfile, Claim, Message, RetrievalResult, StreamMessage
+from common.models.api.redis_models import BiasProfile, Claim, Message, MessagePayload, RetrievalResult, StreamMessage
 from common.redis_client.publisher import RedisPublisher
 from microservices.retrieval_layer.retrieval.embedding_retriever import retrieve_by_embedding
 from microservices.retrieval_layer.retrieval.entity_filter import find_evidence_by_entity_match
 from microservices.retrieval_layer.retrieval.keyword_filter import find_evidence_by_keyword_match
 from microservices.retrieval_layer.retrieval.nli import classify_claim_relation
-from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, CreateOrModifySentiment, CreateOrModifyOutlet, CreateOrModifyClaim, UpdateJob
+from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, CreateOrModifySentiment, CreateOrModifyOutlet, CreateOrModifyClaim, UpdateJob, UpsertArticleTopic
 
 from microservices.retrieval_layer.config import (
     HASH_STORE_NAMESPACE,
@@ -32,12 +32,13 @@ from microservices.retrieval_layer.storage.crud import (
     get_or_create_all_entities,
     get_or_create_article,
     create_claim_and_link_entities,
+    upsert_article_topic,
 )
 
 
 MAX_CANDIDATES_BEFORE_SIMILARITY = 100
 MAX_CANDIDATES_BEFORE_NLI = 10
-MIN_SIMILARITY = 0.25
+MIN_SIMILARITY = 0.35
 EMBEDDING_DIM = 768
 
 
@@ -46,7 +47,93 @@ class RetrievalService(ServiceTemplate):
         super().__init__(config)
         self.hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
         self.uid_store = RedisDuplicateFilter(key_name=UID_STORE_NAMESPACE,ttl_s=0)
+        if torch.cuda.is_available():
+            self.logger.info("GPU DETECTED")
+        else:
+            self.logger.info("GPU NOT DETECTED")
+        
+        self.stats_json_handler = JsonHandler(filename="stats.json")
+        
+    def _log_stats(self,
+               news_outlet: str,
+               input_claims_evaluated: int,
+               evidence_matches: int,
+               verdicts: List[str],
+               confidences: List[float | int],
+               related_articles: int,
+               error_type: Optional[str]=None) -> None:
 
+        data = self.stats_json_handler.read_json()
+        day_key = datetime.now().date().isoformat()
+
+        entry = data.setdefault(day_key, {
+            "user_jobs_processed": 0,
+            "input_claims_evaluated": 0,
+            "evidence_matches": 0,
+            "verdicts": {"true":0,"mostly-true":0,"mixed":0,
+                        "mostly-false":0,"false":0,"unverified":0},
+            "confidence_scores": {"sum":0,"count":0,"min":None,"max":None},
+            "relations": {"support":0,"contradict":0,"irrelevant":0},
+            "related_articles_total": 0,
+            "errors": {},
+            "outlet_stats": {}
+        })
+
+        # Global updates
+        entry["user_jobs_processed"] += 1
+        entry["input_claims_evaluated"] += input_claims_evaluated
+        entry["evidence_matches"] += evidence_matches
+        
+        for verdict in verdicts:
+            if verdict in entry["verdicts"]:
+                entry["verdicts"][verdict] += 1
+            else:
+                entry["verdicts"][verdict] = 1
+        
+        entry["confidence_scores"]["sum"] += sum(confidences)
+        entry["confidence_scores"]["count"] += 1
+        max_confidence = max(confidences)
+        min_confidence = min(confidences)
+        entry["confidence_scores"]["min"] = min_confidence if entry["confidence_scores"]["min"] is None else min(entry["confidence_scores"]["min"], min_confidence)
+        entry["confidence_scores"]["max"] = max_confidence if entry["confidence_scores"]["max"] is None else max(entry["confidence_scores"]["max"], max_confidence)
+
+        entry["related_articles_total"] += related_articles
+
+        if error_type:
+            entry["errors"][error_type] = entry["errors"].get(error_type,0)+1
+
+        # Outlet‑level stats
+        outlet_entry = entry["outlet_stats"].setdefault(news_outlet, {
+            "count" : 0,
+            "input_claims_evaluated":0,
+            "evidence_matches":0,
+            "verdicts":{"true":0,"mostly-true":0,"mixed":0,
+                        "mostly-false":0,"false":0,"unverified":0},
+            "errors":{}
+        })
+        outlet_entry["count"] += 1
+        outlet_entry["input_claims_evaluated"] += input_claims_evaluated
+        outlet_entry["evidence_matches"] += evidence_matches
+        
+        for verdict in verdicts:
+            if verdict in outlet_entry["verdicts"]:
+                outlet_entry["verdicts"][verdict] += 1
+            else:
+                outlet_entry["verdicts"][verdict] = 1
+        
+        if error_type:
+            outlet_entry["errors"][error_type] = outlet_entry["errors"].get(error_type,0)+1
+
+        # Prune to last 30 days
+        MAX_DAYS = 30
+        dates = sorted(data.keys())
+        if len(dates) > MAX_DAYS:
+            for old_date in dates[:-MAX_DAYS]:
+                del data[old_date]
+
+        self.stats_json_handler.write_json(data)
+        
+        
     @staticmethod
     def _normalize_embedding(embedding: List[float] | None) -> List[float] | None:
         """Coerce embeddings to the pgvector dimension (pad/truncate) while preserving values."""
@@ -103,11 +190,10 @@ class RetrievalService(ServiceTemplate):
         else:
             verdict = "false"
         
-        # Calculate confidence (0-100) based on:
-        avg_quality = sum(m["similarity"] * m["confidence"] for m in relevant) / len(relevant)
-        perfect_evidence = len(relevant) * 1.0  # Max quality = 1.0
-        evidence_ratio = ( avg_quality * len(relevant) ) / perfect_evidence
-        confidence = int(evidence_ratio * 100)
+        # Calculate confidence (0-100) based on NLI confidence and evidence count.
+        avg_nli_confidence = sum(m["confidence"] for m in relevant) / len(relevant)
+        evidence_count_factor = min(1.0, len(relevant) / 5.0)
+        confidence = int(avg_nli_confidence * evidence_count_factor * 100)
         return verdict, confidence
 
     def _retrieve_evidence_for_claim_thread(
@@ -193,14 +279,29 @@ class RetrievalService(ServiceTemplate):
             all_claims_added.append(new_claim_entry)
             
         self.logger.debug("Saved article id=%s claims=%d entities=%d", article_entry.id, len(all_claims_added), len(all_entities_added))
-        
+
+        topic_label = message.data.payload.topic_label
+        if topic_label:
+            try:
+                with db.begin_nested():
+                    upsert_article_topic(
+                        db,
+                        UpsertArticleTopic(
+                            article_id=article_entry.id,
+                            topic_label=topic_label,
+                            topic_confidence=message.data.payload.topic_confidence or 0.0,
+                        ),
+                    )
+            except Exception as e:
+                self.logger.warning("topic upsert failed uid=%s: %s", message.uid, e)
+
         return {
             "article_entry_id": article_entry.id,
             "all_entity_ids_added" : [x.id for x in all_entities_added],
             "all_claim_ids_added" : [x.id for x in all_claims_added]
         }
         
-    def _retrieve_evidence_for_claim(self, db: Session, claim: Claim, original_article_id: int, publish_date: str | None = None) -> Dict[str, Any]:
+    def _retrieve_evidence_for_claim(self, db: Session, claim: Claim, original_article_id: int, publish_date: str | None = None) -> List[int | str]:
         input_claim_text = claim.decontextualised_claim_text or ""
         claim_candidates = set()
         
@@ -239,9 +340,6 @@ class RetrievalService(ServiceTemplate):
             )
             claim_candidates.update(entity_candidates)
         
-            if not claim_candidates:
-                return []
-            
             capped_filter_step_candidate_list = list(claim_candidates)[:MAX_CANDIDATES_BEFORE_SIMILARITY]
             # list of db Claim objects
             capped_filter_step_candidate_ids = [filtered_claim.id for filtered_claim in capped_filter_step_candidate_list]
@@ -417,7 +515,15 @@ class RetrievalService(ServiceTemplate):
                 related_articles = payload.get("related_articles") or []
                 self.logger.info("Stored result uid=%s matches=%d related_articles=%d", message.uid, len(matches), len(related_articles))
                 
+            minimum_message:Message = Message(
+                header = message.data.header,
+                payload = MessagePayload(article_url=message.link),
+                stage_timestamps = message.stage_timestamps
+            )
+            
             self.uid_store.add_one(str(message.uid))
+            self.success_publish_router.publish_one(minimum_message.model_dump(mode='json'))
+            
             if self.is_cut_and_paste_mode:
                 self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
             else:
@@ -456,13 +562,22 @@ class RetrievalService(ServiceTemplate):
                     related_articles = payload.get("related_articles") or []
                     self.logger.info("Stored result uid=%s matches=%d related_articles=%d", message.uid, len(matches), len(related_articles))
                 
+                minimum_message:Message = Message(
+                    header = message.data.header,
+                    payload = MessagePayload(article_url=message.link),
+                    stage_timestamps = message.stage_timestamps
+                )
+
+
                 self.uid_store.add_one(str(message.uid))
+                self.success_publish_router.publish_one(minimum_message.model_dump(mode='json'))
+                
                 if self.is_cut_and_paste_mode:
                     self.message_consumer.acknowledge_and_delete(message.stream, message.redis_id)
                 else:
                     self.message_consumer.acknowledge(message.stream, message.redis_id)
                 
-                self.logger.debug(f"Successfully published Msg {message.redis_id} -> {new_id} in hashset")
+                self.logger.debug(f"Successfully published Msg {message.redis_id} -> {new_id} in hashset and stats in {self.output_streams[0]}")
                 ack_count+=1
 
             except Exception as e:
@@ -486,7 +601,7 @@ class RetrievalService(ServiceTemplate):
 
             try:
                 old_redis_id, new_redis_id = future.result() 
-                self.logger.debug(f"Successfully published Msg {old_redis_id} -> {new_redis_id} in hashset")
+                self.logger.debug(f"Successfully published Msg {old_redis_id} -> {new_redis_id} in hashset and stats in {self.output_streams[0]}")
             except Exception:
                 self.logger.warning(f"A worker for message {original_message.redis_id} failed. See previous error logs for details.")
 
@@ -517,7 +632,24 @@ class RetrievalService(ServiceTemplate):
                 claim_evidence_matches,
                 related_articles
             )
-
+            
+            # claim_evidence_results = { 
+            #     "query_claim": input_claim_text,
+                
+            #     "verdict": total_verdict,
+            #     "confidence": total_confidence_score,
+                
+            #     "matches": evidence_matches,
+            #     "match_count": len(evidence_matches),
+            # }
+            
+            len_input_claims = len(message.all_claims or [])
+            len_related_articles = len(related_articles or [])
+            len_evidence_claims_found = sum(x.get("match_count", 0) for x in claim_evidence_matches)
+            verdicts = [x.get("verdict", "unverified") for x in claim_evidence_matches]
+            confidences = [x.get("confidence", 0) for x in claim_evidence_matches]
+            
+            self._log_stats(message.news_outlet_name, len_input_claims, len_evidence_claims_found, verdicts, confidences, len_related_articles)
             message.set_retrieval_result(retrieval_result)
             self.logger.info(
                 "Completed retrieval for uid=%s type=%s claims=%d",
@@ -526,5 +658,7 @@ class RetrievalService(ServiceTemplate):
                 len(message.all_claims or []),
             )   
             validate_after_retrieval(stream_message=message, message=None)
+            
+            
             return message
                     

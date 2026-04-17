@@ -606,10 +606,10 @@ class FetchManagerSelenium:
             return body_element
         
         except TimeoutException as e:
-            self.logger.error(f"[ERROR] Potential proxy error on {article_url}: {e}")
+            self.logger.error(f"[ERROR] TIMEOUT: Potential proxy error on {article_url}: {e}")
             self.proxy_manager.report_bad_proxy(driver_config.proxy_url)
         except WebDriverException as e:
-            self.logger.error(f"[ERROR] Potential proxy error on {article_url}: {e}")
+            self.logger.error(f"[ERROR] SELENIUM FAIL: Potential proxy error on {article_url}: {e}")
             self.proxy_manager.report_bad_proxy(driver_config.proxy_url)
         except SysCallError as e:
             self.logger.error(f"[ERROR] SSL connection reset on {article_url}: {e}")
@@ -617,7 +617,7 @@ class FetchManagerSelenium:
                 self.proxy_manager.report_bad_proxy(driver_config.proxy_url)
             raise e
         except Exception as e:
-            self.logger.error(f"[ERROR] Could not fetch {article_url}: {e}")
+            self.logger.error(f"[ERROR] OTHER: Could not fetch {article_url}: {e}")
             self.proxy_manager.report_bad_proxy(driver_config.proxy_url)
             raise e
         

@@ -1,7 +1,9 @@
 # microservices/nlp/nlp_service.py
-from typing import List
+from datetime import datetime
+from typing import Dict, List, Optional
 from logging import getLogger
 import random
+from common.io.json_updater import JsonHandler
 from common.models.api.dtos.job import JobType
 from common.models.api.validation_helpers import get_pretty_print_stream_message, validate_after_nlp
 import torch
@@ -82,6 +84,8 @@ def _build_dummy_result() -> NLPResult:
     result.claims_in_article = [claim]
     result.entities_in_article = entities
     result.bias_profile = bias_profile
+    result.topic_label = "Politics"
+    result.topic_confidence = 0.75
     return result
 
 
@@ -115,6 +119,106 @@ class NLPService(ServiceTemplate):
                 for name, cls, ctype in PIPELINE_ORDER
             ]
             logger.info("Model health: %s", model_manager.health_check())
+        
+        self.stats_json_handler = JsonHandler(filename="stats.json")
+        
+    def _log_stats(self,
+               news_outlet: str,
+               len_claims_extracted: int,
+               entities_extracted: List[Entity],
+               bias_profile: BiasProfile,
+               error_type: Optional[str] = None) -> None:
+
+        data = self.stats_json_handler.read_json()
+        day_key = datetime.now().date().isoformat()
+
+        entry = data.setdefault(day_key, {
+            "jobs_processed": 0,
+            "claims_extracted": 0,
+            "entities_extracted": 0,
+            "bias_profiles": {
+                "left": 0, "right": 0, "center": 0,
+                "subjective": 0, "objective": 0,
+                "emotive": 0, "non_emotive": 0
+            },
+            "entity_distribution": {},
+            "outlet_stats": {},
+            "errors": {}
+        })
+        
+        # Update global totals
+        entry["jobs_processed"] += 1
+        entry["claims_extracted"] += len_claims_extracted
+        entry["entities_extracted"] += len(entities_extracted)
+
+        # Update global entity distribution
+        for ent in entities_extracted:
+            entry["entity_distribution"][ent.type_of_entity] = (
+                entry["entity_distribution"].get(ent.type_of_entity, 0) + 1
+            )
+
+        if bias_profile and bias_profile.bias_category:
+            bias_cat = bias_profile.bias_category.lower()
+            entry["bias_profiles"].setdefault(bias_cat, 0)
+            entry["bias_profiles"][bias_cat] += 1
+
+        if bias_profile and bias_profile.sentiment_category:
+            sent_cat = bias_profile.sentiment_category.lower()
+            entry["bias_profiles"].setdefault(sent_cat, 0)
+            entry["bias_profiles"][sent_cat] += 1
+
+        # Errors
+        if error_type:
+            entry["errors"][error_type] = entry["errors"].get(error_type, 0) + 1
+
+        # --- Outlet‑level stats ---
+        outlet_entry = entry["outlet_stats"].setdefault(news_outlet, {
+            "jobs_processed": 0,
+            "claims_extracted": 0,
+            "entities_extracted": 0,
+            "entity_distribution": {},
+            "bias_profiles": {
+                "left": 0, "right": 0, "center": 0,
+                "subjective": 0, "objective": 0,
+                "emotive": 0, "non_emotive": 0
+            },
+            "errors": {}
+        })
+
+        outlet_entry["jobs_processed"] += 1
+        outlet_entry["claims_extracted"] += len_claims_extracted
+        outlet_entry["entities_extracted"] += len(entities_extracted)
+
+        # Outlet entity distribution
+        for ent in entities_extracted:
+            outlet_entry["entity_distribution"][ent.type_of_entity] = (
+                outlet_entry["entity_distribution"].get(ent.type_of_entity, 0) + 1
+            )
+
+        # Outlet bias profiles
+        if bias_profile and bias_profile.bias_category:
+            bias_cat = bias_profile.bias_category.lower()
+            outlet_entry["bias_profiles"].setdefault(bias_cat, 0)
+            outlet_entry["bias_profiles"][bias_cat] += 1
+
+        if bias_profile and bias_profile.sentiment_category:
+            sent_cat = bias_profile.sentiment_category.lower()
+            outlet_entry["bias_profiles"].setdefault(sent_cat, 0)
+            outlet_entry["bias_profiles"][sent_cat] += 1
+
+        # Outlet errors
+        if error_type:
+            outlet_entry["errors"][error_type] = outlet_entry["errors"].get(error_type, 0) + 1
+
+        # Prune to last 30 days
+        MAX_DAYS = 30
+        dates = sorted(data.keys())
+        if len(dates) > MAX_DAYS:
+            for old_date in dates[:-MAX_DAYS]:
+                del data[old_date]
+
+        self.stats_json_handler.write_json(data)
+
 
     def _analyze_html_and_update(self, message: StreamMessage) -> StreamMessage:
         """
@@ -168,17 +272,30 @@ class NLPService(ServiceTemplate):
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
         try:
-            if message.type == JobType.USER:
-                logger.info("Processing user article: %s", message.link)
-
             if DUMMY_NLP_MODE:
                 dummy_result = _build_dummy_result()
                 message.set_nlp_result(dummy_result)
                 return message
 
-            analyzed_message: StreamMessage = self._analyze_html_and_update(message)
-            return analyzed_message
+            self._analyze_html_and_update(message)
+            
+            
+            
+            self._log_stats(
+                news_outlet=message.data.payload.news_outlet,
+                len_claims_extracted=len(message.all_claims),
+                entities_extracted=message.all_entities,
+                bias_profile=message.bias_profile
+            )
+            
+            return message
         except Exception as e:
+            self._log_stats(
+                news_outlet=message.data.payload.news_outlet,
+                len_claims_extracted=len(message.all_claims),
+                entities_extracted=message.all_entities,
+                bias_profile=message.bias_profile
+            )
             raise ProcessingError(f"Failed to analyze {message.link}: {e}")
         finally:
             # Always flush the GPU cache after a message to prevent OOM accumulation

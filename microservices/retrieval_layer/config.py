@@ -22,6 +22,11 @@ POSTGRES_SSLMODE: str = get_env_var("POSTGRES_SSLMODE", str, config_logger, defa
 
 # Redis stream configs
 INPUT_STREAMS: List[str] = [x.strip(" ,") for x in get_env_var("INPUT_STREAMS",str, config_logger).split(",")]
+OUTPUT_STREAM: str = get_env_var(
+    "OUTPUT_STREAM",
+    str,
+    config_logger
+)
 
 FAILURE_OUTPUT_STREAM: str = get_env_var(
     "FAILURE_OUTPUT_STREAM",
@@ -100,6 +105,7 @@ env_variables: List[EnvVariable] = [
     EnvVariable("POSTGRES_PASSWORD", POSTGRES_PASSWORD),
     
     EnvVariable("INPUT_STREAMS", INPUT_STREAMS),
+    EnvVariable("OUTPUT_STREAM", OUTPUT_STREAM),
     EnvVariable("FAILURE_OUTPUT_STREAM", FAILURE_OUTPUT_STREAM),
     EnvVariable("GROUP_NAME", GROUP_NAME),
     EnvVariable("CONSUMER_NAME", CONSUMER_NAME),
@@ -117,7 +123,7 @@ env_variables: List[EnvVariable] = [
 ]
 
 input_streams = INPUT_STREAMS
-output_streams = [FAILURE_OUTPUT_STREAM, HASH_STORE_NAMESPACE]
+output_streams = [FAILURE_OUTPUT_STREAM, HASH_STORE_NAMESPACE, BENCHMARK_OUTPUT_STREAM if IS_BENCHMARK else OUTPUT_STREAM]
 
 print_env(Config(env_variables, input_streams, output_streams), config_logger)
 

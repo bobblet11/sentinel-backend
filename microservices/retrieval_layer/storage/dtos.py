@@ -50,3 +50,10 @@ class Evidence:
     bias: str
     publishedAt: str
     excerpt: str
+
+
+@dataclass
+class UpsertArticleTopic:
+    article_id: int
+    topic_label: str
+    topic_confidence: float

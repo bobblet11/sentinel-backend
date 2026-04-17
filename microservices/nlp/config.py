@@ -35,6 +35,20 @@ CW_NLI_WEIGHT = 0.40
 CW_HEURISTIC_WEIGHT = 0.60
 NLI_ENTAILMENT_THRESHOLD = 0.70
 QA_SCORE_THRESHOLD = 0.20
+TOPIC_SIMILARITY_THRESHOLD: float = 0.15
+
+# ── Topic Classification ──────────────────────────────────────────────────────
+TOPIC_LABELS: List[str] = [
+    "Politics",
+    "World",
+    "Technology",
+    "Health",
+    "Science",
+    "Business",
+    "Entertainment",
+    "Sports",
+    "General",
+]
 
 # ── CheckWorthiness (kept for backward compatibility with CheckWorthinessFilter)
 CHECKWORTHY_MODEL = "whispAI/ClaimBuster-DeBERTaV2"
@@ -118,6 +132,9 @@ try:
     QG_MODEL = get_env_var("NLP_QG_MODEL", str, config_logger, QG_MODEL)
     QA_MODEL = get_env_var("NLP_QA_MODEL", str, config_logger, QA_MODEL)
     GEN_MODEL = get_env_var("NLP_GEN_MODEL", str, config_logger, GEN_MODEL)
+    TOPIC_SIMILARITY_THRESHOLD = get_env_var(
+        "NLP_TOPIC_SIMILARITY_THRESHOLD", float, config_logger, TOPIC_SIMILARITY_THRESHOLD
+    )
 
     # Unified device config for all NLP components
     use_gpu = get_env_var("USE_GPU", str, config_logger, "false").lower() == "true"

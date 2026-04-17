@@ -1,11 +1,11 @@
 from dataclasses import asdict
 
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import distinct, select
+from sqlalchemy import distinct, select, text
 
-from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, CreateOrModifySentiment, CreateOrModifyOutlet, CreateOrModifyClaim, Evidence, UpdateJob
+from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, CreateOrModifySentiment, CreateOrModifyOutlet, CreateOrModifyClaim, Evidence, UpdateJob, UpsertArticleTopic
 from microservices.retrieval_layer.db.models import (
-    Article, Claim, Entity, Job, JobTimestamp, NewsOutlet, Author, SentimentAnalysis, claim_to_entity_table
+    Article, Claim, Entity, Job, JobTimestamp, NewsOutlet, Author, SentimentAnalysis, claim_to_entity_table, Topic, ArticleTopic
 )
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -198,6 +198,32 @@ def extend_evidence_claims_into_articles(db: Session, claim_ids: List[int], curr
         # Hash store serialization expects JSON-serializable values.
         related.append(asdict(evidence))
     return related
+
+
+def upsert_article_topic(db: Session, dto: UpsertArticleTopic) -> None:
+    topic_row = db.execute(
+        select(Topic).where(Topic.name == dto.topic_label)
+    ).scalar_one_or_none()
+    if topic_row is None:
+        return
+    db.execute(
+        text(
+            """
+            INSERT INTO article_topic (article_id, topic_id, confidence)
+            VALUES (:article_id, :topic_id, :confidence)
+            ON CONFLICT (article_id)
+            DO UPDATE SET topic_id   = EXCLUDED.topic_id,
+                          confidence = EXCLUDED.confidence
+            """
+        ),
+        {
+            "article_id": dto.article_id,
+            "topic_id": topic_row.id,
+            "confidence": dto.topic_confidence,
+        },
+    )
+    db.flush()
+
 
 def finalise_and_complete_job(db: Session, job_dto: UpdateJob):
     if not job_dto.job_id or not job_dto.job_uid:

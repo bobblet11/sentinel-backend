@@ -24,7 +24,7 @@ if __name__ == "__main__":
         failure_output_stream=FAILURE_OUTPUT_STREAM, 
         router_key_values=[JobType.USER.value, JobType.BACKGROUND.value],
         is_concurrent=True if int(NLP_MAX_WORKERS) > 1 else False,
-        max_workers=NLP_MAX_WORKERS,    
+        max_workers=int(NLP_MAX_WORKERS),    
         
         batch_size=BATCH_SIZE,
         is_cut_and_paste_mode=True, #delete job on ack

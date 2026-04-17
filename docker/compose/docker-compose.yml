@@ -319,7 +319,7 @@ services:
               count: all
               capabilities: [ gpu ]
   retrieval-layer-service-gpu:
-    container_name: sentinel-retrieval-layer-service-container
+    container_name: sentinel-retrieval-layer-GPU-service-container
     shm_size: '${RETRIEVAL_LAYER_SHM_SIZE:-2gb}'
     image: sentinel/retrieval-layer-service:latest
     build:
@@ -344,7 +344,7 @@ services:
       - LOG_MODE=${RETRIEVAL_LOG_MODE:-10}
       - INPUT_STREAMS=${RETRIEVAL_INPUT_STREAMS:-user:to.be.retrieval}
       - FAILURE_OUTPUT_STREAM=${RETRIEVAL_FAILURE_OUTPUT_STREAM:-failure:to.be.retrieval}
-
+      - OUTPUT_STREAM=${RETRIEVAL_OUTPUT_STREAM:-all:stage.timestamps}
       - GROUP_NAME=${RETRIEVAL_GROUP_NAME:-default}
       - CONSUMER_NAME=${RETRIEVAL_CONSUMER_NAME:-retrieval-layer-1}
 
@@ -366,6 +366,9 @@ services:
       - IS_BENCHMARK=${IS_BENCHMARK:-False}
       - BENCHMARK_OUTPUT_STREAM=${BENCHMARK_OUTPUT_STREAM}
       - MAX_WORKERS=${RETRIEVAL_MAX_WORKERS:-1}
+      - USE_GPU=true
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
     deploy:
       resources:
@@ -375,9 +378,13 @@ services:
         reservations:
           cpus: '${RETRIEVAL_CPU_RESERVATION:-0.25}'
           memory: '${RETRIEVAL_MEMORY_RESERVATION:-1G}'
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
 
   retrieval-layer-service-cpu:
-    container_name: sentinel-retrieval-layer-service-container
+    container_name: sentinel-retrieval-layer-CPU-service-container
     shm_size: '${RETRIEVAL_LAYER_SHM_SIZE:-2gb}'
     image: sentinel/retrieval-layer-service:latest
     build:
@@ -402,6 +409,7 @@ services:
       - LOG_MODE=${RETRIEVAL_LOG_MODE:-10}
       - INPUT_STREAMS=${RETRIEVAL_INPUT_STREAMS:-user:to.be.retrieval}
       - FAILURE_OUTPUT_STREAM=${RETRIEVAL_FAILURE_OUTPUT_STREAM:-failure:to.be.retrieval}
+      - OUTPUT_STREAM=${RETRIEVAL_OUTPUT_STREAM:-all:stage.timestamps}
 
       - GROUP_NAME=${RETRIEVAL_GROUP_NAME:-default}
       - CONSUMER_NAME=${RETRIEVAL_CONSUMER_NAME:-retrieval-layer-1}

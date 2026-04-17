@@ -13,6 +13,7 @@ from microservices.api.app.models.job import Job
 from microservices.api.app.services.redis_queue import publish_job
 from sqlalchemy.orm import Session
 from uuid import UUID
+from datetime import datetime, timedelta, timezone
 import asyncio
 from typing import Dict, Any, List, cast
 import logging
@@ -20,6 +21,18 @@ import logging
 router = APIRouter()
 result_hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
 logger = logging.getLogger(__name__)
+
+
+STALE_JOB_THRESHOLD_MINUTES = 15
+
+
+def _is_job_stale(job: Job) -> bool:
+    created_at = cast(Any, job.created_at)
+    if created_at is None:
+        return True
+    if getattr(created_at, "tzinfo", None) is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - created_at > timedelta(minutes=STALE_JOB_THRESHOLD_MINUTES)
 
 
 def _build_bias_analysis(bias_profile: Dict[str, Any] | None) -> Dict[str, Any]:
@@ -112,6 +125,7 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
                 "source": f"Claim #{m['claim_id']}",
                 "url": m.get("source_url") or "",
                 "excerpt": (m.get("source_excerpt") or m.get("claim_text", ""))[:500],
+                "stance": "disputing" if m.get("relation") == "contradict" else "supporting",
             }
             for m in claim_matches[:3]  # Limit to top 3 evidence items
         ]
@@ -149,35 +163,52 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
 def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
     try:
         requested_job_type = JobType.BACKGROUND.value if job_in.is_background else JobType.USER.value
-
-        # # Seen article fast path: reuse most recent job for this URL and skip republishing.
-        # existing_article = get_article_by_url(db=db, article_url=job_in.article_url)
-        # if existing_article:
-        #     print("WTF WHY IT EXIST!")
-        #     existing_job = get_latest_job_for_article(
-        #         db=db,
-        #         article_id=cast(int, existing_article.id),
-        #         job_type=requested_job_type,
-        #     )
-        #     if existing_job:
-        #         logger.info(
-        #             "Seen article detected. Reusing existing job id=%s uid=%s for url=%s",
-        #             existing_job.id,
-        #             existing_job.uid,
-        #             existing_article.url,
-        #         )
-        #         return existing_job
-
-        # Start of the "Unit of Work"
         job_in.news_outlet = get_news_outlet(job_in)
+
+        existing_article = get_article_by_url(db=db, article_url=job_in.article_url)
+        if existing_article:
+            existing_job = get_latest_job_for_article(
+                db=db,
+                article_id=cast(int, existing_article.id),
+                job_type=requested_job_type,
+            )
+
+            if existing_job and str(existing_job.status).lower() == JobStatus.COMPLETE.value:
+                if result_hash_store.exists(str(existing_job.uid)):
+                    logger.info(
+                        "Article already analysed. Reusing completed job id=%s uid=%s for url=%s",
+                        existing_job.id,
+                        existing_job.uid,
+                        existing_article.url,
+                    )
+                    return existing_job
+
+            if existing_job and str(existing_job.status).lower() == JobStatus.PENDING.value and not _is_job_stale(existing_job):
+                logger.info(
+                    "Article already has an active job id=%s uid=%s for url=%s",
+                    existing_job.id,
+                    existing_job.uid,
+                    existing_article.url,
+                )
+                return existing_job
+
+            retry_job: Job = create_job(db=db, job_in=job_in, article_id=cast(int, existing_article.id))
+            publish_job(retry_job, existing_article, job_in)
+            db.commit()
+            logger.info(
+                "Article re-submitted with new job id=%s uid=%s for url=%s",
+                retry_job.id,
+                retry_job.uid,
+                existing_article.url,
+            )
+            return retry_job
+
         new_article: Article = create_article(db=db, job_in=job_in)
         new_job: Job = create_job(db=db, job_in=job_in, article_id=cast(int, new_article.id))
-        
-        # Only publish to Redis if the database commit was successful.
+
         publish_job(new_job, new_article, job_in)
-        
-        # All database operations are prepared. Now, commit them as one transaction.
-        db.commit() 
+
+        db.commit()
         return new_job
 
     except IntegrityError as e:

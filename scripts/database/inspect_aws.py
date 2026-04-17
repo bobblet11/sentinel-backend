@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
+import json
+import os
 import redis
 from dotenv import load_dotenv
 # Load environment
 load_dotenv(dotenv_path="configs/aws/.env")
+# configs/aws/.env sets REDIS_HOST=host.docker.internal for Docker containers;
+# when running from WSL the tunnel is bound to localhost, so override here.
+if os.getenv("REDIS_HOST") == "host.docker.internal":
+    os.environ["REDIS_HOST"] = "localhost"
 
 from common.redis_client.connection import redis_connection
 
@@ -12,6 +18,34 @@ def bar(value, max_value, length=20):
         return "[....................]"
     filled = int((value / max_value) * length)
     return "[" + "*" * filled + "." * (length - filled) + "]"
+
+def show_recent_stream_messages(r, stream_name, limit=3):
+    try:
+        entries = r.xrevrange(stream_name, count=limit)
+    except redis.exceptions.ResponseError:
+        return
+
+    print(f"\nRecent messages in {stream_name}:")
+    if not entries:
+        print("  none")
+        return
+
+    for redis_id, fields in entries:
+        payload_raw = fields.get("payload") if isinstance(fields, dict) else None
+        payload = {}
+        if payload_raw:
+            try:
+                payload = json.loads(payload_raw)
+            except (TypeError, json.JSONDecodeError):
+                payload = {}
+
+        header = payload.get("header", {})
+        body = payload.get("payload", {})
+        print(
+            f"  {redis_id} | uid={header.get('uid', '?')} | "
+            f"type={header.get('type', '?')} | url={body.get('article_url', '?')}"
+        )
+
 
 def inspect_redis():
     r = redis_connection.get_client()
@@ -23,6 +57,7 @@ def inspect_redis():
         for key in keys:
             key_type = r.type(key)
             key_name = key.decode() if isinstance(key, bytes) else key
+            print(key_name, key_type)
             if key_type == "stream":
                 stream_stats[key_name] = r.xlen(key)
             elif key_type == "set":
@@ -64,7 +99,7 @@ def inspect_redis():
             print(f"  Success : {success_rate:.1f}% (completed vs ingested)")
         print()
 
-    print(">>> PIPELINE FLOW")
+    print(">>> PIPELINE FLOW - BACKGROUND")
     print(f"[ background:to.be.scraped ] ({stream_stats.get('background:to.be.scraped',0)})")
     print("            |")
     print("            v")
@@ -76,22 +111,57 @@ def inspect_redis():
     print("            v")
     print(f"[ retrieval:uid.store ] ({completed} completed) ----> failure:to.be.retrieval ({failures['retrieval']})")
 
+    print("\n>>> PIPELINE FLOW - USER")
+    print(f"[ user:to.be.scraped ] ({stream_stats.get('user:to.be.scraped',0)})")
+    print("            |")
+    print("            v")
+    print(f"[ user:to.be.nlp ] ({stream_stats.get('user:to.be.nlp',0)})")
+    print("            |")
+    print("            v")
+    print(f"[ user:to.be.retrieval ] ({stream_stats.get('user:to.be.retrieval',0)})")
+
     print("\n>>> CONSUMER HEALTH")
     for stream in stream_stats.keys():
         try:
             groups = r.xinfo_groups(stream)
             for group in groups:
-                group_name = group['name']
+                group_name = group["name"]
+
+                # Load per-consumer ack counters for this stream/group
+                ack_key = f"stream:{stream}:group:{group_name}:acks"
+                ack_stats = r.hgetall(ack_key)  # {b'consumer_name': b'count', ...}
+
                 consumers = r.xinfo_consumers(stream, group_name)
-                max_pending = max([c['pending'] for c in consumers]) if consumers else 0
+                max_pending = max([c["pending"] for c in consumers]) if consumers else 0
+
                 print(f"\nStream: {stream} | Group: {group_name}")
                 for consumer in consumers:
-                    cname = consumer['name']
-                    pending_count = consumer['pending']
-                    delivered = consumer.get('delivered', 0)  # acknowledged jobs
-                    print(f"  {cname:<20} {bar(pending_count, max_pending)} {pending_count} pending | {delivered} delivered")
+                    cname = consumer["name"]
+                    pending_count = consumer["pending"]
+
+                    # Redis returns hash keys/vals as bytes if decode_responses=False
+                    raw_acked = ack_stats.get(
+                        cname if isinstance(next(iter(ack_stats.keys()), None), str) else cname.encode()
+                    )
+                    acked = int(raw_acked) if raw_acked is not None else 0
+
+                    print(
+                        f"  {cname:<20} {bar(pending_count, max_pending)} "
+                        f"{pending_count} pending | {acked} acked"
+                    )
         except redis.exceptions.ResponseError:
+            # Not a stream with groups, or no groups defined
             pass
+
+    print("\n>>> RECENT USER ACTIVITY")
+    show_recent_stream_messages(r, "user:to.be.scraped")
+    show_recent_stream_messages(r, "user:to.be.nlp")
+    show_recent_stream_messages(r, "user:to.be.retrieval")
+
+    result_keys = sorted([k for k in hash_stats.keys() if k.startswith("retrieval:hash.store:")])
+    print(f"\nStored retrieval result hashes: {len(result_keys)}")
+    for key in result_keys[-5:]:
+        print(f"  {key}")
 
     print("\n====================================\n")
 

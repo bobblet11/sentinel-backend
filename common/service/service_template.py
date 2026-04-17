@@ -204,7 +204,7 @@ class ServiceTemplate(ABC):
 			else:
 				# This message was successfully published. Acknowledge it.
 				if self.is_cut_and_paste_mode:
-					self.message_consumer.acknowledge_and_delete(message.stream, original_message.redis_id)
+					self.message_consumer.acknowledge_and_delete(original_message.stream, original_message.redis_id)
 				else:
 					self.message_consumer.acknowledge(message.stream, original_message.redis_id)
 
