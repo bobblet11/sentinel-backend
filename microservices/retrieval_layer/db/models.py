@@ -94,3 +94,21 @@ class JobTimestamp(Base):
     job_id = Column(Integer, ForeignKey("job.id"), nullable=False)
     stage_name = Column(String(50), nullable=False)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Topic(Base):
+    __tablename__ = "topic"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True)
+
+    article_topics = relationship("ArticleTopic", back_populates="topic")
+
+
+class ArticleTopic(Base):
+    __tablename__ = "article_topic"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    article_id = Column(Integer, ForeignKey("article.id", ondelete="CASCADE"), nullable=False, unique=True)
+    topic_id = Column(Integer, ForeignKey("topic.id", ondelete="RESTRICT"), nullable=False)
+    confidence = Column(Float, nullable=False)
+
+    topic = relationship("Topic", back_populates="article_topics")

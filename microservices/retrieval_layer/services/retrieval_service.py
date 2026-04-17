@@ -17,7 +17,7 @@ from microservices.retrieval_layer.retrieval.embedding_retriever import retrieve
 from microservices.retrieval_layer.retrieval.entity_filter import find_evidence_by_entity_match
 from microservices.retrieval_layer.retrieval.keyword_filter import find_evidence_by_keyword_match
 from microservices.retrieval_layer.retrieval.nli import classify_claim_relation
-from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, CreateOrModifySentiment, CreateOrModifyOutlet, CreateOrModifyClaim, UpdateJob
+from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, CreateOrModifySentiment, CreateOrModifyOutlet, CreateOrModifyClaim, UpdateJob, UpsertArticleTopic
 
 from microservices.retrieval_layer.config import (
     HASH_STORE_NAMESPACE,
@@ -32,6 +32,7 @@ from microservices.retrieval_layer.storage.crud import (
     get_or_create_all_entities,
     get_or_create_article,
     create_claim_and_link_entities,
+    upsert_article_topic,
 )
 
 
@@ -252,7 +253,22 @@ class RetrievalService(ServiceTemplate):
             all_claims_added.append(new_claim_entry)
             
         self.logger.debug("Saved article id=%s claims=%d entities=%d", article_entry.id, len(all_claims_added), len(all_entities_added))
-        
+
+        topic_label = message.data.payload.topic_label
+        if topic_label:
+            try:
+                with db.begin_nested():
+                    upsert_article_topic(
+                        db,
+                        UpsertArticleTopic(
+                            article_id=article_entry.id,
+                            topic_label=topic_label,
+                            topic_confidence=message.data.payload.topic_confidence or 0.0,
+                        ),
+                    )
+            except Exception as e:
+                self.logger.warning("topic upsert failed uid=%s: %s", message.uid, e)
+
         return {
             "article_entry_id": article_entry.id,
             "all_entity_ids_added" : [x.id for x in all_entities_added],

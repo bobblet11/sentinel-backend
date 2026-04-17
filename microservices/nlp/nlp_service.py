@@ -84,6 +84,8 @@ def _build_dummy_result() -> NLPResult:
     result.claims_in_article = [claim]
     result.entities_in_article = entities
     result.bias_profile = bias_profile
+    result.topic_label = "Politics"
+    result.topic_confidence = 0.75
     return result
 
 
