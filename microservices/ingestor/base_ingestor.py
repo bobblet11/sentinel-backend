@@ -74,7 +74,7 @@ class BaseIngestor:
         memory_used_bytes = memory_info.get("used_memory", 0)
         memory_used_human = memory_info.get("used_memory_human", "0B")
 
-        num_keys, memory_used_bytes, memory_used_human
+        return num_keys, memory_used_bytes, memory_used_human
 
     def _take_postgres_snapshot(self) -> int:
         """Return the size of the current Postgres database in bytes."""
@@ -91,15 +91,15 @@ class BaseIngestor:
         
     
     def _log_snapshot(self) -> None:
-        file_data = self.snapshot_json_handler.read_json()
+        file_data = self.db_snapshot_json_handler.read_json()
         cycle_key = datetime.now().strftime("%Y-%m-%d %H:%M")
         
         entry = file_data.setdefault(cycle_key, {
             "snapshots": []
         })
 
-        num_keys, memory_used_bytes, memory_used_human = self._take_redis_snapshot
-        postgres_size = self._take_postgres_snapshot
+        num_keys, memory_used_bytes, memory_used_human = self._take_redis_snapshot()
+        postgres_size = self._take_postgres_snapshot()
         
         snapshot = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -118,7 +118,7 @@ class BaseIngestor:
             for old_date in dates[:-MAX_DAYS]:
                 del file_data[old_date]
 
-        self.snapshot_json_handler.write_json(file_data)
+        self.db_snapshot_json_handler.write_json(file_data)
 
     def _log_stats(self, newly_seen_articles:int =0, non_new_articles:int=0, total_deduplicated_articles_processed:int=0, total_raw_articles_fetched:int=0, outlet_counts:Dict[str, Any] = {}, cycle_duration_s:int = 0 ) -> None:
         file_data = self.stats_json_handler.read_json()

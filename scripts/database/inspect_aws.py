@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import redis
 from dotenv import load_dotenv
 # Load environment
@@ -12,6 +13,34 @@ def bar(value, max_value, length=20):
         return "[....................]"
     filled = int((value / max_value) * length)
     return "[" + "*" * filled + "." * (length - filled) + "]"
+
+def show_recent_stream_messages(r, stream_name, limit=3):
+    try:
+        entries = r.xrevrange(stream_name, count=limit)
+    except redis.exceptions.ResponseError:
+        return
+
+    print(f"\nRecent messages in {stream_name}:")
+    if not entries:
+        print("  none")
+        return
+
+    for redis_id, fields in entries:
+        payload_raw = fields.get("payload") if isinstance(fields, dict) else None
+        payload = {}
+        if payload_raw:
+            try:
+                payload = json.loads(payload_raw)
+            except (TypeError, json.JSONDecodeError):
+                payload = {}
+
+        header = payload.get("header", {})
+        body = payload.get("payload", {})
+        print(
+            f"  {redis_id} | uid={header.get('uid', '?')} | "
+            f"type={header.get('type', '?')} | url={body.get('article_url', '?')}"
+        )
+
 
 def inspect_redis():
     r = redis_connection.get_client()
@@ -65,7 +94,7 @@ def inspect_redis():
             print(f"  Success : {success_rate:.1f}% (completed vs ingested)")
         print()
 
-    print(">>> PIPELINE FLOW")
+    print(">>> PIPELINE FLOW - BACKGROUND")
     print(f"[ background:to.be.scraped ] ({stream_stats.get('background:to.be.scraped',0)})")
     print("            |")
     print("            v")
@@ -76,6 +105,15 @@ def inspect_redis():
     print("            |")
     print("            v")
     print(f"[ retrieval:uid.store ] ({completed} completed) ----> failure:to.be.retrieval ({failures['retrieval']})")
+
+    print("\n>>> PIPELINE FLOW - USER")
+    print(f"[ user:to.be.scraped ] ({stream_stats.get('user:to.be.scraped',0)})")
+    print("            |")
+    print("            v")
+    print(f"[ user:to.be.nlp ] ({stream_stats.get('user:to.be.nlp',0)})")
+    print("            |")
+    print("            v")
+    print(f"[ user:to.be.retrieval ] ({stream_stats.get('user:to.be.retrieval',0)})")
 
     print("\n>>> CONSUMER HEALTH")
     for stream in stream_stats.keys():
@@ -109,6 +147,16 @@ def inspect_redis():
         except redis.exceptions.ResponseError:
             # Not a stream with groups, or no groups defined
             pass
+
+    print("\n>>> RECENT USER ACTIVITY")
+    show_recent_stream_messages(r, "user:to.be.scraped")
+    show_recent_stream_messages(r, "user:to.be.nlp")
+    show_recent_stream_messages(r, "user:to.be.retrieval")
+
+    result_keys = sorted([k for k in hash_stats.keys() if k.startswith("retrieval:hash.store:")])
+    print(f"\nStored retrieval result hashes: {len(result_keys)}")
+    for key in result_keys[-5:]:
+        print(f"  {key}")
 
     print("\n====================================\n")
 
