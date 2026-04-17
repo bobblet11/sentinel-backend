@@ -76,11 +76,19 @@ def inspect_redis():
     completed = set_stats.get("retrieval:uid.store", 0)
     total_ingested = stream_stats.get("background:to.be.scraped", 0) + stream_stats.get("user:to.be.scraped", 0)
 
+    num_keys = r.dbsize()
+    memory_info = r.info("memory")
+    memory_used_bytes = memory_info.get("used_memory", 0)
+    memory_used_human = memory_info.get("used_memory_human", "0B")
+
+
     print("\n====================================")
     print("        REDIS PIPELINE DASHBOARD")
     print("====================================\n")
+    print(">>> DB LEVEL")
+    print(f"Keys: {num_keys}")
+    print(f"Used bytes: {memory_used_bytes} ({memory_used_human})")
 
-    print(">>> SERVICE LEVEL")
     for service in ["scraper", "nlp", "retrieval"]:
         w = waiting.get(service, 0)
         f = failures.get(service, 0)
