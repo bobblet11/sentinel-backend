@@ -40,3 +40,5 @@ backups_extra
 .worktrees/
 .png
 *.png
+./scripts/stats/*
+stats
