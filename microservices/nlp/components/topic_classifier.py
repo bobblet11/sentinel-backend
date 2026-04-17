@@ -101,13 +101,16 @@ _DIGEST_PATTERNS: Tuple[str, ...] = (
 )
 
 
-def _build_doc(article: Article, result: NLPResult) -> str:
-    """Construct a short document string from title + top-2 claims by confidence."""
-    title = (article.title or "").strip()
+_BYLINE_RE = re.compile(
+    r"\s*[-|]\s*(BBC|CBC|ABC|CBS|NBC|NPR|Reuters|AP|CNN)[^\n]*$",
+    re.IGNORECASE,
+)
+_PRIVACY_TRIGGERS = ("cookie", "browsing", "consent", "privacy policy", "copy/paste the link")
 
-    # Blank digest/bulletin titles — they have no discriminative topic signal.
-    if any(re.search(p, title.lower()) for p in _DIGEST_PATTERNS):
-        return ""
+
+def _build_doc(article: Article, result: NLPResult) -> str:
+    """Construct a document string from title + top-4 claims by confidence."""
+    title = (article.title or "").strip()
 
     top_claims: List[str] = []
     if result.claims_in_article:
@@ -118,12 +121,25 @@ def _build_doc(article: Article, result: NLPResult) -> str:
         )
         top_claims = [
             c.decontextualised_claim_text
-            for c in sorted_claims[:2]
+            for c in sorted_claims[:4]
             if c.decontextualised_claim_text
         ]
 
-    parts = [title] + top_claims
-    return " ".join(parts).strip()[:400]
+    doc = (title + (" " + " ".join(top_claims) if top_claims else "")).strip()[:600]
+
+    # Strip trailing source bylines.
+    doc = _BYLINE_RE.sub("", doc)
+
+    # Strip cookie/privacy boilerplate from scraped video pages.
+    if any(t in doc.lower() for t in _PRIVACY_TRIGGERS):
+        first_sent = re.split(r"(?<=[.!?])\s", doc)[0]
+        doc = first_sent[:120]
+
+    # Blank digest/bulletin titles — they have no discriminative topic signal.
+    if any(re.search(p, doc.lower()) for p in _DIGEST_PATTERNS):
+        return ""
+
+    return doc.strip()
 
 
 class TopicClassifier(ArticleProcessor):

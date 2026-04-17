@@ -168,7 +168,7 @@ def load_env(env_file: str = "configs/aws/.env") -> dict:
         )
 
     return {
-        "host": os.environ.get("POSTGRES_HOST", "localhost"),
+        "host": "localhost",
         "port": os.environ.get("POSTGRES_PORT", "5432"),
         "db": os.environ.get("POSTGRES_DB", "sentinel"),
         "user": os.environ.get("POSTGRES_USER", "sentinel"),
@@ -431,11 +431,21 @@ def load_embedding_model() -> "SentenceTransformer":  # noqa: F821
     Returns:
         A SentenceTransformer instance loaded onto the best available device.
     """
+    import os  # noqa: PLC0415
+
+    # configs/aws/.env sets HF_HOME/TRANSFORMERS_CACHE to /opt/sentinel (a Docker-only path).
+    # Override to a local writable cache before importing sentence_transformers so that
+    # HuggingFace resolves the model from the default user cache instead.
+    local_hf_cache = os.path.join(os.path.expanduser("~"), ".cache", "huggingface")
+    os.environ["HF_HOME"] = local_hf_cache
+    os.environ["TRANSFORMERS_CACHE"] = local_hf_cache
+
     import torch  # noqa: PLC0415
     from sentence_transformers import SentenceTransformer  # noqa: PLC0415
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info("Loading sentence-transformers model (device=%s)…", device)
+    logger.info("HuggingFace cache: %s", local_hf_cache)
     return SentenceTransformer("sentence-transformers/all-mpnet-base-v2", device=device)
 
 
