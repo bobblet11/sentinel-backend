@@ -38,7 +38,7 @@ from microservices.retrieval_layer.storage.crud import (
 
 MAX_CANDIDATES_BEFORE_SIMILARITY = 100
 MAX_CANDIDATES_BEFORE_NLI = 10
-MIN_SIMILARITY = 0.7
+MIN_SIMILARITY = 0.35
 EMBEDDING_DIM = 768
 
 
@@ -314,9 +314,6 @@ class RetrievalService(ServiceTemplate):
             )
             claim_candidates.update(entity_candidates)
         
-            if not claim_candidates:
-                return []
-            
             capped_filter_step_candidate_list = list(claim_candidates)[:MAX_CANDIDATES_BEFORE_SIMILARITY]
             # list of db Claim objects
             capped_filter_step_candidate_ids = [filtered_claim.id for filtered_claim in capped_filter_step_candidate_list]

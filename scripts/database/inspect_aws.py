@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 import json
+import os
 import redis
 from dotenv import load_dotenv
 # Load environment
 load_dotenv(dotenv_path="configs/aws/.env")
+# configs/aws/.env sets REDIS_HOST=host.docker.internal for Docker containers;
+# when running from WSL the tunnel is bound to localhost, so override here.
+if os.getenv("REDIS_HOST") == "host.docker.internal":
+    os.environ["REDIS_HOST"] = "localhost"
 
 from common.redis_client.connection import redis_connection
 
