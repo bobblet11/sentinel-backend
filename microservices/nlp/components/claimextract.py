@@ -45,6 +45,8 @@ class ClaimExtraction(ArticleProcessor):
     │                              result.claims_in_article               │
     │ Stage 8  BiasDetector        article-level political + tone analysis│
     │                              → result.bias_profile (optional)       │
+    │ Stage 9  TopicClassifier     cosine-similarity topic assignment      │
+    │                              → result.topic_label (optional)        │
     └─────────────────────────────────────────────────────────────────────┘
 
     The ModelManager is accepted as an optional parameter to centralise model
@@ -87,6 +89,11 @@ class ClaimExtraction(ArticleProcessor):
         self._bias_device_config = device_config
         self._bias_model_manager = model_manager
         self._bias_detector = None
+
+        # Store args for lazy TopicClassifier initialization (Stage 9)
+        self._topic_device_config = device_config
+        self._topic_model_manager = model_manager
+        self._topic_classifier = None
 
         logger.info(
             "ClaimExtraction: All models ready in %.2fs.",
@@ -315,6 +322,21 @@ class ClaimExtraction(ArticleProcessor):
                         sentiment_category="Neutral",
                         sentiment_analysis_confidence=0.0,
                     )
+
+        # ── Stage 9 — Topic Classification ───────────────────────────────────
+        t = time.time()
+        try:
+            if self._topic_classifier is None:
+                from microservices.nlp.components.topic_classifier import TopicClassifier
+
+                self._topic_classifier = TopicClassifier(
+                    device_config=self._topic_device_config,
+                    model_manager=self._topic_model_manager,
+                )
+            self._topic_classifier.run(article, message, options)
+        except Exception as e:
+            logger.warning("ClaimExtraction [Stage 9 TopicClassifier] failed: %s", e)
+        logger.info("[Stage 9 | TopicClassifier] complete in %.2fs", time.time() - t)
 
         # Expose processed sentences so set_nlp_result() can copy them
         # to the MessagePayload for downstream services.

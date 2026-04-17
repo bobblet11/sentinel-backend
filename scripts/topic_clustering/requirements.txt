@@ -1,0 +1,11 @@
+bertopic>=0.16
+umap-learn>=0.5.5
+hdbscan>=0.8.33
+sentence-transformers>=2.2.0
+torch>=2.0
+psycopg2-binary>=2.9
+sqlalchemy>=2.0
+pgvector>=0.2.0
+python-dotenv>=1.0
+numpy>=1.24
+pandas>=2.0

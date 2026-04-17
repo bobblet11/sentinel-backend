@@ -28,7 +28,7 @@ import redis
 
 
 def get_redis_connection() -> redis.Redis:
-    host = os.getenv("REDIS_HOST", "host.docker.internal")
+    host = os.getenv("REDIS_HOST", "localhost")
     port = int(os.getenv("REDIS_PORT", "16379"))
     use_ssl = os.getenv("REDIS_SSL", "true").lower() == "true"
 

@@ -166,6 +166,8 @@ class NLPResult:
     claims_in_article: Optional[List[Claim]] = field(default_factory=list)
     entities_in_article: Optional[List[Entity]] = field(default_factory=list)
     bias_profile: Optional[BiasProfile] = None
+    topic_label: Optional[str] = None
+    topic_confidence: Optional[float] = None
 
 @dataclass
 class RetrievalResult:
@@ -197,6 +199,8 @@ class MessagePayload(BaseModel):
     claims_in_article: List[Claim] = field(default_factory=list)
     entities_in_article: List[Entity] = field(default_factory=list)
     bias_profile: Optional[BiasProfile] = None
+    topic_label: Optional[str] = None
+    topic_confidence: Optional[float] = None
     
     #retrieval
     save_data_result: Optional[Dict[str, Any]] = None
@@ -310,7 +314,9 @@ class StreamMessage:
         return NLPResult(
             claims_in_article = self.data.payload.claims_in_article,
             entities_in_article = self.data.payload.entities_in_article,
-            bias_profile = self.data.payload.bias_profile 
+            bias_profile = self.data.payload.bias_profile,
+            topic_label = self.data.payload.topic_label,
+            topic_confidence = self.data.payload.topic_confidence,
         )
     
     def set_nlp_result(self, nlp_result: NLPResult) -> None:
@@ -327,6 +333,10 @@ class StreamMessage:
             
         if nlp_result.bias_profile:
             self.data.payload.bias_profile = nlp_result.bias_profile
+
+        if nlp_result.topic_label is not None:
+            self.data.payload.topic_label = nlp_result.topic_label
+            self.data.payload.topic_confidence = nlp_result.topic_confidence
 
     def set_retrieval_result(self, retrieval_result: RetrievalResult) -> None:
         if retrieval_result.save_data_result:

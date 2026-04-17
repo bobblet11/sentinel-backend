@@ -192,16 +192,16 @@ def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
                 )
                 return existing_job
 
-            retry_job: Job = create_job(db=db, job_in=job_in, article_id=cast(int, existing_article.id))
-            publish_job(retry_job, existing_article, job_in)
-            db.commit()
-            logger.info(
-                "Article re-submitted with new job id=%s uid=%s for url=%s",
-                retry_job.id,
-                retry_job.uid,
-                existing_article.url,
-            )
-            return retry_job
+            # retry_job: Job = create_job(db=db, job_in=job_in, article_id=cast(int, existing_article.id))
+            # publish_job(retry_job, existing_article, job_in)
+            # db.commit()
+            # logger.info(
+            #     "Article re-submitted with new job id=%s uid=%s for url=%s",
+            #     retry_job.id,
+            #     retry_job.uid,
+            #     existing_article.url,
+            # )
+            # return retry_job
 
         new_article: Article = create_article(db=db, job_in=job_in)
         new_job: Job = create_job(db=db, job_in=job_in, article_id=cast(int, new_article.id))
