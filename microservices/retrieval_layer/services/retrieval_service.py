@@ -159,7 +159,10 @@ class RetrievalService(ServiceTemplate):
                 bias_profile.sentiment_analysis_confidence,
             )
         
-        article_dto = CreateOrModifyArticle(message.link, message.title, message.text, message.html, message.publish_date, message.data.payload.author)
+        author = None
+        if message.data and message.data.payload:
+            author = message.data.payload.author
+        article_dto = CreateOrModifyArticle(message.link, message.title, message.text, message.html, message.publish_date, author)
         outlet_dto = CreateOrModifyOutlet(message.news_outlet_name)
         
         article_entry = get_or_create_article(db, article_dto, sentiment_dto, outlet_dto)
