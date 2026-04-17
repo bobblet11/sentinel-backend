@@ -43,3 +43,4 @@ backups_extra
 */backup.sql
 scripts/topic_clustering/backup.sql
 scripts/topic_clustering/output/
+cloudfared*
