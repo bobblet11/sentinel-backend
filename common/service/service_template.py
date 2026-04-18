@@ -99,7 +99,8 @@ class ServiceTemplate(ABC):
 
 		payload = message.data.model_dump(mode='json') if is_stream_message else message.get("data", {})
   		# Acknowledge the original message before publishing to failure queue
-		self.fail_publisher.publish_one(payload)
+		if payload :
+			self.fail_publisher.publish_one(payload)
 
 		if self.is_cut_and_paste_mode:
 			self.message_consumer.acknowledge_and_delete(stream_name=stream_name, redis_message_id=redis_id)
@@ -119,7 +120,7 @@ class ServiceTemplate(ABC):
 	def _parse_message(self, raw_msg: Dict[str, Any]) -> Optional[StreamMessage]:
 		"""Converts raw Redis dict to a typed StreamMessage with a nested Pydantic model."""
 		msg_data = raw_msg.get("data", {})
-
+		
 		try:
 			# Pydantic does the heavy lifting of validation and parsing!
 			parsed_message:Message = Message.model_validate(msg_data)
@@ -250,7 +251,7 @@ class ServiceTemplate(ABC):
 			self.logger.warning("NO STREAM MESSAGES, sleeping for a minute before retrying...")
 			time.sleep(60)
 			return
-		
+		# self.logger.info(f"Fetched batch of {raw_messages} messages for processing.")
 		self.logger.info(f"Processing batch of {len(raw_messages)} messages.")
 		if self.is_concurrent:
 			self._process_batch_concurrently(executor, raw_messages)
