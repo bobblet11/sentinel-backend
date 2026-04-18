@@ -1,4 +1,6 @@
 .env
+scripts/topic_clustering/backup.sql
+scripts/topic_clustering/output/
 __pycache__
 **/__pycache__/
 webshareio_proxies.json
@@ -38,3 +40,11 @@ tests/claims_export.csv
 ./backups_extra
 backups_extra
 .worktrees/
+.png
+*.png
+./scripts/stats/*
+stats
+*/backup.sql
+scripts/topic_clustering/backup.sql
+scripts/topic_clustering/output/
+cloudfared*

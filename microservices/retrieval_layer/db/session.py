@@ -58,6 +58,19 @@ def ensure_schema_compatibility() -> None:
                 connection.execute(text(statement))
                 logger.info("Retrieval DB migration: added article.%s", column_name)
 
+        # Seed the 9 predefined topic labels (idempotent).
+        connection.execute(
+            text(
+                """
+                INSERT INTO topic (name) VALUES
+                    ('Politics'), ('World'), ('Technology'), ('Health'),
+                    ('Science'), ('Business'), ('Entertainment'), ('Sports'), ('General')
+                ON CONFLICT (name) DO NOTHING;
+                """
+            )
+        )
+        logger.info("Retrieval DB: topic seed applied.")
+
         connection.execute(
             text(
                 """
