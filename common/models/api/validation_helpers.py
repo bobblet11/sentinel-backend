@@ -53,10 +53,10 @@ def validate_after_webscraper(stream_message: StreamMessage, message: Message = 
         errors.append("Missing news_outlet")
     if not payload.article_url or not payload.article_url.startswith("http"):
         errors.append("Invalid article_url")
-    if not payload.publish_date:
-        errors.append("Missing publish_date")
-    if not payload.author:
-        errors.append("Missing author")
+    # if not payload.publish_date:
+    #     errors.append("Missing publish_date")
+    # if not payload.author:
+    #     errors.append("Missing author")
     if not payload.parsed_text or len(payload.parsed_text) < 50:
         errors.append("Parsed text too short or missing")
     if not payload.raw_html or "<html" not in payload.raw_html.lower():

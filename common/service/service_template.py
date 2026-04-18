@@ -88,6 +88,13 @@ class ServiceTemplate(ABC):
 		self.logger.info("\nShutdown signal received. Finishing current batch...")
 		self.keep_running = False
 
+	def _acknowledge_failed_message(self, stream_name: str, redis_id: str, delete_from_stream: bool) -> None:
+		"""Acknowledge a failed message and optionally try to remove it from the stream."""
+		if delete_from_stream:
+			self.message_consumer.acknowledge_and_delete(stream_name=stream_name, redis_message_id=redis_id)
+		else:
+			self.message_consumer.acknowledge(stream_name=stream_name, redis_message_id=redis_id)
+
 	def _handle_failure(self, message: StreamMessage | Dict[str, Any], error: Exception):
 		"""Logs the error and publishes the message to the failure stream."""
 		is_stream_message:bool = isinstance(message, StreamMessage)
@@ -98,14 +105,24 @@ class ServiceTemplate(ABC):
 		self.logger.error(f"Failed to process message {redis_id}: {error}")
 
 		payload = message.data.model_dump(mode='json') if is_stream_message else message.get("data", {})
-  		# Acknowledge the original message before publishing to failure queue
-		if payload :
-			self.fail_publisher.publish_one(payload)
+		if not payload:
+			self.logger.warning(
+				f"Message {redis_id} on {stream_name} has no publishable payload; acknowledging without forwarding to failure stream."
+			)
+			self._acknowledge_failed_message(
+				stream_name=stream_name,
+				redis_id=redis_id,
+				delete_from_stream=False,
+			)
+			return
 
-		if self.is_cut_and_paste_mode:
-			self.message_consumer.acknowledge_and_delete(stream_name=stream_name, redis_message_id=redis_id)
-		else:
-			self.message_consumer.acknowledge(stream_name=stream_name, redis_message_id=redis_id)
+	 	# Acknowledge the original message before publishing to failure queue
+		self.fail_publisher.publish_one(payload)
+		self._acknowledge_failed_message(
+			stream_name=stream_name,
+			redis_id=redis_id,
+			delete_from_stream=self.is_cut_and_paste_mode,
+		)
   
 	def _handle_failure_batch(self, messages: List[StreamMessage | Dict[str, Any]], error: Exception):
 		"""Logs the error and publishes the message to the failure stream."""

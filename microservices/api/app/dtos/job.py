@@ -24,6 +24,7 @@ class JobCreate(BaseModel):
     article_html: str | None = None
     article_text: str | None = None
     article_title: str | None = None
+    article_author: str | None = None
     article_published_at: str | None = None
     article_summary: str  | None = None
     

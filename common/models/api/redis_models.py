@@ -304,10 +304,10 @@ class StreamMessage:
         if parsed_result.title:
             self.data.payload.title = parsed_result.title
             
-        if parsed_result.author:
+        if parsed_result.author and not self.data.payload.author:
             self.data.payload.author = parsed_result.author
             
-        if parsed_result.published_at:
+        if parsed_result.published_at and not self.data.payload.publish_date:
             self.data.payload.publish_date = parsed_result.published_at
     
     def create_nlp_result(self) -> NLPResult:
