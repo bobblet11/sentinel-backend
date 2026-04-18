@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from logging import Logger, getLogger
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
@@ -241,11 +242,15 @@ class ServiceTemplate(ABC):
 		"""Fetches and processes a single batch of messages, either pending or new."""
 		# Prioritize pending messages from previous runs
 		raw_messages = self.message_consumer.consume_pending()
-		if not raw_messages:
+		if not raw_messages or len(raw_messages) == 0:
+			self.logger.warning("NO PENDING MESSAGES, fetching from streams")
 			raw_messages = self._get_raw_messages()
 
-		if not raw_messages:
+		if not raw_messages or len(raw_messages) == 0:
+			self.logger.warning("NO STREAM MESSAGES, sleeping for a minute before retrying...")
+			time.sleep(60)
 			return
+		
 		self.logger.info(f"Processing batch of {len(raw_messages)} messages.")
 		if self.is_concurrent:
 			self._process_batch_concurrently(executor, raw_messages)
