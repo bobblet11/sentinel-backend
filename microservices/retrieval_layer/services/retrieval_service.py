@@ -38,7 +38,7 @@ from microservices.retrieval_layer.storage.crud import (
 
 MAX_CANDIDATES_BEFORE_SIMILARITY = 100
 MAX_CANDIDATES_BEFORE_NLI = 10
-MIN_SIMILARITY = 0.35
+MIN_SIMILARITY = 0.25
 EMBEDDING_DIM = 768
 
 
@@ -171,15 +171,25 @@ class RetrievalService(ServiceTemplate):
         irrelevant_count = sum(1 for m in matches if m["relation"] == "irrelevant")
         total = len(matches)
 
-        # Verdict based on support/contradict counts
-        if irrelevant_count == total or (support_count == 0 and contradict_count == 0):
+        # High-similarity "irrelevant" matches: NLI tends to over-predict neutral.
+        # Treat them as soft support so they don't silently suppress a verdict.
+        HIGH_SIM_THRESHOLD = 0.6
+        soft_support_count = sum(
+            1 for m in matches
+            if m["relation"] == "irrelevant" and m["similarity"] >= HIGH_SIM_THRESHOLD
+        )
+        effective_support = support_count + soft_support_count
+        effective_irrelevant = irrelevant_count - soft_support_count
+
+        # Verdict based on effective support/contradict counts
+        if effective_irrelevant == total or (effective_support == 0 and contradict_count == 0):
             verdict = "unverified"
         elif contradict_count == 0:
             verdict = "true" if support_count == total else "mostly-true"
-        elif support_count == 0:
+        elif effective_support == 0:
             verdict = "false" if contradict_count == total else "mostly-false"
         else:
-            support_ratio = support_count / total
+            support_ratio = effective_support / (effective_support + contradict_count)
             if support_ratio > 0.66:
                 verdict = "mostly-true"
             elif support_ratio < 0.33:

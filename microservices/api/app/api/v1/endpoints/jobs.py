@@ -142,6 +142,15 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
     # Calculate overall trustScore from average confidence
     confidences = [m.get("confidence", 0) for m in matches_list]
     trust_score = int(sum(confidences) / len(confidences)) if confidences else 0
+
+    # Apply a minimum floor for well-established, reputable outlets.
+    REPUTABLE_OUTLETS = {
+        "BBC", "Reuters", "AP News", "NPR", "The Guardian",
+        "CBC", "Euronews", "ABC", "CBS", "NBC", "Al Jazeera",
+    }
+    outlet_name = article.outlet.name if article.outlet else ""
+    if outlet_name in REPUTABLE_OUTLETS:
+        trust_score = max(trust_score, 60)
     
     bias_analysis = _build_bias_analysis(retrieval_result.get("bias_profile"))
     
