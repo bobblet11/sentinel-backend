@@ -150,7 +150,7 @@ def _transform_retrieval_to_frontend_format(article: Article, retrieval_result: 
     }
     outlet_name = article.outlet.name if article.outlet else ""
     if outlet_name in REPUTABLE_OUTLETS:
-        trust_score = max(trust_score, 60)
+        trust_score = min(trust_score + 60, 99)
     
     bias_analysis = _build_bias_analysis(retrieval_result.get("bias_profile"))
     
