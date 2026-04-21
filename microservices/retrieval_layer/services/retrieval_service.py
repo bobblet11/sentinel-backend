@@ -165,35 +165,47 @@ class RetrievalService(ServiceTemplate):
         
         if not matches:
             return "unverified", 0
-        relevant = [m for m in matches if m["relation"] in ("support", "contradict")]
-        if not relevant:
-            return "unverified", 0
-        
-        # Calculate verdict ("true" | "mostly-true" | "mixed" | "mostly-false" | "false" | "unverified") based on:
-        support_weight = sum(m["confidence"] for m in relevant if m["relation"] == "support")
-        contradict_weight = sum(m["confidence"] for m in relevant if m["relation"] == "contradict")
-        total_weight = support_weight + contradict_weight
-        if total_weight == 0:
-            self.logger.error("total weight is 0! Division by 0 error!")
-            
-        net_support = (support_weight - contradict_weight) / total_weight if total_weight > 0 else 0
-        
-        
-        if net_support >= 0.5:
-            verdict = "true"
-        elif net_support >= 0.1:
-            verdict = "mostly-true"
-        elif net_support > -0.1:
-            verdict = "mixed"
-        elif net_support > -0.5:
-            verdict = "mostly-false"
+
+        support_count = sum(1 for m in matches if m["relation"] == "support")
+        contradict_count = sum(1 for m in matches if m["relation"] == "contradict")
+        irrelevant_count = sum(1 for m in matches if m["relation"] == "irrelevant")
+        total = len(matches)
+
+        # Verdict based on support/contradict counts
+        if irrelevant_count == total or (support_count == 0 and contradict_count == 0):
+            verdict = "unverified"
+        elif contradict_count == 0:
+            verdict = "true" if support_count == total else "mostly-true"
+        elif support_count == 0:
+            verdict = "false" if contradict_count == total else "mostly-false"
         else:
-            verdict = "false"
-        
-        # Calculate confidence (0-100) based on NLI confidence and evidence count.
-        avg_nli_confidence = sum(m["confidence"] for m in relevant) / len(relevant)
-        evidence_count_factor = min(1.0, len(relevant) / 5.0)
-        confidence = int(avg_nli_confidence * evidence_count_factor * 100)
+            support_ratio = support_count / total
+            if support_ratio > 0.66:
+                verdict = "mostly-true"
+            elif support_ratio < 0.33:
+                verdict = "mostly-false"
+            else:
+                verdict = "mixed"
+
+        # Confidence: composite of match quality, similarity, and NLI confidence
+        high_quality_matches = [
+            m for m in matches
+            if m["similarity"] > 0.5 and m["relation"] != "irrelevant"
+        ]
+        high_confidence_matches = [
+            m for m in high_quality_matches
+            if m["confidence"] >= 0.9
+        ]
+
+        if not high_quality_matches:
+            confidence = 20
+        else:
+            match_count_score = min(len(high_quality_matches) * 20, 60)
+            avg_similarity = sum(m["similarity"] for m in high_quality_matches) / len(high_quality_matches)
+            similarity_score = int(avg_similarity * 30)
+            high_conf_bonus = min(len(high_confidence_matches) * 10, 10)
+            confidence = min(match_count_score + similarity_score + high_conf_bonus, 100)
+
         return verdict, confidence
 
     def _save_data_into_postgres(self, db: Session, message: StreamMessage):
