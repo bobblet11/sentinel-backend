@@ -21,7 +21,7 @@ On the backend, the platform performs four core tasks:
 ## Table of Contents
 - [Accompanying Publications](#accompanying-publications)
   - [Poster](#poster)
-  - [Report](#report)
+  - [Technical Report](#technical-report)
 - [Running the Project](#running-the-project)
   - [Prerequisites](#prerequisites)
   - [First-Time Setup](#first-time-setup)
