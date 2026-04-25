@@ -48,3 +48,5 @@ stats
 scripts/topic_clustering/backup.sql
 scripts/topic_clustering/output/
 cloudfared*
+
+configs
