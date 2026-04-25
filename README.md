@@ -4,12 +4,6 @@ Sentinel is a real-time misinformation intelligence platform designed to help re
 
 This repository showcases the backend system behind that workflow: a production-oriented pipeline built with FastAPI, Redis Streams, PostgreSQL, pgvector, Docker, and transformer-based NLP components.
 
-## Problem and Motivation
-
-Misinformation tools often solve only one part of the problem. Some systems detect whether a sentence looks check-worthy, some rate the political leaning of an outlet, and some aggregate previously published fact checks. What they usually do not provide is a unified workflow that can analyze a live article in real time, extract factual claims, surface framing bias, and retrieve related evidence across a continuously updated corpus.
-
-Sentinel addresses that gap. The goal is not to produce a simplistic true-or-false machine, but to create a system that helps users inspect how claims are expressed, how articles are framed, and how similar claims appear across other reporting sources.
-
 ## What Sentinel Does
 
 Sentinel supports two complementary product experiences:
@@ -23,6 +17,153 @@ On the backend, the platform performs four core tasks:
 - extract claim-like statements and enrich them with NLP-derived metadata
 - classify article-level bias and sentiment signals
 - retrieve semantically related evidence from a growing news corpus
+
+## Table of Contents
+
+- [Running the Project](#running-the-project)
+  - [Prerequisites](#prerequisites)
+  - [First-Time Setup](#first-time-setup)
+  - [Choosing a Config](#choosing-a-config)
+  - [Service Profiles](#service-profiles)
+  - [Deploying the Stack](#deploying-the-stack)
+  - [Accessing the API](#accessing-the-api)
+  - [Code Quality](#code-quality)
+- [System Architecture Overview](#system-architecture-overview)
+- [Pipeline Walkthrough](#pipeline-walkthrough)
+- [Technical Highlights](#technical-highlights)
+- [NLP Pipeline Deep Dive](#nlp-pipeline-deep-dive)
+- [Retrieval and Evidence Matching](#retrieval-and-evidence-matching)
+- [Key Results and Metrics](#key-results-and-metrics)
+- [Deployment and Scalability Story](#deployment-and-scalability-story)
+- [Frontend Integration Context](#frontend-integration-context)
+- [Tech Stack](#tech-stack)
+- [Service Documentation](#service-documentation)
+
+## Running the Project
+
+### Prerequisites
+
+Before setting up the project, install the following on your host machine:
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) or Docker Engine with Compose support
+- [Visual Studio Code](https://code.visualstudio.com/)
+- [VS Code Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+- Git
+
+**Windows users:** install [WSL2 with Ubuntu](https://learn.microsoft.com/en-us/windows/wsl/install) and clone the repository inside the WSL filesystem, not the Windows drive. Docker Desktop must be configured to use the WSL2 backend.
+
+### First-Time Setup
+
+1. **Clone the repository**
+
+   ```bash
+   git clone <repository-url>
+   cd sentinel-backend
+   ```
+
+2. **Open in VS Code and reopen in the Dev Container**
+
+   ```
+   Ctrl+Shift+P → Dev Containers: Rebuild and Reopen in Container
+   ```
+
+   The first build downloads images and dependencies and takes around 15–30 minutes. Subsequent launches are fast.
+
+3. **Create your environment file**
+
+   Copy the template for the config you want to use:
+
+   ```bash
+   cp configs/.env.template configs/base/.env
+   ```
+
+   Then edit `configs/base/.env` and fill in at minimum:
+
+   | Variable | Description |
+   |---|---|
+   | `POSTGRES_HOST` | database host (`postgres` for local container) |
+   | `POSTGRES_USER` | database username |
+   | `POSTGRES_PASSWORD` | database password |
+   | `REDIS_HOST` | Redis host (`redis` for local container) |
+   | `REDIS_PORT` | Redis port |
+   | `COMPOSE_PROFILES` | comma-separated list of services to start |
+
+   See [configs/.env.template](./configs/.env.template) for the full reference including NLP model names, resource limits, and stream names.
+
+### Choosing a Config
+
+The deploy script expects a config directory name as its argument. Each directory under `configs/` contains a `.env` file and an optional `docker-compose.override.yml`.
+
+### Service Profiles
+
+The `COMPOSE_PROFILES` variable in your `.env` controls which services start. Add the profiles you need as a comma-separated list:
+
+| Profile | Starts |
+|---|---|
+| `local` | Redis and PostgreSQL containers |
+| `api` | API service |
+| `ingestor` | Ingestor service |
+| `scraper` | Web scraper service |
+| `nlp-cpu` | NLP service (CPU mode) |
+| `nlp-gpu` | NLP service (GPU mode) |
+| `retrieval-cpu` | Retrieval layer (CPU mode) |
+| `retrieval-gpu` | Retrieval layer (GPU mode) |
+
+Example for a full local stack without GPU:
+
+```
+COMPOSE_PROFILES=local,api,ingestor,scraper,nlp-cpu,retrieval-cpu
+```
+
+### Deploying the Stack
+
+```bash
+# Deploy all services for the chosen config
+./scripts/deploy.sh base
+
+# Stop and remove containers
+./scripts/clean.sh base
+
+# Wipe PostgreSQL and Redis data volumes
+./scripts/clear_data.sh
+
+# Tail logs for a specific service
+./scripts/logs.sh sentinel-nlp-CPU-service-container
+```
+
+### Accessing the API
+
+Once the API service is running, it is available at `http://localhost:8001`.
+
+Submit an article job:
+
+```bash
+curl -X POST http://localhost:8001/api/v1/jobs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Article Title",
+    "content": "Article body text...",
+    "news_outlet": "Example News",
+    "article_url": "https://example.com/article",
+    "type": "user"
+  }'
+```
+
+Poll for the result using the `uid` from the submission response:
+
+```bash
+curl "http://localhost:8001/api/v1/jobs/{uid}/result?timeout=30"
+```
+
+### Code Quality
+
+Before committing changes, run the formatting and static analysis pipeline:
+
+```bash
+./scripts/format_and_lint.sh
+```
+
+This runs `autoflake`, `isort`, `black`, `flake8`, and `mypy` in sequence.
 
 ## System Architecture Overview
 
@@ -178,22 +319,8 @@ The backend therefore is not just a data-processing pipeline; it is the service 
 
 Database setup and schema assets live under `microservices/db/`, with migration-specific notes already documented in `microservices/db/migrations/README.md`.
 
-## Short Setup
+## Setup and Usage
 
-Recommended workflow:
+Full setup instructions, config options, service profiles, and deployment commands are covered in the [Running the Project](#running-the-project) section above.
 
-1. Open the repository in VS Code.
-2. Reopen it inside the Dev Container.
-3. Prepare a config-specific `.env` file under a directory such as `configs/base`.
-4. Deploy the stack with the provided script.
-
-Main commands:
-
-```bash
-./scripts/deploy.sh [config-name]
-./scripts/clean.sh [config-name]
-./scripts/clear_data.sh
-./scripts/format_and_lint.sh
-```
-
-Configuration values are documented in [configs/.env.template]
+The complete environment variable reference is in [configs/.env.template](./configs/.env.template).
