@@ -103,6 +103,7 @@ AGENTS.md
 
 # Screenshots & Media
 *.png
+!poster.png
 .png
 *.jpg
 *.jpeg
