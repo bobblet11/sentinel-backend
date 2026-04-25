@@ -30,12 +30,12 @@ class BlockPrioritisationLevel(StrEnum):
     """Enum defining how blocking times are calculated for priority streams.
 
     Priority levels determine the timeout (block) duration for checking each stream:
-    - USER streams (e.g., user:to.be.nlp) are checked first with shorter timeouts
-    - BACKGROUND streams (e.g., background:to.be.nlp) are checked later with longer timeouts
+    - USER streams (e.g., user:to.be.nlp) are checked first with longer times spent waiting for jobs
+    - BACKGROUND streams (e.g., background:to.be.nlp) are checked afterwards with less time spent waiting for jobs
 
     Attributes:
         EXPONENTIAL: Block times increase exponentially with priority rank.
-            Lower-priority streams wait 2^n times longer. Strongly favors high-priority work.
+            Higher-priority streams wait for messages 2^n times longer. Strongly favors high-priority work.
         LINEAR: Block times increase linearly (2000ms per rank). Balances fairness and priority.
         UNIFORM_5: All streams block for 5000ms. Fair round-robin, minimal priority bias.
     """
@@ -49,7 +49,7 @@ class PrioritisedRedisConsumerCombiner:
     """Consumes messages from multiple Redis streams with configurable priority weighting.
 
     This consumer reads from multiple streams in a prioritized order. Each stream is checked
-    sequentially using a blocking read with a stream-specific timeout. This ensures that
+    sequentially using a blocking read with a stream-specific block time. This ensures that
     higher-priority streams (e.g., user jobs) are always serviced before lower-priority
     streams (e.g., background jobs), while still eventually processing all work.
 
@@ -57,16 +57,16 @@ class PrioritisedRedisConsumerCombiner:
     priority). Streams are checked in ascending order by rank.
 
     Block times are calculated based on the BlockPrioritisationLevel strategy:
-        - EXPONENTIAL: Lower-priority streams block longer, strongly favoring high-priority work
+        - EXPONENTIAL: Lower-priority streams spend less time waiting for messages, strongly favoring high-priority work
         - LINEAR: Predictable fairness with steady priority bias
         - UNIFORM_5: All streams block equally, fair round-robin behavior
 
     Example:
         >>> streams = ['user:to.be.nlp', 'background:to.be.nlp']
         >>> priority_map = {'user:to.be.nlp': 1, 'background:to.be.nlp': 2}
-        >>> block_map = {'user:to.be.nlp': 1000, 'background:to.be.nlp': 5000}
+        >>> block_map = {'user:to.be.nlp': 5000, 'background:to.be.nlp': 1000}
         >>> consumer = PrioritisedRedisConsumerCombiner(block_map, 'nlp_group', 'worker1', priority_map)
-        >>> msg = consumer.consume_one()  # Checks user stream first (1000ms), then background (5000ms)
+        >>> msg = consumer.consume_one()  # Checks user stream first for 5000ms, if no message arrives, then background (1000ms), if no message arrives, restart cycle
     """
 
     def __init__(
@@ -440,12 +440,12 @@ class PrioritisedRedisConsumerCombiner:
         """Generates blocking timeouts per stream based on priority and strategy.
 
         Creates a map of stream names to block durations (ms) using the specified
-        BlockPrioritisationLevel strategy. Lower-priority streams receive longer
-        timeouts, ensuring higher-priority streams are checked more frequently.
+        BlockPrioritisationLevel strategy. Lower-priority streams receive shorter 
+        block times, ensuring higher-priority streams spend more time waiting for messages.
 
         Strategy behavior (for stream order [0] > [1] > [2]):
-            EXPONENTIAL: [1000, 2000, 4000] - exponential increase favors high-priority
-            LINEAR: [1000, 3000, 5000] - predictable, configurable fairness
+            EXPONENTIAL: [4000, 2000, 1000] - exponential decreqase favors high-priority
+            LINEAR: [5000, 3000, 1000] - predictable, configurable fairness
             UNIFORM_5: [5000, 5000, 5000] - fair round-robin, minimal bias
 
         Args:
@@ -468,6 +468,7 @@ class PrioritisedRedisConsumerCombiner:
         EXPONENTIAL_BASE = 2
         input_streams_length = len(input_streams)
         for priority_index, stream_name in enumerate(input_streams):
+            # inverse so that high priority (smaller index) is higher block time 
             inverse_priority_index = (input_streams_length - 1) - priority_index
 
             if level is BlockPrioritisationLevel.LINEAR:
