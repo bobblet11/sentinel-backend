@@ -3,6 +3,7 @@ from typing import List
 
 from dotenv import load_dotenv
 
+from common.model_manager.manager import ModelManager
 from common.env.get_env_var import get_env_var
 from common.env.log_env import Config, EnvVariable, print_env
 
@@ -198,7 +199,6 @@ except SystemExit:
     DEVICE_CONFIG = DeviceConfig.resolve(use_gpu=_use_gpu_fallback)
     DEVICE = DEVICE_CONFIG.device
 
-from common.model_manager.manager import ModelManager
 
 # Centralized model manager instance — models are registered but not yet loaded
 model_manager = ModelManager(device=DEVICE, dummy_mode=DUMMY_NLP_MODE)

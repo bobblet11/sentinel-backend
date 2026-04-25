@@ -52,12 +52,12 @@ class ParserRegistryManager:
                 return
 
             self.logger: Logger = getLogger("parser_registry_manager")
-            self.logger.info(f"Starting initialisation")
+            self.logger.info("Starting initialisation")
 
             self.url_to_parser_map: Dict[str, BaseParser] = URL_TO_PARSER_MAP
 
             self._initialized = True
-            self.logger.info(f"Initialisation complete!")
+            self.logger.info("Initialisation complete!")
 
     def _match_hardcoded_parser(self, article_url: str) -> Optional[BaseParser]:
         for url_patterns, parser in self.url_to_parser_map.items():

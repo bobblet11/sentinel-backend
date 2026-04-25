@@ -111,7 +111,7 @@ class FileProxySource(ProxySource):
 
         if bootstrap_proxies:
             self.logger.debug(
-                f"File sources require no bootstrap_proxy. Ignoring it..."
+                "File sources require no bootstrap_proxy. Ignoring it..."
             )
 
         self.logger.info(f"Reading file {self.file_path} to get proxies...")
@@ -137,7 +137,7 @@ class FileProxySource(ProxySource):
         try:
             formatted_content = self._format_for_save(proxies)
             self.file_path.write_text(formatted_content, encoding="utf-8")
-            self.logger.info(f"Proxies saved successfully")
+            self.logger.info("Proxies saved successfully")
 
         except FileNotFoundError:
             self.logger.error(f"No file found at {self.file_path}!")

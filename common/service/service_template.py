@@ -179,7 +179,7 @@ class ServiceTemplate(ABC):
             parsed_message: Message = Message.model_validate(msg_data)
 
             # Calculate priority based on the validated object
-            msg_type: str = parsed_message.header.type
+            # msg_type: str = parsed_message.header.type
             # temp
             priority = 0
 

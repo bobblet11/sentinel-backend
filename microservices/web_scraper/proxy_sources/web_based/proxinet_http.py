@@ -26,7 +26,7 @@ class ProxiNetHttpSource(HttpProxySource):
             tbody = soup.find("tbody")
 
             if not tbody:
-                raise Exception(f"Could not find tbody. Site layout may have changed.")
+                raise Exception("Could not find tbody. Site layout may have changed.")
 
             rows = tbody.find_all("tr")
 

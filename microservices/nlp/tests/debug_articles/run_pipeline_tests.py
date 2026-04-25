@@ -166,7 +166,7 @@ def print_result(
     print(sep)
 
     # --- Bias ---
-    print(f"\nBIAS PROFILE")
+    print("\nBIAS PROFILE")
     print("-" * 70)
     if result.bias_profile:
         bp = result.bias_profile
@@ -194,14 +194,14 @@ def print_result(
             print(f"       entities: {ents}")
 
     # --- Timings & Errors ---
-    print(f"\nSTAGE TIMINGS")
+    print("\nSTAGE TIMINGS")
     print("-" * 70)
     for stage, t in stage_timings.items():
         print(f"  {stage:<25} {t:.3f}s")
     print(f"  {'TOTAL':<25} {sum(stage_timings.values()):.3f}s")
 
     if errors:
-        print(f"\nERRORS")
+        print("\nERRORS")
         print("-" * 70)
         for e in errors:
             print(f"  {e}")

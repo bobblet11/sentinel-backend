@@ -19,6 +19,25 @@ import time
 import uuid
 from pathlib import Path
 
+
+import sentence_transformers  # noqa: E402, F401
+
+# ---------------------------------------------------------------------------
+# Project imports
+# ---------------------------------------------------------------------------
+import transformers  # noqa: E402, F401 — prime import before parallel model loading
+
+from common.models.api.redis_models import (
+    Article,
+    Message,  # noqa: E402
+    MessageHeader,
+    MessagePayload,
+    NLPOptions,
+    StreamMessage,
+)
+from microservices.nlp.components.bias import BiasDetector  # noqa: E402
+from microservices.nlp.config import DEVICE_CONFIG, model_manager  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Path setup
 # ---------------------------------------------------------------------------
@@ -82,23 +101,6 @@ if not args.debug:
         logging.getLogger(noisy).setLevel(logging.ERROR)
 log = logging.getLogger("test_bias_all_articles")
 
-import sentence_transformers  # noqa: E402, F401
-
-# ---------------------------------------------------------------------------
-# Project imports
-# ---------------------------------------------------------------------------
-import transformers  # noqa: E402, F401 — prime import before parallel model loading
-
-from common.models.api.redis_models import (
-    Article,
-    Message,  # noqa: E402
-    MessageHeader,
-    MessagePayload,
-    NLPOptions,
-    StreamMessage,
-)
-from microservices.nlp.components.bias import BiasDetector  # noqa: E402
-from microservices.nlp.config import DEVICE_CONFIG, model_manager  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -213,7 +215,7 @@ def main() -> None:
         print(f"No JSON files found in {ARTICLES_DIR}")
         sys.exit(1)
 
-    print(f"\nLoading bias models (BIAS_POLITICAL + BIAS_SENTIMENT)...")
+    print("\nLoading bias models (BIAS_POLITICAL + BIAS_SENTIMENT)...")
     model_manager.load_all(keys=["BIAS_POLITICAL", "BIAS_SENTIMENT"])
 
     # Health check — abort early if models failed to load

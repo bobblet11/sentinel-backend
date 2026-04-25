@@ -118,10 +118,10 @@ class FetchManagerSelenium:
             return
 
         self.logger: Logger = getLogger("fetch_manager_SELENIUM")
-        self.logger.info(f"Starting initialisation")
+        self.logger.info("Starting initialisation")
 
         if not proxy_manager:
-            self.logger.error(f"No proxy manager available!")
+            self.logger.error("No proxy manager available!")
             exit(1)
 
         self._create_selenium_wire_CA_folder()
@@ -202,7 +202,7 @@ class FetchManagerSelenium:
             raise e
 
         self._initialized: bool = True
-        self.logger.info(f"Initialisation complete!")
+        self.logger.info("Initialisation complete!")
 
     def _create_selenium_wire_CA_folder(self) -> None:
         """Pre-create the selenium-wire CA folder to prevent the 'PEM routines' error"""
@@ -487,7 +487,7 @@ class FetchManagerSelenium:
                     return True
 
             except TimeoutException:
-                self.logger.warning(f"Timeout: Pop up did not appear.")
+                self.logger.warning("Timeout: Pop up did not appear.")
             except Exception as e:
                 self.logger.error(f"⚠️ Error interacting: {e}")
             return False

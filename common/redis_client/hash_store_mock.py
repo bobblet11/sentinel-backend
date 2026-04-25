@@ -1,4 +1,3 @@
-import json
 from logging import Logger, getLogger
 from typing import Any, Dict, List, Optional
 
@@ -47,7 +46,7 @@ class RedisHashStoreMock:
 
         try:
             # Serialize all values to JSON for consistency.
-            serialized_data = {k: json.dumps(v) for k, v in data.items()}
+            # serialized_data = {k: json.dumps(v) for k, v in data.items()}
             # self.client.hset(self._key(uid), mapping=serialized_data)
             self.logger.debug(f"Stored data for UID: {uid}")
         except Exception as e:
@@ -88,7 +87,7 @@ class RedisHashStoreMock:
             raise ValueError("`updates` must be a dictionary.")
 
         try:
-            serialized = {k: json.dumps(v) for k, v in updates.items()}
+            # serialized = {k: json.dumps(v) for k, v in updates.items()}
             # self.client.hset(self._key(uid), mapping=serialized)
             self.logger.debug(f"Updated fields for UID: {uid}")
         except Exception as e:
@@ -126,7 +125,7 @@ class RedisHashStoreMock:
         """
         Lists all record keys under this namespace (optionally filtered by pattern).
         """
-        full_pattern = f"{self.hash_namespace}:{pattern}"
+        # full_pattern = f"{self.hash_namespace}:{pattern}"
         try:
             keys = []
             # keys = [key.decode() for key in self.client.keys(full_pattern)]

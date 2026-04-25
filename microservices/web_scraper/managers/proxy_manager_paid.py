@@ -40,7 +40,7 @@ class ProxyManagerPaid:
                 return
 
             self.logger: Logger = getLogger("proxy_manager_SELENIUM")
-            self.logger.info(f"Starting initialisation")
+            self.logger.info("Starting initialisation")
 
             # --- State ---
             self.proxies: ProxyDictSet = {
@@ -67,7 +67,7 @@ class ProxyManagerPaid:
                 raise
 
             self._initialized = True
-            self.logger.info(f"Initialisation complete!")
+            self.logger.info("Initialisation complete!")
 
     @exponential_retry(
         max_attempts=3,

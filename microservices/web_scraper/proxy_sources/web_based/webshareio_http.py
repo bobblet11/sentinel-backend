@@ -35,12 +35,12 @@ class WebshareIOHttpSource(HttpProxySource):
 
         line_parser: Callable[[str], List[str]] = parse_line_fun
 
-        self.logger.info(f"Fetching proxies from Webshare.io")
+        self.logger.info("Fetching proxies from Webshare.io")
         https: List[str] = self._fetch_from_url(
             f"{self.URL}", bootstrap_proxies, line_parser
         )
         self.logger.info(f"Found https {https}")
-        self.logger.info(f"Attempting to create country map (default = US)")
+        self.logger.info("Attempting to create country map (default = US)")
         self.update_mappings(https)
 
         return {"https": https or [], "socks4": [], "socks5": []}

@@ -61,12 +61,12 @@ class ParseManager:
                 return
 
             self.logger: Logger = getLogger("parse_manager")
-            self.logger.info(f"Starting initialisation")
+            self.logger.info("Starting initialisation")
 
             self.hardcoded_parser_registry = registry or ParserRegistryManager()
 
             self._initialized = True
-            self.logger.info(f"Initialisation complete!")
+            self.logger.info("Initialisation complete!")
 
     def _attempt_multiple_keys(
         self, payload: Dict[str, Any], keys: List[str]
@@ -86,7 +86,7 @@ class ParseManager:
     def _strategy_metadata(
         self, article_metadata: Dict[str, str]
     ) -> Optional[ParseResult]:
-        self.logger.debug(f"[level 0] Attempting to parse with metadata")
+        self.logger.debug("[level 0] Attempting to parse with metadata")
 
         if not article_metadata:
             return None
@@ -107,7 +107,7 @@ class ParseManager:
     def _strategy_hardcoded(
         self, article_url: str, soup: BeautifulSoup
     ) -> Optional[ParseResult]:
-        self.logger.debug(f"[level 1] Attempting parsing with hardcoded parser")
+        self.logger.debug("[level 1] Attempting parsing with hardcoded parser")
 
         if not article_url:
             return None
@@ -123,7 +123,7 @@ class ParseManager:
         return result
 
     def _strategy_trafilatura(self, raw_html: str) -> Optional[ParseResult]:
-        self.logger.debug(f"[level 2] Attempting parsing with trafilatura")
+        self.logger.debug("[level 2] Attempting parsing with trafilatura")
 
         metadata = trafilatura.extract_metadata(raw_html)
 
@@ -142,7 +142,7 @@ class ParseManager:
         return ParseResult(clean_text, None, author, published_at)
 
     def _strategy_fallback(self, soup: BeautifulSoup) -> Optional[ParseResult]:
-        self.logger.debug(f"[level 3] Attempting parsing with fallback")
+        self.logger.debug("[level 3] Attempting parsing with fallback")
         text: str = self._fallback_extract_text(soup)
 
         return ParseResult(text, None, None, None)

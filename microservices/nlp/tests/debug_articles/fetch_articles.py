@@ -221,14 +221,14 @@ def main():
             failed.append(source["name"])
         time.sleep(1)  # polite pause between sources
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Collection complete: {collected}/{len(SOURCES)} sources")
     if failed:
         print(f"Failed sources: {', '.join(failed)}")
     else:
         print("All sources collected successfully.")
     print(f"Articles saved to: {OUTPUT_DIR.resolve()}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     if collected < 5:
         log.error("Fewer than 5 articles collected — pipeline test may be unreliable.")

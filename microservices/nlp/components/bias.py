@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from transformers import pipeline
 
@@ -158,10 +158,10 @@ class BiasDetector(ArticleProcessor):
             bias_out = sorted(bias_out, key=lambda x: x["score"], reverse=True)
             raw_label = bias_out[0]["label"]
             confidence = float(bias_out[0]["score"])
-            scores: Dict[str, float] = {
-                self._LABEL_MAP.get(item["label"], "Center"): float(item["score"])
-                for item in bias_out
-            }
+            # scores: Dict[str, float] = {
+            #     self._LABEL_MAP.get(item["label"], "Center"): float(item["score"])
+            #     for item in bias_out
+            # }
             political_bias = self._LABEL_MAP.get(raw_label, "Center")
 
         except Exception as e:

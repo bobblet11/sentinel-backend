@@ -26,7 +26,7 @@ class RotatingScreenshotHandler:
         screenshot_directory: Path | str = Path("/app/screenshots"),
         max_bytes: int = MAX_SIZE_OF_SCREENSHOT_FOLDER,
     ) -> None:
-        self.logger: Logger = getLogger(f"screenshot_handler")
+        self.logger: Logger = getLogger("screenshot_handler")
 
         if isinstance(screenshot_directory, str):
             screenshot_directory = Path(screenshot_directory)

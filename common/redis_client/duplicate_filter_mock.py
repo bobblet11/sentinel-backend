@@ -9,7 +9,7 @@ class RedisDuplicateFilterMock:
     """
 
     def __init__(self):
-        self.logger = getLogger(f"MOCK.redis_duplicate_filter")
+        self.logger = getLogger("MOCK.redis_duplicate_filter")
         self.duplicate_filter = set()
 
     def has_one(self, item: str) -> bool:

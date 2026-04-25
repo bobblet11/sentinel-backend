@@ -260,7 +260,7 @@ class BaseIngestor:
         if len(messages_to_publish) == 0:
             self.logger.info("Ingestion cycle: no messages to publish.")
             return
-        published_ids: List[str] = self.publisher.publish_many(messages_to_publish)
+        self.publisher.publish_many(messages_to_publish)
 
         # Step 5: Add unseen urls to cache for future cycles
         self.duplicate_filter.add_many(list(unseen_urls))
@@ -271,7 +271,7 @@ class BaseIngestor:
         no_raw_articles_fetched = len(raw_articles)
         no_raw_deduplicated_articles_fetched = len(unique_articles)
 
-        for outlet, stats in outlet_counts.items():
+        for _, stats in outlet_counts.items():
             stats["seen_skipped"] = stats["total"] - stats["unseen"]
         duration = (datetime.now() - start_time).total_seconds()
         self._log_stats(
