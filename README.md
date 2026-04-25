@@ -301,11 +301,11 @@ The backend therefore is not just a data-processing pipeline; it is the service 
 
 - Python
 - FastAPI
-- Redis Streams
+- Redis
 - PostgreSQL
 - pgvector
-- Docker and Docker Compose
-- Selenium-based scraping
+- Docker & Docker Compose
+- Selenium-based scraping & Trafilatura-based parsing
 - transformer-based NLP models
 - React and TypeScript clients consuming backend APIs
 
