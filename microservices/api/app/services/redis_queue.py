@@ -1,19 +1,16 @@
 import datetime
-import hashlib
-import json
 from typing import Any, Optional, cast
 
 from common.models.api.dtos.job import JobStage, JobStatus
-from common.models.api.redis_models import Message, MessageHeader, MessagePayload, MessageTimestamp, add_timestamp_to_message
-from common.redis_client.consumer import RedisConsumer
+from common.models.api.redis_models import (Message, MessageHeader,
+                                            MessagePayload,
+                                            add_timestamp_to_message)
 from common.redis_client.publisher import RedisPublisher
 from common.redis_client.publisher_router import RedisPublisherRouter
 from microservices.api.app.core.config import OUTPUT_STREAM
-from microservices.api.app.dtos.job import JobCreate, JobResponse, JobType
+from microservices.api.app.dtos.job import JobCreate, JobType
 from microservices.api.app.models.article import Article
 from microservices.api.app.models.job import Job
-
-
 
 routing_map = RedisPublisherRouter.generate_router_mapping([OUTPUT_STREAM,"background:to.be.scraped"], [JobType.USER.value, JobType.BACKGROUND.value])
 publisher_router = RedisPublisherRouter(

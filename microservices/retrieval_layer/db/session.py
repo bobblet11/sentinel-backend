@@ -2,16 +2,13 @@ import logging
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
-from microservices.retrieval_layer.config import (
-    POSTGRES_USER,
-    POSTGRES_PASSWORD,
-    POSTGRES_HOST,
-    POSTGRES_PORT,
-    POSTGRES_DB,
-    POSTGRES_SSLMODE,
-)
+from microservices.retrieval_layer.config import (POSTGRES_DB, POSTGRES_HOST,
+                                                  POSTGRES_PASSWORD,
+                                                  POSTGRES_PORT,
+                                                  POSTGRES_SSLMODE,
+                                                  POSTGRES_USER)
 from microservices.retrieval_layer.db.models import Base
 
 logger = logging.getLogger(__name__)

@@ -1,25 +1,27 @@
 import logging
 import re
 import time
+from typing import Any, List, Optional
+
 import spacy
 import torch
-from typing import Any, List, Optional
 from rank_bm25 import BM25Okapi
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForQuestionAnswering
+from transformers import (AutoModelForQuestionAnswering, AutoModelForSeq2SeqLM,
+                          AutoTokenizer)
 
+from common.models.api.redis_models import (Article, NLPOptions, SentenceScore,
+                                            StreamMessage)
+from microservices.nlp.components.device import DeviceConfig
+from microservices.nlp.config import (BERT_MAX_LENGTH, BM25_TOP_K,
+                                      DECONTEXT_GEN_BATCH_SIZE,
+                                      DECONTEXT_MAX_GEN_LENGTH,
+                                      DECONTEXT_MAX_UNITS,
+                                      DECONTEXT_QA_BATCH_SIZE,
+                                      DECONTEXT_QG_BATCH_SIZE,
+                                      DECONTEXT_REWRITE_RATIO, GEN_MODEL,
+                                      QA_MODEL, QA_SCORE_THRESHOLD, QG_MODEL)
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
-from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore, StreamMessage
-from microservices.nlp.config import (
-    QG_MODEL, QA_MODEL, GEN_MODEL,
-    BM25_TOP_K, QA_SCORE_THRESHOLD,
-    BERT_MAX_LENGTH, DECONTEXT_MAX_GEN_LENGTH,
-    DECONTEXT_MAX_UNITS, DECONTEXT_REWRITE_RATIO,
-    DECONTEXT_QG_BATCH_SIZE,
-    DECONTEXT_QA_BATCH_SIZE,
-    DECONTEXT_GEN_BATCH_SIZE,
-)
 
 logger = logging.getLogger(__name__)
 

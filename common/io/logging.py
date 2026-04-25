@@ -1,12 +1,12 @@
-from dataclasses import asdict, dataclass
-import logging
-import sys
-import os
-import glob
 import datetime
-from pathlib import Path
+import glob
+import logging
+import os
+import sys
+from dataclasses import asdict, dataclass
 from logging.handlers import TimedRotatingFileHandler
-from typing import Any, Callable, List
+from pathlib import Path
+from typing import Callable, List
 
 NOISY_LOGGERS = [
         "seleniumwire", 

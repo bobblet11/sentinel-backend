@@ -1,9 +1,9 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Tuple, List
-from common.models.api.redis_models import StreamMessage
-from filelock import FileLock 
+from typing import Any, Dict
+
+from filelock import FileLock
 
 
 class JsonHandler():

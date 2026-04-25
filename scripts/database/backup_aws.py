@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-from dotenv import load_dotenv
-import redis
 import datetime
-import os
 import json
+import os
+
+from dotenv import load_dotenv
 
 load_dotenv(dotenv_path="configs/aws/.env")
 
 # Configuration
-from common.redis_client.connection import REDIS_HOST, REDIS_PORT, redis_connection
+from common.redis_client.connection import redis_connection
 
 BACKUP_DIR = "./backups/aws"
 timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")

@@ -1,7 +1,9 @@
-from logging import Logger, getLogger
-import redis
 import json
+from logging import Logger, getLogger
 from typing import Any, Dict, List, Optional
+
+import redis
+
 from common.redis_client.connection import redis_connection
 
 

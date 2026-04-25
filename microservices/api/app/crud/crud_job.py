@@ -1,8 +1,11 @@
 import uuid
+
 from sqlalchemy.orm import Session
-from microservices.api.app.models.job import Job
-from microservices.api.app.dtos.job import JobCreate, JobResponse, JobStatus, JobType
+
 from microservices.api.app.core.logger import logger
+from microservices.api.app.dtos.job import JobCreate, JobStatus, JobType
+from microservices.api.app.models.job import Job
+
 
 def create_job(db: Session, job_in: JobCreate, article_id: int)->Job:
     uid:str = str(uuid.uuid4())

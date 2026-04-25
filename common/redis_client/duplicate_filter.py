@@ -1,8 +1,10 @@
+from logging import getLogger
+from typing import List
+
 import redis
 
-from typing import List, Optional
 from common.redis_client.connection import redis_connection
-from logging import Logger, getLogger
+
 
 class RedisDuplicateFilter:
     """

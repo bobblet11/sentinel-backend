@@ -1,12 +1,10 @@
-from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from microservices.api.app.models.article import Article, NewsOutlet
-from microservices.api.app.models.job import Job
-from microservices.api.app.dtos.job import JobCreate 
 from microservices.api.app.core.logger import logger
+from microservices.api.app.dtos.job import JobCreate
+from microservices.api.app.models.article import Article, NewsOutlet
 
 
 def get_or_create_outlet(db: Session, name: str) -> NewsOutlet:

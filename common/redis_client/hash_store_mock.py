@@ -1,9 +1,6 @@
 import json
-import redis
-from typing import Any, Dict, Optional, List
 from logging import Logger, getLogger
-
-from common.redis_client.connection import redis_connection
+from typing import Any, Dict, List, Optional
 
 
 class RedisHashStoreMock:

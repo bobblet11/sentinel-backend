@@ -1,10 +1,9 @@
 import concurrent.futures
-from typing import Dict, List, Optional, Callable
+from typing import Callable, Dict, List, Optional
 
-import requests
-
-from microservices.web_scraper.config import  WEBSHARIO_URL
-from microservices.web_scraper.proxy_sources.base_classes import HttpProxySource, ProxyUtils
+from microservices.web_scraper.config import WEBSHARIO_URL
+from microservices.web_scraper.proxy_sources.base_classes import (
+    HttpProxySource, ProxyUtils)
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]

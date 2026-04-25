@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 import os
-import redis
+
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import sessionmaker, Session
-from scripts.database.inspect_aws import inspect_redis
+from sqlalchemy.orm import Session, sessionmaker
 
+from scripts.database.inspect_aws import inspect_redis
 
 POSTGRES_USER:str = str(os.getenv("POSTGRES_USER", None))
 POSTGRES_PASSWORD:str = str(os.getenv("POSTGRES_PASSWORD", None))

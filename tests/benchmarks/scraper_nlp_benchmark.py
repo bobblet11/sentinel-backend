@@ -1,11 +1,9 @@
-import time
 from typing import Any, Dict, List, Tuple
 
 from pydantic import ValidationError
 
 from common.models.api.redis_models import Message
-from tests.benchmarks.benchmark_base import BenchmarkResults, BenchmarkTemplate
-
+from tests.benchmarks.benchmark_base import BenchmarkTemplate
 
 URL_SPREAD = {
     "euronews": "https://www.euronews.com/2026/03/30/trump-threatens-to-obliterate-irans-kharg-island-oil-hub-if-no-deal-reached-shortly",

@@ -3,6 +3,7 @@ import threading
 from typing import Any
 
 import redis
+
 from common.requests.retry_request import exponential_retry
 
 REDIS_HOST:str = str(os.getenv("REDIS_HOST", "redis"))

@@ -1,23 +1,17 @@
-import logging
 import signal
+
 from common.io.logging import setup_logging
 from common.models.api.dtos.job import JobType
-from common.redis_client.prioritised_consumer_combiner import BlockPrioritisationLevel
+from common.redis_client.prioritised_consumer_combiner import \
+    BlockPrioritisationLevel
 from common.service.service_template import ServiceConfig
+from microservices.web_scraper.config import (BACKGROUND_OUTPUT_STREAM,
+                                              BATCH_SIZE, CONSUMER_NAME,
+                                              FAILURE_OUTPUT_STREAM,
+                                              GROUP_NAME, INPUT_STREAMS,
+                                              LOG_MODE, SCRAPER_MAX_WORKERS,
+                                              USER_OUTPUT_STREAM)
 from microservices.web_scraper.scraper_service import ScraperService
-from logging import Logger, getLogger, DEBUG
-
-from microservices.web_scraper.config import (
-    BACKGROUND_OUTPUT_STREAM,
-    BATCH_SIZE,
-    CONSUMER_NAME,
-    FAILURE_OUTPUT_STREAM,
-    GROUP_NAME,
-    INPUT_STREAMS,
-    SCRAPER_MAX_WORKERS,
-    USER_OUTPUT_STREAM,
-    LOG_MODE
-)
 
 SERVICE_NAME="scraper"
 CONTAINER_NAME="web_scraper"

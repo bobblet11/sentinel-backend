@@ -1,8 +1,10 @@
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
-from uuid import UUID
 from datetime import datetime
 from enum import StrEnum
+from uuid import UUID
+
+from pydantic import BaseModel
+
+
 class JobStatus(StrEnum):
     PENDING = "pending"
     COMPLETE = "complete"

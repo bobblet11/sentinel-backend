@@ -4,13 +4,15 @@ Run: conda run -n sentinel-env python3 results/generate_charts.py
 """
 
 import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import matplotlib.gridspec as gridspec
-import numpy as np
 import csv
 from pathlib import Path
+
+import matplotlib.gridspec as gridspec
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import numpy as np
 
 OUT = Path(__file__).parent
 OUT.mkdir(exist_ok=True)

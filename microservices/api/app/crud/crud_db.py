@@ -1,10 +1,9 @@
-from typing import Dict, TypedDict
+from typing import TypedDict
+
 from psycopg2 import OperationalError
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-from microservices.api.app.db.session import get_db
-from microservices.api.app.models.job import Job
-from microservices.api.app.dtos.job import JobCreate, JobStatus, JobType
+
 
 class DbStatus(TypedDict):
     status: str

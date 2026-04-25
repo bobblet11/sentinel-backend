@@ -1,21 +1,21 @@
-from datetime import datetime
 import hashlib
 import json
-from pathlib import Path
+import re
 import time
-import random
+from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import redis
 import requests
-import re
-from dataclasses import asdict, dataclass, field
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Tuple, Optional
-from abc import ABC, abstractmethod
 
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
-from common.models.api.redis_models import Message, MessageHeader, MessagePayload
-
+from common.models.api.redis_models import (Message, MessageHeader,
+                                            MessagePayload)
 
 # Define service boundaries (START/END pairs)
 SERVICE_BOUNDARIES = {
@@ -337,13 +337,11 @@ class BenchmarkTemplate(ABC):
     @abstractmethod
     def generate_jobs(self) -> List[Dict[str, Any]]:
         """Return a list of job dicts: { 'article_url': ..., 'is_background': ... }"""
-        pass
 
     @abstractmethod
     def validate_results(self, successfully_processed_jobs: List[Dict[str, Any]]) -> Tuple[List[Dict[str,Any]], List[Dict[str, Any]]]:
         """validate correctness of results."""
         # return successfully_processed_jobs, [] to skip
-        pass
 
     # ----------------------------------------------------------------------
     # JOB SUBMISSION

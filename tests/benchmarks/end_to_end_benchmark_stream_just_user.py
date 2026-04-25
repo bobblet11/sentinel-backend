@@ -1,11 +1,13 @@
-import time
 from typing import Any, Dict, List, Tuple
+
 from pydantic import ValidationError
 
-from common.models.api.redis_models import Message, StreamMessage
-from common.models.api.validation_helpers import validate_after_ingestor, validate_after_nlp, validate_after_retrieval, validate_after_webscraper
-from tests.benchmarks.benchmark_base import BenchmarkResults, BenchmarkTemplate
-
+from common.models.api.redis_models import Message
+from common.models.api.validation_helpers import (validate_after_ingestor,
+                                                  validate_after_nlp,
+                                                  validate_after_retrieval,
+                                                  validate_after_webscraper)
+from tests.benchmarks.benchmark_base import BenchmarkTemplate
 
 URL_SPREAD_BACKGROUND = {}
 
@@ -37,7 +39,6 @@ class EndToEndUser(BenchmarkTemplate):
         """Return a list of Redis jobs using URL_SPREAD."""
         jobs = []
         # Use the same URL_SPREAD as in the good benchmark
-        i = 0
         for url in URL_SPREAD_BACKGROUND.values():                
             message = self._create_redis_job(url, is_background=True)
             jobs.append({"submission_type": "redis", "payload": message})

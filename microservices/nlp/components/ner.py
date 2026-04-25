@@ -1,13 +1,15 @@
 import logging
-import torch
-from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
+from transformers import (AutoModelForTokenClassification, AutoTokenizer,
+                          pipeline)
+
+from common.models.api.redis_models import (Article, Entity, NLPOptions,
+                                            SentenceScore, StreamMessage)
+from microservices.nlp.components.device import DeviceConfig
+from microservices.nlp.config import NER_BATCH_SIZE, NER_MODEL
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
-from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, Entity, SentenceScore, StreamMessage
-from microservices.nlp.config import NER_MODEL, NER_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 

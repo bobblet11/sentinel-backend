@@ -1,8 +1,11 @@
 import json
-from typing import Any, Dict, List, Optional
 from logging import Logger, getLogger
-from common.redis_client.connection import redis_connection
+from typing import Any, Dict, List
+
 import redis
+
+from common.redis_client.connection import redis_connection
+
 
 class RedisPublisher:
     """

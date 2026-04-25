@@ -1,11 +1,11 @@
-import os
-from requests import get, Response, exceptions
-
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Optional, Tuple, Any
-from logging import Logger, getLogger
-from common.requests.user_agent_manager import user_agent_manager
+from logging import getLogger
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from requests import Response, exceptions, get
+
+from common.requests.user_agent_manager import user_agent_manager
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]
@@ -72,7 +72,6 @@ class ProxySource(ABC):
         Abstract method to get proxies.
         Returns a dictionary categorized by proxy type ('https', 'socks4', 'socks5').
         """
-        pass
     
     def log_summary(self, proxies: ProxyDict) -> None: 
         count_summary = ", ".join([f"{k.upper()}:{len(v)}" for k, v in proxies.items()])
@@ -95,12 +94,10 @@ class FileProxySource(ProxySource):
     @abstractmethod
     def _parse_file_content(self, content: str) -> ProxyDict:
         """Parses raw file content into categorized proxy lists."""
-        pass
     
     @abstractmethod
     def _format_for_save(self, proxies: ProxyDict) -> str:
         """Formats the proxies into a string for saving to a file."""
-        pass
     
     def get_proxies(self, bootstrap_proxies: ProxyRequestDict = None) -> ProxyDict:
         """Reads and parses proxies from the file path."""

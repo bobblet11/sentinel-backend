@@ -1,15 +1,18 @@
 import concurrent.futures
-
-from dataclasses import dataclass
-from feedparser import FeedParserDict, parse
 from logging import Logger, getLogger
-from typing import Dict, Iterator, List
+from typing import Iterator, List
+
+from feedparser import FeedParserDict, parse
+
 from common.models.api.redis_models import Article
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
 from common.requests.user_agent_manager import user_agent_manager
+from microservices.ingestor.config import (MAX_INGESTOR_WORKERS, OUTPUT_STREAM,
+                                           REDIS_DUPLICATE_FILTER_KEY)
+
 from .base_ingestor import BaseIngestor
-from microservices.ingestor.config import MAX_INGESTOR_WORKERS, OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
+
 
 class RssIngestor(BaseIngestor):
     """

@@ -1,11 +1,11 @@
 import random
 import threading
+from logging import Logger, getLogger
 from typing import Dict, List, Optional, Set
-from logging import getLogger, Logger
+
 from common.requests.retry_request import exponential_retry
-from microservices.web_scraper.proxy_sources.web_based.webshareio_http import (
-    WebshareIOHttpSource,
-)
+from microservices.web_scraper.proxy_sources.web_based.webshareio_http import \
+    WebshareIOHttpSource
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]

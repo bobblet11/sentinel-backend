@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 from dotenv import load_dotenv
-import redis
-import os
 
 # Load environment
 load_dotenv(dotenv_path="configs/aws/.env")
 
 # Configuration
 from common.redis_client.connection import redis_connection
+
 
 def delete_streams_and_sets():
     r = redis_connection.get_client()

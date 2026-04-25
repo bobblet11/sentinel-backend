@@ -1,7 +1,10 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import select
-from microservices.retrieval_layer.db.models import Claim, Entity, Article
 from datetime import datetime
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from microservices.retrieval_layer.db.models import Article, Claim, Entity
+
 
 def find_evidence_by_entity_match(
     db: Session,

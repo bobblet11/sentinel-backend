@@ -1,9 +1,9 @@
-from typing import List, Any
-from pydantic import ValidationError
 import json
-from common.models.api.redis_models import Message, MessagePayload, StreamMessage
-
 import re
+from typing import List
+
+from common.models.api.redis_models import (Message, MessagePayload,
+                                            StreamMessage)
 
 HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
 

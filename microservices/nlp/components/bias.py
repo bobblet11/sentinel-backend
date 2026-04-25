@@ -1,16 +1,16 @@
 import logging
-import torch
 from typing import Any, Dict, Optional
+
 from transformers import pipeline
 
+from common.models.api.redis_models import (Article, BiasProfile, NLPOptions,
+                                            StreamMessage)
+from microservices.nlp.components.device import DeviceConfig
+from microservices.nlp.config import (BIAS_MAX_CHARS, BIAS_POLITICAL_MODEL,
+                                      BIAS_SENTIMENT_MAX_LEN,
+                                      BIAS_SENTIMENT_MODEL)
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
-from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, BiasProfile, Message, NLPOptions, NLPResult, StreamMessage
-from microservices.nlp.config import (
-    BIAS_POLITICAL_MODEL, BIAS_SENTIMENT_MODEL,
-    BIAS_MAX_CHARS, BIAS_SENTIMENT_MAX_LEN,
-)
 
 logger = logging.getLogger(__name__)
 

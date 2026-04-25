@@ -1,6 +1,5 @@
-import time
 
-from tests.benchmarks.benchmark_base import BenchmarkResults, BenchmarkTemplate
+from tests.benchmarks.benchmark_base import BenchmarkTemplate
 
 
 class Benchmark_1_3(BenchmarkTemplate):

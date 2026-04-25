@@ -127,11 +127,12 @@
 # nyt_scraper.py
 import json
 import re
-from typing import Dict, Optional
-from urllib.parse import urlparse
+from typing import Optional
 
 from bs4 import BeautifulSoup
-from microservices.web_scraper.parsers.base_parser import BaseParser, ParseResult
+
+from microservices.web_scraper.parsers.base_parser import (BaseParser,
+                                                           ParseResult)
 
 
 class CBSParser(BaseParser):

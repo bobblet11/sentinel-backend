@@ -1,26 +1,22 @@
 import signal
-from logging import INFO
 
 from common.io.logging import setup_logging
 from common.models.api.dtos.job import JobType
+from common.redis_client.prioritised_consumer_combiner import \
+    BlockPrioritisationLevel
 from common.service.service_template import ServiceConfig
-from common.redis_client.prioritised_consumer_combiner import BlockPrioritisationLevel
-
-from microservices.retrieval_layer.services.retrieval_service import RetrievalService
-from microservices.retrieval_layer.config import (
-    INPUT_STREAMS,
-    FAILURE_OUTPUT_STREAM,
-    GROUP_NAME,
-    CONSUMER_NAME,
-    BATCH_SIZE,
-    RETRY_FAILURE_MODE,
-    LOG_MODE,
-    BENCHMARK_OUTPUT_STREAM,
-    IS_BENCHMARK,
-    MAX_WORKERS,
-    OUTPUT_STREAM
-)
-from microservices.retrieval_layer.db.session import ensure_schema_compatibility
+from microservices.retrieval_layer.config import (BATCH_SIZE,
+                                                  BENCHMARK_OUTPUT_STREAM,
+                                                  CONSUMER_NAME,
+                                                  FAILURE_OUTPUT_STREAM,
+                                                  GROUP_NAME, INPUT_STREAMS,
+                                                  IS_BENCHMARK, LOG_MODE,
+                                                  MAX_WORKERS, OUTPUT_STREAM,
+                                                  RETRY_FAILURE_MODE)
+from microservices.retrieval_layer.db.session import \
+    ensure_schema_compatibility
+from microservices.retrieval_layer.services.retrieval_service import \
+    RetrievalService
 
 SERVICE_NAME = "retrieval"
 CONTAINER_NAME = "retrieval-layer"

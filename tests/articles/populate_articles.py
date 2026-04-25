@@ -1,19 +1,22 @@
 import json
-from datetime import datetime
 import logging
 import os
 
 from common.redis_client.duplicate_filter_mock import RedisDuplicateFilterMock
+
 os.environ['MAX_INGESTOR_WORKERS'] = '10'
 os.environ['REDIS_DUPLICATE_FILTER_KEY'] = ''
 os.environ['OUTPUT_STREAM'] = ''
+from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, List
-from dataclasses import asdict
+
 from pydantic import TypeAdapter
 
 from common.io.logging import setup_logging
-from microservices.ingestor.main import RssSourceCategoryEntry, RssSourceEntry, categorise_rss_sources_by_payment_tier
+from microservices.ingestor.main import (
+    RssSourceCategoryEntry, RssSourceEntry,
+    categorise_rss_sources_by_payment_tier)
 from microservices.ingestor.rss_ingestor import Article, RssIngestor
 
 ARTICLES_PATH = Path("tests/articles/articles.jsonl")

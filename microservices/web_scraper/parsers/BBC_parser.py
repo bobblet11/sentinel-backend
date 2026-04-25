@@ -1,10 +1,13 @@
 # nyt_scraper.py
 import json
 import re
-from typing import Dict, Optional
+from typing import Optional
 
 from bs4 import BeautifulSoup
-from microservices.web_scraper.parsers.base_parser import BaseParser, ParseResult
+
+from microservices.web_scraper.parsers.base_parser import (BaseParser,
+                                                           ParseResult)
+
 
 class BBCParser(BaseParser):
     def extract(self, soup: BeautifulSoup, article_url: str) -> Optional[ParseResult]:

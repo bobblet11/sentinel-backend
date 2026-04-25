@@ -1,10 +1,10 @@
-from typing import List
-from dotenv import load_dotenv
-from common.env.log_env import print_env, Config, EnvVariable
-from common.env.get_env_var import get_env_var
 from logging import Logger, getLogger
+from typing import List
 
+from dotenv import load_dotenv
 
+from common.env.get_env_var import get_env_var
+from common.env.log_env import Config, EnvVariable, print_env
 
 load_dotenv()
 config_logger: Logger = getLogger("config")

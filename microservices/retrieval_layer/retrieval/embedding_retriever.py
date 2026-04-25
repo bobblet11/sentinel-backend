@@ -1,9 +1,10 @@
 from typing import Dict, List, Tuple
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from sqlalchemy import select, text
+
 from microservices.retrieval_layer.db.models import Article, Claim
-from pgvector.sqlalchemy import Vector
+
 MAX_CANDIDATES = 100  # hard cap BEFORE NLI
 
 

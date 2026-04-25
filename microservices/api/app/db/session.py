@@ -1,11 +1,12 @@
 from logging import Logger, getLogger
-from fastapi import FastAPI
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import sessionmaker, Session
-from microservices.api.app.core.config import POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_DB, POSTGRES_PORT, POSTGRES_SSLMODE
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
+from microservices.api.app.core.config import (POSTGRES_DB, POSTGRES_HOST,
+                                               POSTGRES_PASSWORD,
+                                               POSTGRES_PORT, POSTGRES_SSLMODE,
+                                               POSTGRES_USER)
 
 logger:Logger = getLogger("postgres_session")
 

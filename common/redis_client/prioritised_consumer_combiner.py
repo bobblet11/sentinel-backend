@@ -1,11 +1,10 @@
-from enum import StrEnum
 import json
-import redis
-import math
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
 from logging import Logger, getLogger
+from typing import Any, Dict, List, Optional
 
-from common.models.api.dtos.job import JobType
+import redis
+
 from common.redis_client.connection import redis_connection
 
 DEFAULT_BLOCK_MS = 5_000

@@ -1,22 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import asyncio
+import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, cast
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from common.models.api.dtos.job import JobStatus
 from common.redis_client.hash_store import RedisHashStore
 from microservices.api.app.core.config import HASH_STORE_NAMESPACE
-from microservices.api.app.crud.crud_article import create_article, get_article_by_url
+from microservices.api.app.crud.crud_article import (create_article,
+                                                     get_article_by_url)
+from microservices.api.app.crud.crud_job import (create_job, get_job,
+                                                 get_latest_job_for_article)
 from microservices.api.app.db.session import get_db
-from microservices.api.app.services.news_outlet import get_news_outlet
 from microservices.api.app.dtos.job import JobCreate, JobResponse, JobType
-from microservices.api.app.crud.crud_job import create_job, get_job, get_latest_job_for_article
 from microservices.api.app.models.article import Article
 from microservices.api.app.models.job import Job
+from microservices.api.app.services.news_outlet import get_news_outlet
 from microservices.api.app.services.redis_queue import publish_job
-from sqlalchemy.orm import Session
-from uuid import UUID
-from datetime import datetime, timedelta, timezone
-import asyncio
-from typing import Dict, Any, List, cast
-import logging
 
 router = APIRouter()
 result_hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)

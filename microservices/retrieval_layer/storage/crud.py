@@ -1,15 +1,16 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
+from typing import Any, Dict, List
 
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import distinct, select, text
 
-from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, CreateOrModifySentiment, CreateOrModifyOutlet, CreateOrModifyClaim, Evidence, UpdateJob, UpsertArticleTopic
-from microservices.retrieval_layer.db.models import (
-    Article, Claim, Entity, Job, JobTimestamp, NewsOutlet, Author, SentimentAnalysis, claim_to_entity_table, Topic, ArticleTopic
-)
-from datetime import datetime
-from typing import Dict, Any, List, Optional
-
+from microservices.retrieval_layer.db.models import (Article, Author, Claim,
+                                                     Entity, Job, JobTimestamp,
+                                                     NewsOutlet,
+                                                     SentimentAnalysis, Topic)
+from microservices.retrieval_layer.storage.dtos import (
+    CreateOrModifyArticle, CreateOrModifyClaim, CreateOrModifyOutlet,
+    CreateOrModifySentiment, Evidence, UpdateJob, UpsertArticleTopic)
 
 
 def get_or_create_author(db: Session, name: str) -> Author:

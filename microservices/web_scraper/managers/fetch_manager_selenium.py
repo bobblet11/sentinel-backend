@@ -3,44 +3,38 @@ import json
 import os
 import shutil
 import socket
+import subprocess
 import tempfile
 import threading
 import time
-import traceback
 import uuid
-import subprocess
+from dataclasses import dataclass
+from logging import Logger, getLogger
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from typing import Any, Dict, List, Tuple, Callable, Optional
-
-from requests.exceptions import RequestException
-from selenium.common.exceptions import (
-    ElementClickInterceptedException,
-    TimeoutException,
-    WebDriverException,
-)
+from pyvirtualdisplay import Display
 from requests import Request
-
+from requests.exceptions import RequestException
+from selenium.common.exceptions import (ElementClickInterceptedException,
+                                        TimeoutException, WebDriverException)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from seleniumwire import undetected_chromedriver as uc
-from logging import Logger, getLogger
-
 from undetected_chromedriver import Chrome, ChromeOptions, Patcher
-from common import requests
-from common.requests.retry_request import exponential_retry
-from microservices.web_scraper.config import (
-    FETCH_DELAY_GROWTH_RATE,
-    INITIAL_FETCH_DELAY_S,
-    MAX_FETCH_RETRIES,
-    MAX_SCREENSHOT_FOLDER_SIZE
-)
-from dataclasses import dataclass
-from microservices.web_scraper.managers.proxy_manager_paid import proxy_manager_paid, ProxyManagerPaid
-from common.requests.user_agent_manager import BrowserProfile, user_agent_manager
-from pathlib import Path
-from pyvirtualdisplay import Display
+
 from common.io.screenshot_handler import RotatingScreenshotHandler
+from common.requests.retry_request import exponential_retry
+from common.requests.user_agent_manager import (BrowserProfile,
+                                                user_agent_manager)
+from microservices.web_scraper.config import (FETCH_DELAY_GROWTH_RATE,
+                                              INITIAL_FETCH_DELAY_S,
+                                              MAX_FETCH_RETRIES,
+                                              MAX_SCREENSHOT_FOLDER_SIZE)
+from microservices.web_scraper.managers.proxy_manager_paid import (
+    ProxyManagerPaid, proxy_manager_paid)
+
 ProxyRequestDict = Optional[Dict[str, str]]
 
 CURRENT_DIR: str = Path(os.path.dirname(os.path.abspath(__file__)))

@@ -1,11 +1,12 @@
 # nyt_scraper.py
-import re
-from typing import Dict, Optional
-from urllib.parse import urlparse
+from typing import Optional
 
 from bs4 import BeautifulSoup
 
-from microservices.web_scraper.parsers.base_parser import BaseParser, ParseResult
+from microservices.web_scraper.parsers.base_parser import (BaseParser,
+                                                           ParseResult)
+
+
 class TheGuardianParser(BaseParser):
     def extract(self, soup: BeautifulSoup, article_url: str) -> Optional[ParseResult]:
         # Guardian usually puts content in div[data-gu-name='body'] or main

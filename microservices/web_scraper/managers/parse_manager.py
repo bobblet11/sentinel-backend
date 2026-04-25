@@ -1,16 +1,18 @@
 import json
-from logging import Logger, getLogger
 import re
-from unittest import result
-import trafilatura
-import threading 
-
-from typing import Any, Dict, List, Optional, Callable
-from bs4 import BeautifulSoup
-from microservices.web_scraper.managers.parser_registry_manager import ParserRegistryManager
-from microservices.web_scraper.parsers.base_parser import BaseParser
-from dataclasses import asdict, dataclass
+import threading
+from dataclasses import dataclass
 from datetime import datetime
+from logging import Logger, getLogger
+from typing import Any, Callable, Dict, List, Optional
+
+import trafilatura
+from bs4 import BeautifulSoup
+
+from microservices.web_scraper.managers.parser_registry_manager import \
+    ParserRegistryManager
+from microservices.web_scraper.parsers.base_parser import BaseParser
+
 
 @dataclass
 class ParseResult:

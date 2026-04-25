@@ -4,7 +4,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, StreamMessage
+from common.models.api.redis_models import (Article, NLPOptions, NLPResult,
+                                            StreamMessage)
 from microservices.nlp.components.device import DeviceConfig
 from microservices.nlp.config import TOPIC_LABELS, TOPIC_SIMILARITY_THRESHOLD
 from microservices.nlp.models.base import ArticleProcessor

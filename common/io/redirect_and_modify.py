@@ -1,7 +1,8 @@
 import io
 import sys
 from contextlib import redirect_stdout
-from typing import Callable, Tuple, Any, List
+from typing import Callable, List, Tuple
+
 from common.io.utils import indent_with_tab
 
 

@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+
 from common.redis_client.connection import redis_connection
 
 r = redis_connection.get_client()

@@ -1,10 +1,12 @@
 import functools
 import time
+from logging import Logger
 from math import exp
 from random import uniform
-from typing import Callable, Any
+from typing import Any, Callable
+
 from common.io.logging import get_logger
-from logging import getLogger, Logger
+
 
 def retry(max_attempts:int=3, delay_s:int=1) -> Callable:
     def decorator_retry(func: Callable) -> Callable:

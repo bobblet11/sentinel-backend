@@ -20,12 +20,8 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 from sqlalchemy import text
 
-from scripts.topic_clustering.poc_cluster import (
-    _build_docs,
-    fetch_articles,
-    get_engine,
-    load_env,
-)
+from scripts.topic_clustering.poc_cluster import (_build_docs, fetch_articles,
+                                                  get_engine, load_env)
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,11 +1,9 @@
-from dataclasses import dataclass
-import threading
 import hashlib
 import random
-
-from typing import Any, Dict, List, Optional, Set, Tuple
-from fake_useragent import UserAgent
+import threading
+from dataclasses import dataclass
 from logging import Logger, getLogger
+from typing import Any, Dict, List, Tuple
 
 MIN_CHROME_BROWSER_VERSION:int=130
 MAX_CHROME_BROWSER_VERSION:int=143

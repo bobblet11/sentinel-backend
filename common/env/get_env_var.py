@@ -1,8 +1,6 @@
 import os
-from common.env.log_env import EnvVariable
-from typing import Type, TypeVar, Any
 from logging import Logger
-
+from typing import Any, Type, TypeVar
 
 T = TypeVar("T")
 

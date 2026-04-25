@@ -1,23 +1,23 @@
-from datetime import datetime
 import hashlib
 import logging
+import re
+from datetime import datetime
+from typing import Any, Dict, Iterator, List, Optional, Set, Tuple
 
 from psycopg2 import OperationalError
 from sqlalchemy import text
 
-
-
+from common.io.json_updater import JsonHandler
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
-from common.models.api.redis_models import Article, Message, MessageHeader, MessagePayload, MessageTimestamp, add_timestamp_to_message
-from common.models.api.validation_helpers import get_pretty_print_message, validate_after_ingestor
+from common.models.api.redis_models import (Article, Message, MessageHeader,
+                                            MessagePayload,
+                                            add_timestamp_to_message)
+from common.models.api.validation_helpers import (get_pretty_print_message,
+                                                  validate_after_ingestor)
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.publisher import RedisPublisher
-from common.io.json_updater import JsonHandler
-from microservices.ingestor.config import OUTPUT_STREAM, REDIS_DUPLICATE_FILTER_KEY
-from typing import Iterator, Dict, Set, List, Any, Optional, Tuple
-from datetime import datetime
-import re
-
+from microservices.ingestor.config import (OUTPUT_STREAM,
+                                           REDIS_DUPLICATE_FILTER_KEY)
 from microservices.ingestor.db import get_db
 
 OUTLET_PATTERNS = {

@@ -1,16 +1,16 @@
 import requests
 from bs4 import BeautifulSoup
 
-from microservices.web_scraper.parsers.BBC_parser import BBCParser
 # from microservices.web_scraper.parsers.CNN_parser import CNNParser  # if exists
 from microservices.web_scraper.parsers.ABC_parser import ABCParser
+from microservices.web_scraper.parsers.BBC_parser import BBCParser
 from microservices.web_scraper.parsers.CBC_parser import CBCParser
 from microservices.web_scraper.parsers.CBS_parser import CBSParser
-from microservices.web_scraper.parsers.NPR_parser import NPRParser
-from microservices.web_scraper.parsers.NBC_parser import NBCParser
 from microservices.web_scraper.parsers.Euronews_parser import EuronewsParser
-from microservices.web_scraper.parsers.The_Guardian_parser import TheGuardianParser
-
+from microservices.web_scraper.parsers.NBC_parser import NBCParser
+from microservices.web_scraper.parsers.NPR_parser import NPRParser
+from microservices.web_scraper.parsers.The_Guardian_parser import \
+    TheGuardianParser
 
 PARSER_MAP = {
     "bbc": BBCParser(),

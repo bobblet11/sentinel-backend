@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional
 
-from microservices.web_scraper.proxy_sources.base_classes import FileProxySource
+from microservices.web_scraper.proxy_sources.base_classes import \
+    FileProxySource
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]

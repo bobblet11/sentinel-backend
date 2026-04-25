@@ -5,7 +5,8 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from microservices.api.app.db.session import get_db
-from microservices.api.app.models.article import Article, NewsOutlet, SentimentAnalysis
+from microservices.api.app.models.article import (Article, NewsOutlet,
+                                                  SentimentAnalysis)
 
 router = APIRouter()
 outlets_router = APIRouter()

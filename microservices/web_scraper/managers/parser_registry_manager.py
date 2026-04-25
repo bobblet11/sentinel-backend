@@ -1,17 +1,18 @@
 
 import threading
-from typing import Dict, List, Optional
+from logging import Logger, getLogger
+from typing import Dict, Optional
+
+from microservices.web_scraper.parsers.ABC_parser import ABCParser
 from microservices.web_scraper.parsers.base_parser import BaseParser
 from microservices.web_scraper.parsers.BBC_parser import BBCParser
-from microservices.web_scraper.parsers.ABC_parser import ABCParser
 from microservices.web_scraper.parsers.CBC_parser import CBCParser
 from microservices.web_scraper.parsers.CBS_parser import CBSParser
 from microservices.web_scraper.parsers.Euronews_parser import EuronewsParser
 from microservices.web_scraper.parsers.NBC_parser import NBCParser
 from microservices.web_scraper.parsers.NPR_parser import NPRParser
-from microservices.web_scraper.parsers.The_Guardian_parser import TheGuardianParser
-
-from logging import Logger, getLogger
+from microservices.web_scraper.parsers.The_Guardian_parser import \
+    TheGuardianParser
 
 URL_TO_PARSER_MAP: Dict[str, BaseParser] = {
             ("abcnews", "abcnews.go.com"):          ABCParser(),

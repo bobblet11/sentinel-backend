@@ -1,7 +1,9 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import select, or_
-from microservices.retrieval_layer.db.models import Claim, Article
 from datetime import datetime
+
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session
+
+from microservices.retrieval_layer.db.models import Article, Claim
 from microservices.retrieval_layer.retrieval.common_words import STOP_WORDS
 
 

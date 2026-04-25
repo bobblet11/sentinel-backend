@@ -1,6 +1,7 @@
-from typing import Optional
 import re
-from microservices.api.app.dtos.job import JobCreate, JobResponse, JobType
+from typing import Optional
+
+from microservices.api.app.dtos.job import JobCreate
 
 OUTLET_PATTERNS = {
     r"(bbc\.com|bbc\.co\.uk|www\.bbc\.com)": "BBC",

@@ -1,15 +1,13 @@
 import logging
 from typing import Any, List, Optional
 
+from common.models.api.redis_models import (Article, Claim, NLPOptions,
+                                            SentenceScore, StreamMessage)
+from microservices.nlp.components.device import DeviceConfig
+from microservices.nlp.config import (CHECKWORTHY_BATCH_SIZE,
+                                      MAX_SENTENCES_FOR_CHECKWORTHY)
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
-from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, Claim, SentenceScore, StreamMessage
-from microservices.nlp.config import (
-    CHECKWORTHY_BATCH_SIZE,
-    CHECKWORTHY_MODEL,
-    MAX_SENTENCES_FOR_CHECKWORTHY,
-)
 
 logger = logging.getLogger(__name__)
 

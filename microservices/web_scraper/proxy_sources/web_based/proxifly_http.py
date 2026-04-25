@@ -1,9 +1,7 @@
-from typing import Dict, List, Optional, Callable
+from typing import Callable, Dict, List, Optional
 
 from microservices.web_scraper.proxy_sources.base_classes import (
-    HttpProxySource,
-    ProxyUtils,
-)
+    HttpProxySource, ProxyUtils)
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]

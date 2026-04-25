@@ -1,40 +1,37 @@
-from concurrent.futures import as_completed
-from concurrent.futures import ThreadPoolExecutor
-from email.mime import message
-from typing import Any, Dict, List, Optional, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from requests import Session
-from common.io.json_updater import JsonHandler
+from typing import Any, Dict, List, Optional, Tuple
+
 import torch
+from requests import Session
+
+from common.io.json_updater import JsonHandler
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
-from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_nlp, validate_after_retrieval
+from common.models.api.redis_models import (Claim, Message, MessagePayload,
+                                            RetrievalResult, StreamMessage)
+from common.models.api.validation_helpers import (
+    get_pretty_print_stream_message, validate_after_retrieval)
 from common.redis_client.duplicate_filter import RedisDuplicateFilter
 from common.redis_client.hash_store import RedisHashStore
 from common.service.service_template import ServiceTemplate
-from common.models.api.redis_models import BiasProfile, Claim, Message, MessagePayload, RetrievalResult, StreamMessage
-from common.redis_client.publisher import RedisPublisher
-from microservices.retrieval_layer.retrieval.embedding_retriever import retrieve_by_embedding
-from microservices.retrieval_layer.retrieval.entity_filter import find_evidence_by_entity_match
-from microservices.retrieval_layer.retrieval.keyword_filter import find_evidence_by_keyword_match
+from microservices.retrieval_layer.config import (HASH_STORE_NAMESPACE,
+                                                  IS_BENCHMARK,
+                                                  UID_STORE_NAMESPACE)
+from microservices.retrieval_layer.db.session import get_db_transaction
+from microservices.retrieval_layer.retrieval.embedding_retriever import \
+    retrieve_by_embedding
+from microservices.retrieval_layer.retrieval.entity_filter import \
+    find_evidence_by_entity_match
+from microservices.retrieval_layer.retrieval.keyword_filter import \
+    find_evidence_by_keyword_match
 from microservices.retrieval_layer.retrieval.nli import classify_claim_relation
-from microservices.retrieval_layer.storage.dtos import CreateOrModifyArticle, CreateOrModifySentiment, CreateOrModifyOutlet, CreateOrModifyClaim, UpdateJob, UpsertArticleTopic
-
-from microservices.retrieval_layer.config import (
-    HASH_STORE_NAMESPACE,
-    UID_STORE_NAMESPACE,
-    IS_BENCHMARK
-)
-
-from microservices.retrieval_layer.db.session import get_db_session, get_db_transaction
 from microservices.retrieval_layer.storage.crud import (
-    extend_evidence_claims_into_articles,
-    finalise_and_complete_job,
-    get_or_create_all_entities,
-    get_or_create_article,
-    create_claim_and_link_entities,
-    upsert_article_topic,
-)
-
+    create_claim_and_link_entities, extend_evidence_claims_into_articles,
+    finalise_and_complete_job, get_or_create_all_entities,
+    get_or_create_article, upsert_article_topic)
+from microservices.retrieval_layer.storage.dtos import (
+    CreateOrModifyArticle, CreateOrModifyClaim, CreateOrModifyOutlet,
+    CreateOrModifySentiment, UpdateJob, UpsertArticleTopic)
 
 MAX_CANDIDATES_BEFORE_SIMILARITY = 100
 MAX_CANDIDATES_BEFORE_NLI = 10

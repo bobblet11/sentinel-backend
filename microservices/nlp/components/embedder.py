@@ -1,14 +1,16 @@
 import logging
-import torch
-import numpy as np
 from typing import Any, List, Optional
+
+import numpy as np
+import torch
 from sentence_transformers import SentenceTransformer
 
+from common.models.api.redis_models import (Article, NLPOptions, SentenceScore,
+                                            StreamMessage)
+from microservices.nlp.components.device import DeviceConfig
+from microservices.nlp.config import EMBEDDER_BATCH_SIZE, EMBEDDING_MODEL
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
-from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore, StreamMessage
-from microservices.nlp.config import EMBEDDING_MODEL, EMBEDDER_BATCH_SIZE
 
 logger = logging.getLogger(__name__)
 

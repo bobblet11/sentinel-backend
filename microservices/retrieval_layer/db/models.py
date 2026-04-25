@@ -1,8 +1,8 @@
-from sqlalchemy import (
-    Column, Integer, String, Text, DateTime, ForeignKey, Float, Table, func, JSON
-)
-from sqlalchemy.orm import relationship, declarative_base
 from pgvector.sqlalchemy import Vector
+from sqlalchemy import (Column, DateTime, Float, ForeignKey, Integer, String,
+                        Table, Text, func)
+from sqlalchemy.orm import declarative_base, relationship
+
 Base = declarative_base()
 
 claim_to_entity_table = Table(

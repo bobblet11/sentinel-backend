@@ -10,8 +10,8 @@ Connection defaults to the Docker network IP. Override with env vars:
 """
 
 import os
-import sys
 import subprocess
+import sys
 
 import psycopg2
 

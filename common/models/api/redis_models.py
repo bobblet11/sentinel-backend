@@ -1,12 +1,11 @@
 import datetime
-from datetime import timezone
 import time
-from typing import Any, List, Union, Dict, Optional
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional, Union
+
 from pydantic import BaseModel
 
 from common.models.api.dtos.job import JobStage
-
 
 """
 In redis, each message looks like this

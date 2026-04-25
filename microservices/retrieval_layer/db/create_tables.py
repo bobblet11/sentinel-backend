@@ -1,4 +1,5 @@
-from microservices.retrieval_layer.db.session import ensure_schema_compatibility
+from microservices.retrieval_layer.db.session import \
+    ensure_schema_compatibility
 
 
 def main():

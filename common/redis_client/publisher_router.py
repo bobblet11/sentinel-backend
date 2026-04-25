@@ -1,7 +1,9 @@
 import hashlib
-from typing import Any, Dict, List, Optional
-from common.redis_client.publisher import RedisPublisher
 from logging import Logger, getLogger
+from typing import Any, Dict, List
+
+from common.redis_client.publisher import RedisPublisher
+
 
 def get_nested_value(d: Dict, keys: List[str]) -> Any:
     """Safely retrieves a value from a nested dictionary."""

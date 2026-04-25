@@ -1,8 +1,7 @@
-import redis
 
+from logging import getLogger
 from typing import List
-from common.redis_client.connection import redis_connection
-from logging import Logger, getLogger
+
 
 class RedisDuplicateFilterMock:
     """

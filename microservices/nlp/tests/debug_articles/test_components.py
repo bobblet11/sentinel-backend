@@ -99,22 +99,26 @@ logging.basicConfig(
 )
 log = logging.getLogger("test_components")
 
-# ---------------------------------------------------------------------------
-# Project imports (after sys.path and env vars are set)
-# ---------------------------------------------------------------------------
-from common.models.api.redis_models import Article, Message, MessageHeader, MessagePayload, NLPOptions, NLPResult, SentenceScore, StreamMessage  # noqa: E402
-from microservices.nlp.components.bias import BiasDetector  # noqa: E402
-from microservices.nlp.components.checkworthy import CheckWorthinessFilter  # noqa: E402
-from microservices.nlp.components.embedder import Embedder  # noqa: E402
-from microservices.nlp.components.ner import EntityRecognizer  # noqa: E402
-from microservices.nlp.components.preprocess import Preprocessor  # noqa: E402
-from microservices.nlp.config import DEVICE_CONFIG, model_manager  # noqa: E402
-
 # Prime heavy library imports in the main thread before load_all() spawns worker
 # threads — avoids a huggingface_hub circular import that occurs when
 # sentence_transformers and transformers are imported concurrently.
 import sentence_transformers  # noqa: E402, F401
 import transformers  # noqa: E402, F401
+
+# ---------------------------------------------------------------------------
+# Project imports (after sys.path and env vars are set)
+# ---------------------------------------------------------------------------
+from common.models.api.redis_models import (Article, Message,  # noqa: E402
+                                            MessageHeader, MessagePayload,
+                                            NLPOptions, NLPResult,
+                                            SentenceScore, StreamMessage)
+from microservices.nlp.components.bias import BiasDetector  # noqa: E402
+from microservices.nlp.components.checkworthy import \
+    CheckWorthinessFilter  # noqa: E402
+from microservices.nlp.components.embedder import Embedder  # noqa: E402
+from microservices.nlp.components.ner import EntityRecognizer  # noqa: E402
+from microservices.nlp.components.preprocess import Preprocessor  # noqa: E402
+from microservices.nlp.config import DEVICE_CONFIG, model_manager  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constants

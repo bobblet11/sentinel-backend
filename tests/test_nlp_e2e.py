@@ -100,18 +100,15 @@ log = logging.getLogger("test_nlp_e2e")
 # Project imports
 # ---------------------------------------------------------------------------
 import sentence_transformers  # noqa: E402, F401 — prime before parallel model load
-import transformers            # noqa: E402, F401
+import transformers  # noqa: E402, F401
 
-from common.models.api.redis_models import (  # noqa: E402
-    Article,
-    Message,
-    MessageHeader,
-    MessagePayload,
-    NLPOptions,
-    StreamMessage,
-)
-from microservices.nlp.components.claimextract import ClaimExtraction  # noqa: E402
-from microservices.nlp.config import DEVICE_CONFIG, TOPIC_LABELS, model_manager  # noqa: E402
+from common.models.api.redis_models import (Article, Message,  # noqa: E402
+                                            MessageHeader, MessagePayload,
+                                            NLPOptions, StreamMessage)
+from microservices.nlp.components.claimextract import \
+    ClaimExtraction  # noqa: E402
+from microservices.nlp.config import (DEVICE_CONFIG,  # noqa: E402
+                                      TOPIC_LABELS, model_manager)
 
 EMBEDDING_DIM = 768
 SEP  = "=" * 78
@@ -492,18 +489,14 @@ log = logging.getLogger("test_nlp_e2e")
 # Project imports
 # ---------------------------------------------------------------------------
 import sentence_transformers  # noqa: E402, F401 — prime before parallel model load
-import transformers            # noqa: E402, F401
+import transformers  # noqa: E402, F401
 
-from common.models.api.redis_models import (  # noqa: E402
-    Article,
-    Message,
-    MessageHeader,
-    MessagePayload,
-    NLPOptions,
-    StreamMessage,
-)
-from microservices.nlp.components.claimextract import ClaimExtraction  # noqa: E402
-from microservices.nlp.config import DEVICE_CONFIG, model_manager      # noqa: E402
+from common.models.api.redis_models import (Article, Message,  # noqa: E402
+                                            MessageHeader, MessagePayload,
+                                            NLPOptions, StreamMessage)
+from microservices.nlp.components.claimextract import \
+    ClaimExtraction  # noqa: E402
+from microservices.nlp.config import DEVICE_CONFIG, model_manager  # noqa: E402
 
 EMBEDDING_DIM = 768
 SEP  = "=" * 78

@@ -14,14 +14,10 @@ import argparse
 import logging
 from typing import List, Tuple
 
-from scripts.topic_clustering.poc_cluster import (
-    PREDEFINED_TOPICS,
-    _build_docs,
-    fetch_articles,
-    get_engine,
-    load_env,
-    run_zero_shot_bertopic,
-)
+from scripts.topic_clustering.poc_cluster import (PREDEFINED_TOPICS,
+                                                  _build_docs, fetch_articles,
+                                                  get_engine, load_env,
+                                                  run_zero_shot_bertopic)
 
 logging.basicConfig(
     level=logging.INFO,

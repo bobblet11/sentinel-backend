@@ -1,23 +1,19 @@
-from datetime import datetime
+import re
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from logging import Logger, getLogger
-from typing import Any, Dict, Optional, List, Tuple
+from datetime import datetime
+from typing import Optional
+
 from common.io.json_updater import JsonHandler
 from common.models.api.dtos.job import JobStage
 from common.models.api.redis_models import StreamMessage
-from common.models.api.validation_helpers import get_pretty_print_message, get_pretty_print_stream_message, validate_after_webscraper
-from common.redis_client.consumer import RedisConsumer
-from common.redis_client.publisher import RedisPublisher
-from common.redis_client.publisher_router import RedisPublisherRouter
-from common.service.service_template import ProcessingError, ServiceConfig, ServiceTemplate
-from microservices.web_scraper.config import (
-    MAX_FETCH_RETRIES
-)
-from microservices.web_scraper.managers.fetch_manager_selenium import fetch_manager
-from microservices.web_scraper.managers.parse_manager import parse_manager, ParseResult
-import traceback
-import re
+from common.models.api.validation_helpers import (
+    get_pretty_print_stream_message, validate_after_webscraper)
+from common.service.service_template import ServiceConfig, ServiceTemplate
+from microservices.web_scraper.managers.fetch_manager_selenium import \
+    fetch_manager
+from microservices.web_scraper.managers.parse_manager import (ParseResult,
+                                                              parse_manager)
+
 
 class ScraperError(Exception):
     def __init__(self, message, url=None, stage=None, details=None):
@@ -81,7 +77,7 @@ class ScraperService(ServiceTemplate):
         # Normalize times
         fetch_time = fetch_time or 0.0
         parse_time = parse_time or 0.0
-        total_time = fetch_time + parse_time
+        fetch_time + parse_time
         
         html_len = html_len or 0
         text_len = text_len or 0

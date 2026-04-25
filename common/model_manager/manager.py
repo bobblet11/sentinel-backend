@@ -2,15 +2,12 @@ import json
 import logging
 import os
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from common.model_manager.exceptions import (
-    ModelLoadError,
-    ModelNotFoundError,
-    ModelNotReadyError,
-)
+from common.model_manager.exceptions import (ModelLoadError,
+                                             ModelNotFoundError,
+                                             ModelNotReadyError)
 from common.model_manager.registry import DevicePolicy, ModelEntry, ModelState
 
 logger = logging.getLogger(__name__)

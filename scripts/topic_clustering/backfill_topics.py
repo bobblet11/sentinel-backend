@@ -21,22 +21,19 @@ Options:
 import argparse
 import logging
 import sys
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 import numpy as np
-
-from scripts.topic_clustering.poc_cluster import (
-    CONFIDENCE_THRESHOLD,
-    PREDEFINED_TOPICS,
-    TOPIC_DESCRIPTIONS,
-    _build_docs,
-    _clean_doc,
-    get_engine,
-    load_embedding_model,
-    load_env,
-)
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+
+from scripts.topic_clustering.poc_cluster import (CONFIDENCE_THRESHOLD,
+                                                  PREDEFINED_TOPICS,
+                                                  TOPIC_DESCRIPTIONS,
+                                                  _build_docs, _clean_doc,
+                                                  get_engine,
+                                                  load_embedding_model,
+                                                  load_env)
 
 logging.basicConfig(
     level=logging.INFO,

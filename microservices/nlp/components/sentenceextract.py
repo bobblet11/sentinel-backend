@@ -1,21 +1,22 @@
 import logging
-import torch
-import numpy as np
-import torch.nn.functional as F
 from typing import List
-from transformers import AutoTokenizer, AutoModel, AutoModelForSequenceClassification
-from torch.amp import autocast
 
+import numpy as np
+import torch
+import torch.nn.functional as F
+from torch.amp import autocast
+from transformers import (AutoModel, AutoModelForSequenceClassification,
+                          AutoTokenizer)
+
+from common.models.api.redis_models import (Article, NLPOptions, SentenceScore,
+                                            StreamMessage)
+from microservices.nlp.components.device import DeviceConfig
+from microservices.nlp.config import (BERT_MAX_LENGTH, BERT_SCORING_MODEL,
+                                      NLI_ENTAILMENT_THRESHOLD, NLI_MAX_PAIRS,
+                                      NLI_MODEL, SENTENCE_EXTRACT_TOP_K,
+                                      SENTENCE_SCORING_BATCH)
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
-from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore, StreamMessage
-from microservices.nlp.config import (
-    BERT_SCORING_MODEL, NLI_MODEL,
-    SENTENCE_SCORING_BATCH, NLI_MAX_PAIRS,
-    NLI_ENTAILMENT_THRESHOLD, BERT_MAX_LENGTH,
-    SENTENCE_EXTRACT_TOP_K,
-)
 
 logger = logging.getLogger(__name__)
 

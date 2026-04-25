@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
-from common.models.api.redis_models import Article, Message, NLPOptions, NLPResult, SentenceScore, StreamMessage
+from common.models.api.redis_models import (Article, NLPOptions, NLPResult,
+                                            SentenceScore, StreamMessage)
 
 
 class NLPComponent(ABC):
@@ -18,7 +19,6 @@ class NLPComponent(ABC):
         """
         Executes the component logic and updates the shared NLPResult in-place.
         """
-        pass
 
 
 class ArticleProcessor(ABC):
@@ -31,7 +31,6 @@ class ArticleProcessor(ABC):
     @abstractmethod
     def run(self, article: Article, message: StreamMessage, options: NLPOptions) -> None:
         """Executes component logic and writes into result in-place."""
-        pass
 
 
 class SentenceProcessor(ABC):
@@ -52,7 +51,6 @@ class SentenceProcessor(ABC):
         sentences: List[SentenceScore],
     ) -> List[SentenceScore]:
         """Transforms the sentence list and returns the (possibly filtered) result."""
-        pass
 
 
 class SentenceEmbedder(ABC):
@@ -65,7 +63,6 @@ class SentenceEmbedder(ABC):
         """
         Encodes a list of sentences into embeddings.
         """
-        pass
 
 
 class ZeroShotClassifier(ABC):
@@ -78,7 +75,6 @@ class ZeroShotClassifier(ABC):
         """
         Classifies text against a list of candidate labels.
         """
-        pass
 
 
 class NERModel(ABC):
@@ -91,7 +87,6 @@ class NERModel(ABC):
         """
         Extracts entities from the provided text.
         """
-        pass
 
 
 class Seq2SeqRewriter(ABC):
@@ -104,4 +99,3 @@ class Seq2SeqRewriter(ABC):
         """
         Rewrites the text usually to include missing context.
         """
-        pass

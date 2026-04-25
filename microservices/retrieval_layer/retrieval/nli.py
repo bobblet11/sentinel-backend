@@ -1,6 +1,5 @@
-from transformers import pipeline
-import os
 import torch
+from transformers import pipeline
 
 _nli = None
 

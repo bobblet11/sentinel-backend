@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 from typing import List
 
-
 KEY = "scrape_group"
 BENCHMARK_RESULT_1 = Path("tests/logs/benchmark_1_1.json")
 BENCHMARK_RESULT_2 = Path("tests/logs/benchmark_1_2.json")

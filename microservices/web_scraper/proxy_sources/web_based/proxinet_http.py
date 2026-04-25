@@ -3,9 +3,7 @@ from typing import Dict, List, Optional, Set
 from bs4 import BeautifulSoup
 
 from microservices.web_scraper.proxy_sources.base_classes import (
-    HttpProxySource,
-    ProxyUtils,
-)
+    HttpProxySource, ProxyUtils)
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]

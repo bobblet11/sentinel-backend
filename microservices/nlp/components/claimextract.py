@@ -1,23 +1,25 @@
 import logging
-from common.models.api.dtos.job import JobStage
-import spacy
 import time
 from typing import List
 
-# Local imports
-from microservices.nlp.models.base import ArticleProcessor
-from microservices.nlp.components.device import DeviceConfig
-from common.models.api.redis_models import Article, BiasProfile, Claim, NLPOptions, NLPResult, SentenceScore, StreamMessage
+import spacy
 
+from common.models.api.dtos.job import JobStage
+from common.models.api.redis_models import (Article, BiasProfile, Claim,
+                                            NLPOptions, NLPResult,
+                                            SentenceScore, StreamMessage)
+from microservices.nlp.components.bias import BiasDetector
+from microservices.nlp.components.checkworthy import CheckWorthinessFilter
+from microservices.nlp.components.decontext import Decontextualizer
+from microservices.nlp.components.device import DeviceConfig
+from microservices.nlp.components.embedder import Embedder
+from microservices.nlp.components.ner import EntityRecognizer
 # Pipeline stage imports
 from microservices.nlp.components.preprocess import Preprocessor
-from microservices.nlp.components.ner import EntityRecognizer
 from microservices.nlp.components.sentenceextract import SentenceExtraction
-from microservices.nlp.components.decontext import Decontextualizer
-from microservices.nlp.components.checkworthy import CheckWorthinessFilter
-from microservices.nlp.components.embedder import Embedder
-from microservices.nlp.components.bias import BiasDetector
 from microservices.nlp.config import ENABLE_DECONTEXTUALIZATION
+# Local imports
+from microservices.nlp.models.base import ArticleProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -327,7 +329,8 @@ class ClaimExtraction(ArticleProcessor):
         t = time.time()
         try:
             if self._topic_classifier is None:
-                from microservices.nlp.components.topic_classifier import TopicClassifier
+                from microservices.nlp.components.topic_classifier import \
+                    TopicClassifier
 
                 self._topic_classifier = TopicClassifier(
                     device_config=self._topic_device_config,

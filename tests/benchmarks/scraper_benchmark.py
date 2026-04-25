@@ -1,11 +1,9 @@
-import time
 from typing import Any, Dict, List, Tuple
 
 from pydantic import ValidationError
 
 from common.models.api.redis_models import Message
-from tests.benchmarks.benchmark_base import BenchmarkResults, BenchmarkTemplate
-
+from tests.benchmarks.benchmark_base import BenchmarkTemplate
 
 URL_SPREAD = {
     "bbc": "https://www.bbc.com/news/articles/c937gd1vq7xo",

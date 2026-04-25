@@ -1,8 +1,9 @@
-from microservices.api.app.core.config import POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST, POSTGRES_DB, POSTGRES_PORT
-from microservices.api.app.db.session import engine
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import sessionmaker, Session
+
+from microservices.api.app.core.config import POSTGRES_HOST, POSTGRES_PORT
+from microservices.api.app.db.session import engine
+
 
 def test_connection():
     print(f"Testing connection to: {POSTGRES_HOST}:{POSTGRES_PORT}...")

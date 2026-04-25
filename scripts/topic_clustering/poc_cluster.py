@@ -19,7 +19,8 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple  # noqa: F401 (Tuple used in classify signature)
+from typing import (Dict,  # noqa: F401 (Tuple used in classify signature)
+                    List, Optional, Tuple)
 
 import numpy as np
 import pandas as pd

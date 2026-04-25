@@ -76,20 +76,15 @@ if not args.debug:
         logging.getLogger(noisy).setLevel(logging.ERROR)
 log = logging.getLogger("test_bias_all_articles")
 
+import sentence_transformers  # noqa: E402, F401
 # ---------------------------------------------------------------------------
 # Project imports
 # ---------------------------------------------------------------------------
 import transformers  # noqa: E402, F401 — prime import before parallel model loading
-import sentence_transformers  # noqa: E402, F401
 
-from common.models.api.redis_models import (  # noqa: E402
-    Article,
-    Message,
-    MessageHeader,
-    MessagePayload,
-    NLPOptions,
-    StreamMessage,
-)
+from common.models.api.redis_models import (Article, Message,  # noqa: E402
+                                            MessageHeader, MessagePayload,
+                                            NLPOptions, StreamMessage)
 from microservices.nlp.components.bias import BiasDetector  # noqa: E402
 from microservices.nlp.config import DEVICE_CONFIG, model_manager  # noqa: E402
 

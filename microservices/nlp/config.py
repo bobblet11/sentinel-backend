@@ -1,11 +1,10 @@
+from logging import Logger, getLogger
 from typing import List
 
-import torch
 from dotenv import load_dotenv
 
 from common.env.get_env_var import get_env_var
 from common.env.log_env import Config, EnvVariable, print_env
-from logging import Logger, getLogger
 
 load_dotenv()
 config_logger: Logger = getLogger("config")
@@ -183,6 +182,7 @@ except SystemExit:
     DUMMY_NLP_MODE = False
 
     import os
+
     from microservices.nlp.components.device import DeviceConfig
 
     ENABLE_DECONTEXTUALIZATION = os.environ.get(

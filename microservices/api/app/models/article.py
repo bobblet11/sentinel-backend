@@ -1,8 +1,6 @@
-import uuid
 
-from sqlalchemy import Column, ForeignKey, String, DateTime, Integer, Text, Float
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
+from sqlalchemy import (Column, DateTime, Float, ForeignKey, Integer, String,
+                        Text)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 

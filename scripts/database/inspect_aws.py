@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 import json
+
 import redis
 from dotenv import load_dotenv
+
 # Load environment
 load_dotenv(dotenv_path="configs/aws/.env")
 
 from common.redis_client.connection import redis_connection
+
 
 def bar(value, max_value, length=20):
     """Simple ASCII bar chart."""

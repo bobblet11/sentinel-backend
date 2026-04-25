@@ -1,15 +1,16 @@
 import logging
 import sys
-import traceback 
-from pydantic import TypeAdapter
-from typing import Dict, List
+import traceback
+from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
+from typing import Dict, List
+
+from pydantic import TypeAdapter
+
+from common.io.logging import TimeDeltaConfig, setup_logging
 from microservices.ingestor.config import LOG_MODE
 from microservices.ingestor.rss_ingestor import RssIngestor
-from common.io.logging import TimeDeltaConfig, setup_logging
-from dataclasses import field 
-from dataclasses import dataclass
-from enum import StrEnum
 
 SERVICE_NAME:str = "ingestor"
 RSS_FEED_FILE_NAME:str = "rss_feeds.json"

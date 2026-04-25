@@ -25,7 +25,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # ---------------------------------------------------------------------------
 # Path setup — must happen before any project imports
@@ -90,19 +90,21 @@ logging.basicConfig(
 )
 log = logging.getLogger("pipeline_test")
 
-# ---------------------------------------------------------------------------
-# Project imports (after sys.path is set and env vars are in place)
-# ---------------------------------------------------------------------------
-from common.models.api.redis_models import Article, NLPOptions, NLPResult  # noqa: E402
-from microservices.nlp.components.claimextract import ClaimExtraction  # noqa: E402
-from microservices.nlp.components.device import DeviceConfig  # noqa: E402
-from microservices.nlp.config import model_manager  # noqa: E402
-
 # Prime heavy library imports in the main thread before load_all() spawns worker
 # threads — avoids a huggingface_hub circular import that occurs when
 # sentence_transformers and transformers are imported concurrently.
 import sentence_transformers  # noqa: E402, F401
 import transformers  # noqa: E402, F401
+
+# ---------------------------------------------------------------------------
+# Project imports (after sys.path is set and env vars are in place)
+# ---------------------------------------------------------------------------
+from common.models.api.redis_models import (Article, NLPOptions,  # noqa: E402
+                                            NLPResult)
+from microservices.nlp.components.claimextract import \
+    ClaimExtraction  # noqa: E402
+from microservices.nlp.components.device import DeviceConfig  # noqa: E402
+from microservices.nlp.config import model_manager  # noqa: E402
 
 # Load all models before running any component (required even in dummy mode
 # because components call model_manager.get() at instantiation time).

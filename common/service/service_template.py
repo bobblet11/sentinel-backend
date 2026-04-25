@@ -1,19 +1,19 @@
 
+import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from logging import Logger, getLogger
-import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import ValidationError
 
-from common.models.api.dtos.job import JobType
 from common.models.api.redis_models import Message, StreamMessage
-from common.redis_client.consumer_combiner import RedisConsumerCombiner
-from common.redis_client.prioritised_consumer_combiner import BlockPrioritisationLevel, PrioritisedRedisConsumerCombiner
+from common.redis_client.prioritised_consumer_combiner import (
+    BlockPrioritisationLevel, PrioritisedRedisConsumerCombiner)
 from common.redis_client.publisher import RedisPublisher
 from common.redis_client.publisher_router import RedisPublisherRouter
+
 
 class ProcessingError(Exception):
     def __init__(self, message):

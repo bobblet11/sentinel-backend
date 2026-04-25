@@ -1,32 +1,23 @@
 # microservices/nlp/nlp_service.py
-from datetime import datetime
-from typing import Dict, List, Optional
-from logging import getLogger
 import random
-from common.io.json_updater import JsonHandler
-from common.models.api.dtos.job import JobType
-from common.models.api.validation_helpers import get_pretty_print_stream_message, validate_after_nlp
+from datetime import datetime
+from logging import getLogger
+from typing import List, Optional
+
 import torch
 
-from common.models.api.redis_models import (
-    Article,
-    BiasProfile,
-    Claim,
-    Entity,
-    NLPOptions,
-    NLPResult,
-    SentenceScore,
-    StreamMessage,
-)
-from common.service.service_template import ProcessingError, ServiceConfig, ServiceTemplate
-
+from common.io.json_updater import JsonHandler
+from common.models.api.redis_models import (Article, BiasProfile, Claim,
+                                            Entity, NLPOptions, NLPResult,
+                                            SentenceScore, StreamMessage)
+from common.models.api.validation_helpers import (
+    get_pretty_print_stream_message, validate_after_nlp)
+from common.service.service_template import (ProcessingError, ServiceConfig,
+                                             ServiceTemplate)
 from microservices.nlp.components.claimextract import ClaimExtraction
-from microservices.nlp.config import (
-    DEVICE_CONFIG,
-    DUMMY_NLP_MODE,
-    ENABLE_DECONTEXTUALIZATION,
-    model_manager,
-)
+from microservices.nlp.config import (DEVICE_CONFIG, DUMMY_NLP_MODE,
+                                      ENABLE_DECONTEXTUALIZATION,
+                                      model_manager)
 
 logger = getLogger("NLP")
 EMBEDDING_DIM = 768

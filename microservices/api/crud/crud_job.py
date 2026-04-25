@@ -1,6 +1,7 @@
-from sqlalchemy.orm import Session
-from app.models.job import JobRequest
 from app.dtos.job import JobCreate
+from app.models.job import JobRequest
+from sqlalchemy.orm import Session
+
 
 def create_job(db: Session, job: JobCreate):
     db_obj = JobRequest(

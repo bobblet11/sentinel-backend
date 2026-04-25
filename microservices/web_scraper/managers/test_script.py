@@ -1,8 +1,9 @@
 # microservices/web_scraper/managers/test_script.py
 
-from microservices.web_scraper.managers.parse_manager import ParseManager
 import glob
 import os
+
+from microservices.web_scraper.managers.parse_manager import ParseManager
 
 # --- MAP FILENAMES TO REALISTIC DOMAIN URLs ---
 DOMAIN_MAP = {

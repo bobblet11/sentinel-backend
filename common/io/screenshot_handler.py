@@ -1,11 +1,11 @@
-import time 
 import hashlib
 import os
-
+import time
+from dataclasses import dataclass
 from logging import Logger, getLogger
 from pathlib import Path
-from dataclasses import dataclass
 from typing import List, Optional
+
 from common.constants.constants import BYTES_IN_ONE_MiB
 
 MAX_SIZE_OF_SCREENSHOT_FOLDER: int = BYTES_IN_ONE_MiB * 512

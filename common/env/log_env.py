@@ -1,6 +1,7 @@
-from typing import List, Any
-from logging import Logger
 from dataclasses import dataclass
+from logging import Logger
+from typing import List
+
 
 @dataclass(frozen=True)
 class EnvVariable:

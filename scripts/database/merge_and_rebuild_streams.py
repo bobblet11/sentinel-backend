@@ -7,18 +7,22 @@
 import datetime
 import hashlib
 import json
-import time
 import re
-
+import time
 from typing import Any, Dict, List, Set
 
-from dotenv import load_dotenv
 import redis
+from dotenv import load_dotenv
+
 from common.models.api.dtos.job import JobStage, JobStatus, JobType
-from common.models.api.redis_models import Message, MessageHeader, MessagePayload, MessageTimestamp, StreamMessage
+from common.models.api.redis_models import (Message, MessageHeader,
+                                            MessagePayload, MessageTimestamp,
+                                            StreamMessage)
 
 load_dotenv(dotenv_path="configs/aws/.env")
-from common.redis_client.connection import REDIS_HOST, REDIS_PORT, redis_connection
+from common.redis_client.connection import (REDIS_HOST, REDIS_PORT,
+                                            redis_connection)
+
 INPUT_SET_KEY_OPTIONS = ["ingestor:seen.articles"]
 INPUT_STREAM_KEY_OPTIONS = ["background:to.be.scraped", "prioritised:to.be.scraped", "background:to.be.nlp", "ingestor:to.be.scraped", "failure:to.be.scraped"]
 

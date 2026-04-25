@@ -1,12 +1,15 @@
 import logging
-import spacy
 import re
 from typing import List
 
+import spacy
+
+from common.models.api.redis_models import (Article, NLPOptions, SentenceScore,
+                                            StreamMessage)
+from microservices.nlp.config import (PHOTO_CREDIT_MAX_LEN,
+                                      PREPROCESS_MIN_TOKENS)
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
-from common.models.api.redis_models import Article, NLPOptions, NLPResult, SentenceScore, StreamMessage
-from microservices.nlp.config import PREPROCESS_MIN_TOKENS, PHOTO_CREDIT_MAX_LEN
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,9 @@
-from typing import Dict, Optional
+from dataclasses import dataclass
+from typing import Optional
 
 from bs4 import BeautifulSoup
 from bs4.element import Comment
-from dataclasses import dataclass
+
 
 @dataclass
 class ParseResult:

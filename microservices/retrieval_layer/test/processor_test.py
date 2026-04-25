@@ -1,5 +1,6 @@
-from microservices.retrieval_layer.processor import process_nlp_message
 from pprint import pprint
+
+from microservices.retrieval_layer.processor import process_nlp_message
 
 SAMPLE_MESSAGE = {
     "article": {

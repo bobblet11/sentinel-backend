@@ -1,15 +1,14 @@
 
 
-from fastapi.responses import JSONResponse
-from psycopg2 import IntegrityError, OperationalError
 import uvicorn
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from sqlalchemy.orm import Session
-from microservices.api.app.core.logger import logger
-from microservices.api.app.core.config import API_SERVICE_PORT
+from fastapi.responses import JSONResponse
+from psycopg2 import IntegrityError, OperationalError
+
 from microservices.api.app.api.v1.api import api_router
+from microservices.api.app.core.config import API_SERVICE_PORT
+from microservices.api.app.core.logger import logger
 
 CONTAINER_NAME:str = "sentinel_api_service"
 FAST_API_NAME:str = "Sentinel API Service"

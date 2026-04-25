@@ -1,11 +1,10 @@
-import uuid
 
-from sqlalchemy import Column, ForeignKey, String, DateTime, JSON, Integer, UUID
+from sqlalchemy import UUID, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.sql import func
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import func
 
-from microservices.api.app.dtos.job import JobType, JobStatus
+from microservices.api.app.dtos.job import JobStatus, JobType
 
 Base = declarative_base()
 class Job(Base):
