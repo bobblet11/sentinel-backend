@@ -3,9 +3,11 @@
 .env.local
 .env.*.local
 configs/.env
+configs
 
 # Python
 __pycache__/
+__pycache__
 **/__pycache__/
 *.py[cod]
 *$py.class
@@ -58,32 +60,60 @@ package-lock.json
 
 # Data & Logs
 logs/
+./logs
+logs
 *.log
+**.log
+.log
 data/postgres_data/
+data/postgres_data
 data/redis_data/
+data/redis_data
 data_report/
 
 # Build & Runtime Artifacts
 .cache/
+.cache
 results/
+results/*
 backups/
+backups
+./backups/*
 backups_extra/
+backups_extra
+./backups_extra
 .worktrees/
 
 # Session & Temporary Files
 .claude/
 .opencode/
 stats/
+./scripts/stats/*
+stats
 claude_docs/
+
+# Repo documentation (local changes)
+CLAUDE.md
+.claude
+claude_docs
+.github
+GEMINI.md
+AGENTS.md
+.opencode
 
 # Screenshots & Media
 *.png
+.png
 *.jpg
 *.jpeg
 microservices/web_scraper/screenshots/
+./microservices/web_scraper/screenshots
+microservices/web_scraper/screenshots
+/workspaces/sentinel-backend/microservices/web_scraper/screenshots
 
 # Database & Backup Files
 *.sql
+*/backup.sql
 scripts/topic_clustering/backup.sql
 scripts/topic_clustering/output/
 
@@ -94,23 +124,25 @@ microservices/web_scraper/proxy_sources/webshareio_proxies.json
 
 # Credentials & Keys
 *.pem
+.pem
 *.key
 *.pfx
 *.p12
 
 # Archives
 *.zip
+.zip
 backups.zip
 
 # Large Binary Files (CI/CD tools)
 cloudflared*
-cloudflared.deb
-cloudflared.dsudo
+cloudfared*
 
 # System Files
 .DS_Store
 .AppleDouble
 .LSOverride
+.todos.db
 Thumbs.db
 
 # Test Exports

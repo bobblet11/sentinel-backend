@@ -1,164 +1,199 @@
-# Sentinel Backend Development Environment
+# Sentinel
 
-Welcome to the Sentinel project! This repository contains all the microservices for the backend of the Sentinel Misinformation Intelligence Platform.
+Sentinel is a real-time misinformation intelligence platform designed to help readers inspect news content at the moment of consumption. The backend of the Sentinel app combines claim extraction, bias analysis, semantic retrieval, and asynchronous microservice orchestration to turn raw articles into structured, evidence-backed outputs.
 
-This project uses a **VS Code Dev Container** to provide a fully configured, one-click development environment. This ensures that every team member has the exact same tools and dependencies, eliminating "it works on my machine" issues, regardless of whether you are on Windows or macOS.
+This repository showcases the backend system behind that workflow: a production-oriented pipeline built with FastAPI, Redis Streams, PostgreSQL, pgvector, Docker, and transformer-based NLP components.
 
-## Prerequisites
+## Problem and Motivation
 
-Before you begin, you must have the following software installed on your host machine.
+Misinformation tools often solve only one part of the problem. Some systems detect whether a sentence looks check-worthy, some rate the political leaning of an outlet, and some aggregate previously published fact checks. What they usually do not provide is a unified workflow that can analyze a live article in real time, extract factual claims, surface framing bias, and retrieve related evidence across a continuously updated corpus.
 
-<details>
-<summary><strong>macOS Setup Instructions</strong></summary>
+Sentinel addresses that gap. The goal is not to produce a simplistic true-or-false machine, but to create a system that helps users inspect how claims are expressed, how articles are framed, and how similar claims appear across other reporting sources.
 
-1.  **Git:** macOS comes with Git pre-installed. You can verify by opening the Terminal and running `git --version`.
-2.  **Docker Desktop for Mac:** This is the most important component. It handles all the container and virtualization logic.
-    *   [Download Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/) (Choose the correct chip: Apple Silicon or Intel).
-    *   After installation, launch the Docker Desktop application. You should see the whale icon in your menu bar.
-3.  **Visual Studio Code:** Our primary code editor.
-    *   [Download VS Code for macOS](https://code.visualstudio.com/download).
-4.  **VS Code "Dev Containers" Extension:** This is what ties everything together.
-    *   Launch VS Code, go to the Extensions view (the icon with squares on the left sidebar).
-    *   Search for and install `ms-vscode-remote.remote-containers`.
+## What Sentinel Does
 
-</details>
+Sentinel supports two complementary product experiences:
 
-<details>
-<summary><strong>Windows Setup Instructions</strong></summary>
+- a browser extension for in-context article analysis
+- a web dashboard for broader exploration of stored article intelligence
 
-1.  **Git:** For version control.
-    *   [Download Git for Windows](https://git-scm.com/download/win).
-2.  **WSL2 with Ubuntu:** Our development environment runs on a Linux kernel.
-    *   Follow the [Official Microsoft Guide to install WSL](https://learn.microsoft.com/en-us/windows/wsl/install).
-    *   From the Microsoft Store, install the **Ubuntu** distribution.
-    *   After installation, open a PowerShell/CMD terminal and run `wsl --set-default Ubuntu` to make it your default.
-3.  **Docker Desktop for Windows:** For containerization.
-    *   [Download Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/).
-    *   During setup or in the settings, ensure it is configured to **use the WSL2 backend**.
-4.  **Visual Studio Code:** Our primary code editor.
-    *   [Download VS Code for Windows](https://code.visualstudio.com/download).
-5.  **VS Code "Dev Containers" Extension:** This is what ties everything together.
-    *   Launch VS Code, go to the Extensions view.
-    *   Search for and install `ms-vscode-remote.remote-containers`.
+On the backend, the platform performs four core tasks:
 
-</details>
+- scrape and normalize article content from submitted URLs and monitored feeds
+- extract claim-like statements and enrich them with NLP-derived metadata
+- classify article-level bias and sentiment signals
+- retrieve semantically related evidence from a growing news corpus
 
+## System Architecture Overview
 
+The backend is structured as a microservice system with two coordinated pipelines:
 
+- a background pipeline that continuously ingests and processes articles into the knowledge base
+- an on-demand pipeline that analyzes user-submitted articles in real time
 
+The core services are:
 
-## First-Time Setup
+- `api-service` for job submission and result delivery
+- `ingestor-service` for RSS-based discovery of new articles
+- `web_scraper-service` for URL resolution and content extraction
+- `nlp-service` for analytical processing over article text
+- `retrieval-layer` for evidence search, persistence, and verdict-oriented matching
 
-The process is nearly identical for both macOS and Windows.
+Supporting infrastructure includes:
 
-1.  **Clone the Repository:**
-    *   **On macOS:** Open your normal Terminal app.
-    *   **On Windows:** Open your **Ubuntu terminal** (from the Start Menu).
-    *   Navigate to where you want to store your projects (e.g., `cd ~/projects`) and clone the repository:
-        ```bash
-        git clone <your-repository-url>
-        cd sentinel-backend
-        ```
-    *   **Windows Users:** It is critical that you clone the repository *inside* the WSL filesystem (e.g., in your Ubuntu home directory), not onto your Windows C: drive.
+- Redis Streams for inter-service communication
+- PostgreSQL for durable structured storage
+- pgvector for embedding-backed similarity search
+- Docker Compose for deployment and orchestration
 
-2.  **Launch VS Code:**
-    *   From within the `sentinel-backend` directory in your terminal, type the command:
-        ```bash
-        code .
-        ```
+## Pipeline Walkthrough
 
-3.  **Initial Config:**
-    *   Duplicate the .env.template file, rename it to .env, and edit values.
-    *   You should have .env.template and .env files at project root now
-    *   **Configure PostgreSQL** in your .env file:
-        ```bash
-        # PostgreSQL Configuration
-        POSTGRES_DB=sentinel_db
-        POSTGRES_USER=sentinel_user
-        POSTGRES_PASSWORD=your_secure_password_here
-        POSTGRES_PORT=15432
-        API_SERVICE_PORT=8001
-        ```
-    *   **Configure PostgreSQL credentials** in your .env file:
-        ```bash
-        # --- Github Credentials ---
-        GITHUB_USER=your_github_username
-        GITHUB_EMAIL=your_github_email
-        ```
-    *   **Configure Redis credentials** in your .env file:
-        ```bash
-        # --- Redis Configuration ---
-        REDIS_HOST=redis
-        REDIS_PORT=6379
-        ```
+The backend flow is split by job type, but both paths share the same major processing stages.
 
-4.  **Reopen in Container:**
-    * 	Open the container by,
-    *   Ctrl + Shift + P
-    *   Dev Containers: Rebuild Container & Reopen
-    
-5.  **Initial Build:**
-    *   VS Code will now build the Docker image for the development environment. This will take a significant amount of time (15-30 minutes) as it downloads Docker images, system packages, and all our Python dependencies.
-    *   **This is a one-time cost.** Subsequent launches will be much faster.
-    *   Once the build is complete, your VS Code window will reload, and you will be inside the fully configured Dev Container. Check the bottom-left corner; it should say **"Dev Container: Sentinel..."**.
-    *   **PostgreSQL will start automatically** when the dev container is ready.
+### On-demand flow
 
-## Daily Workflow
+```text
+Client
+  -> POST /api/v1/jobs
+  -> user:to.be.scraped
+  -> Web Scraper
+  -> user:to.be.nlp
+  -> NLP Service
+  -> user:to.be.retrieval
+  -> Retrieval Layer
+  -> GET /api/v1/jobs/{uid}/result
+```
 
-1.  **Starting the Environment:**
-    *   Open the `sentinel-backend` project folder in VS Code.
-    *   Click "Reopen in Container" when prompted. (This will be very fast after the first build).
+### Background flow
 
-2.  **Running the Microservice Simulation:**
-    *   Open the integrated terminal in VS Code (`Ctrl+` ` ` or `Cmd+` ` ` on Mac). This is a terminal *inside* the container.
-    *   Run all the services defined in our simulation using Docker Compose:
-        ```bash
-        ./scripts/clean.sh && ./scripts/build.sh && ./scripts/deploy.sh
-        ```
+```text
+RSS feeds
+  -> Ingestor
+  -> background:to.be.scraped
+  -> Web Scraper
+  -> background:to.be.nlp
+  -> NLP Service
+  -> background:to.be.retrieval
+  -> Retrieval Layer
+  -> persistent corpus storage
+```
 
-3.  **Stopping the Services:**
-    *   Press `Ctrl+C` in the terminal where `docker-compose` is running.
-    *   Double check by running 
-        ```bash
-        sudo docker-compose down
-        ```
+The stream naming pattern follows `{job_type}:to.be.{stage}`, which keeps the pipeline explicit and easy to trace. Failed jobs are routed to stage-specific failure streams rather than being dropped, which preserves operational visibility and replayability.
 
-## Managing Python Dependencies
+## Technical Highlights
 
-All Python packages for the development environment are managed by the `.devcontainer/environment.yml` file. **Do not use `pip install` directly in the terminal for permanent changes.**
+The backend is designed around several strong engineering ideas that make it a substantive systems project rather than a simple API wrapper.
 
-To add a new Python package:
+- Two-lane priority architecture separates user work from background ingestion so interactive requests are not starved by corpus maintenance.
+- Redis Streams provide persistent, decoupled stage handoff with consumer-group semantics and replayable failure handling.
+- The NLP service uses transformer-based components for claim extraction, bias analysis, sentiment analysis, and semantic embedding.
+- The retrieval stack combines relational filtering, vector similarity, and NLI-based reranking instead of relying on a single retrieval method.
+- The system is built to run in distributed multi-instance deployments, with shared coordination over Redis and PostgreSQL.
 
-1.  Open the `.devcontainer/environment.yml` file.
-2.  Add the package name (e.g., `new-package-name`) to the `pip:` section if handled by pip. Otherwise, just make a entry under dependencies.
-3.  Save the file.
-4.  Open the Command Palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac).
-5.  Run the command: **"Dev Containers: Rebuild and Reopen in Container"**.
-6.  This will rebuild the environment with your new package installed, ensuring everyone on the team gets it automatically.
+## NLP Pipeline Deep Dive
 
+The NLP service is the analytical core of Sentinel. It converts scraped article text into structured claims and article-level metadata that can be stored, searched, and surfaced to users.
 
-## Microservices Architecture
+Its major stages include:
 
-The Sentinel backend consists of several microservices that work together:
+- text preprocessing to clean and segment article content
+- named entity recognition to identify people, organizations, locations, and related entities
+- sentence extraction to reduce the article into high-value candidate statements
+- decontextualization to rewrite context-dependent sentences into standalone claims
+- check-worthiness filtering to keep only the most verification-relevant statements
+- dense embedding generation for semantic retrieval
+- bias and sentiment classification at the article level
+- claim conversion and topic classification for downstream retrieval and presentation
+- supports GPU acceleration and model preloading to keep transformer-heavy stages viable in production-style operation.
 
-### Core Services
+## Retrieval and Evidence Matching
 
-*   **API Gateway** (`microservices/api_gateway/`): Main entry point for external requests
-*   **Database Service** (`microservices/db/`): PostgreSQL operations and data management
-*   **Ingestor** (`microservices/ingestor/`): RSS feed processing and content ingestion
-*   **Web Scraper** (`microservices/web_scraper/`): Content extraction from URLs
-*   **NLP Service** (`microservices/nlp/`): Natural language processing and analysis
+The retrieval layer is responsible for turning extracted claims into evidence-backed outputs.
 
-### Infrastructure Services
+Instead of doing a single naive similarity search, the backend applies a retrieval cascade:
 
-*   **PostgreSQL**: Primary database with pgvector for semantic search
-*   **Redis**: Message queuing and caching
+1. entity-based filtering narrows the candidate pool using claim-linked named entities
+2. keyword filtering expands coverage through article-title matching
+3. vector similarity search over pgvector embeddings surfaces semantically related claims
+4. NLI-based classification determines whether candidate evidence supports, contradicts, or remains neutral toward the input claim
 
-### Service Communication
+This layered approach reduces unnecessary compute early while preserving semantic depth later in the ranking process.
 
-Services communicate via:
-*   **Docker network**: `sentinel-net` for internal communication
-*   **REST APIs**: HTTP endpoints for service-to-service calls
-*   **Message queues**: Redis streams for asynchronous processing
+## Key Results and Metrics
 
-All services are designed to be stateless and scalable, following microservices best practices.
+Sentinel is beyond a conceptual prototype and operates as a deployed and evaluated platform.
+
+To date, the system produces the following results across its deployment snapshots and evaluation runs:
+
+- 7,954 total unique articles saved in the broader corpus snapshot
+- 50,578 verifiable claims extracted across the broader deployment snapshot
+- 27,354 unique named entities identified in the broader corpus snapshot
+- 4,353 articles processed during the 96-hour evaluation window
+- 24,252 verifiable claims extracted during that evaluation window
+- 138,193 entity mentions identified during the same evaluation period
+- an average of 5.6 verifiable claims extracted per article
+- 99 completed user analysis jobs
+- long-run ingestion deduplication efficiency above 98%
+
+To date, the architecture demonstrates horizontal scaling across three deployment instances while preserving a shared corpus and coordinated pipeline state.
+
+## Deployment and Scalability Story
+
+Sentinel runs in a hybrid cloud-edge deployment model.
+
+- Redis and PostgreSQL act as centralized coordination and persistence layers
+- scraping and NLP-heavy workloads run on decentralized worker nodes
+- multiple worker instances consume from shared streams using consumer-group patterns
+
+This setup lets the system combine centralized state with distributed compute, which is a credible and technically interesting deployment strategy for transformer-heavy workloads.
+
+## Frontend Integration Context
+
+The backend system serves two client experiences.
+
+- The browser extension submits article jobs and polls for completed analysis.
+- The dashboard supports browsing and comparing previously processed content at larger scale.
+
+The backend therefore is not just a data-processing pipeline; it is the service layer of a full product experience.
+
+## Tech Stack
+
+- Python
+- FastAPI
+- Redis Streams
+- PostgreSQL
+- pgvector
+- Docker and Docker Compose
+- Selenium-based scraping
+- transformer-based NLP models
+- React and TypeScript clients consuming backend APIs
+
+## Service Documentation
+
+- [API service](./microservices/api/README.md)
+- [Ingestor service](./microservices/ingestor/README.md)
+- [Web scraper service](./microservices/web_scraper/README.md)
+- [NLP service](./microservices/nlp/README.md)
+- [Retrieval layer service](./microservices/retrieval_layer/README.md)
+
+Database setup and schema assets live under `microservices/db/`, with migration-specific notes already documented in `microservices/db/migrations/README.md`.
+
+## Short Setup
+
+Recommended workflow:
+
+1. Open the repository in VS Code.
+2. Reopen it inside the Dev Container.
+3. Prepare a config-specific `.env` file under a directory such as `configs/base`.
+4. Deploy the stack with the provided script.
+
+Main commands:
+
+```bash
+./scripts/deploy.sh [config-name]
+./scripts/clean.sh [config-name]
+./scripts/clear_data.sh
+./scripts/format_and_lint.sh
+```
+
+Configuration values are documented in [configs/.env.template]
