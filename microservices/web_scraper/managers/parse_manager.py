@@ -1,3 +1,20 @@
+"""HTML parsing service for article content extraction.
+
+This module implements multi-strategy parsing to robustly extract article content
+from HTML using: (1) hardcoded site-specific parsers, (2) trafilatura library,
+(3) RSS metadata fallback, (4) DOM paragraph extraction as last resort.
+
+Key Features:
+    - Registry of site-specific custom parsers for major outlets
+    - Trafilatura fallback with text cleaning and noise removal
+    - Metadata extraction from JSON-LD, og: tags, and meta headers
+    - DOM traversal fallback when other methods fail
+    - Field hydration: fills missing title/author/date from multiple sources
+    - ISO 8601 date normalization across inconsistent formats
+    - Thread-safe singleton pattern
+
+ParseResult dataclass contains extracted fields: text, title, author, published_at.
+"""
 import json
 import re
 import threading
@@ -17,6 +34,14 @@ from microservices.web_scraper.parsers.base_parser import BaseParser
 
 @dataclass
 class ParseResult:
+    """Extracted article content from HTML parsing.
+
+    Attributes:
+        text: Full article body text (primary extracted content).
+        title: Article headline/title.
+        author: Author byline or creator name.
+        published_at: ISO 8601 publication timestamp.
+    """
     text: str
     title: Optional[str]
     author: Optional[str]
@@ -33,12 +58,20 @@ class ParseResult:
 
 
 class ParseManager:
-    """
-    Robust raw_HTML -> article parser which:
-      1) Checks hardcoded scrapers (registry)
-      2) Uses RSS metadata if provided (message-driven)
-      3) Uses trafilatura
-      4) Falls back to DOM paragraph extraction
+    """Multi-strategy HTML article parser with fallback chain.
+
+    Thread-safe singleton that tries parsing strategies in order until success:
+    1. Hardcoded site-specific parsers (registry)
+    2. Trafilatura (general-purpose extraction)
+    3. RSS metadata (if provided)
+    4. DOM paragraph fallback (worst-case)
+
+    Each strategy is evaluated for sufficiency (text length > 200 chars), with
+    missing fields (title, author, date) hydrated post-parse from multiple sources.
+
+    Attributes:
+        hardcoded_parser_registry: ParserRegistryManager with outlet-specific parsers.
+        logger: Logger instance for debug/error output.
     """
 
     _instance = None
@@ -53,6 +86,12 @@ class ParseManager:
         return cls._instance
 
     def __init__(self, registry: ParserRegistryManager = None):
+        """Initialize or return existing singleton with parser registry.
+
+        Args:
+            registry: ParserRegistryManager with hardcoded outlet parsers.
+                     Defaults to new ParserRegistryManager() if None.
+        """
         if getattr(self, "_initialized", False):
             return
 
@@ -71,8 +110,17 @@ class ParseManager:
     def _attempt_multiple_keys(
         self, payload: Dict[str, Any], keys: List[str]
     ) -> Optional[Any]:
-        """
-        Finds a key inside of a dictionary
+        """Try to extract value from dict using first matching key.
+
+        Args:
+            payload: Dictionary to search.
+            keys: List of key names to try in order.
+
+        Returns:
+            Value from dict if any key found, None otherwise.
+
+        Raises:
+            Exception: If payload or keys is None/empty.
         """
         if not keys or not payload:
             raise Exception("Missing arguments")
@@ -189,9 +237,23 @@ class ParseManager:
         article_url: Optional[str] = None,
         article_metadata: Optional[Dict[str, Any]] = None,
     ) -> ParseResult:
+        """Parse HTML into article content using multi-strategy approach.
 
-        if not raw_html or len(raw_html) < 20:
-            raise ValueError("raw_html content too short or empty during parsing")
+        Tries hardcoded parser → trafilatura → RSS metadata → fallback DOM.
+        Returns first "sufficient" result (text length > 200 chars), then
+        hydrates missing fields (title, author, date) from multiple sources.
+
+        Args:
+            raw_html: Raw HTML string to parse (minimum 20 chars).
+            article_url: URL of article (used for hardcoded parser selection).
+            article_metadata: RSS/metadata dict with title, author, content fields.
+
+        Returns:
+            ParseResult with text, title, author, published_at populated.
+
+        Raises:
+            ValueError: If raw_html is None or length < 20.
+        """
 
         soup = BeautifulSoup(raw_html, "lxml")
 
@@ -218,8 +280,15 @@ class ParseManager:
         return fallback_result
 
     def _extract_text_with_trafilatura(self, raw_html: str) -> Optional[str]:
-        """
-        Will rely on trafilatura to extract all text.
+        """Extract article body text using trafilatura library.
+
+        Removes comments and tables; returns cleaned text or None if extraction fails.
+
+        Args:
+            raw_html: Raw HTML string.
+
+        Returns:
+            Extracted text or None if trafilatura returns empty result.
         """
         text: Optional[str] = trafilatura.extract(
             filecontent=raw_html, include_comments=False, include_tables=False
@@ -227,8 +296,16 @@ class ParseManager:
         return text
 
     def _fallback_extract_text(self, soup: BeautifulSoup) -> str:
-        """
-        Will manually remove tags that don't contain text content.
+        """Extract article text via DOM tree, removing noisy tags.
+
+        Finds article/main/body container, removes scripts/iframes/navs, and
+        joins all paragraph text. Fallback when trafilatura/hardcoded parsers fail.
+
+        Args:
+            soup: BeautifulSoup parsed HTML document.
+
+        Returns:
+            Joined paragraph text; empty string if no paragraphs found.
         """
         container = soup.find(["article", "main", "body"]) or soup
         noisy_tags_to_remove: List[str] = container(
@@ -263,6 +340,11 @@ class ParseManager:
         return joined_paragraphs
 
     def _extract_title(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extract article title from multiple sources: <title>, og:title, JSON-LD, <h1>.
+
+        Returns:
+            Title string or None if all sources fail.
+        """
         if soup.title and soup.title.string:
             return soup.title.string.strip()
 
@@ -282,6 +364,11 @@ class ParseManager:
         return None
 
     def _extract_author(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extract author name from meta tags, JSON-LD, or byline classes.
+
+        Filters out URL values. Returns:
+            Author name or None if all sources fail.
+        """
         patterns = [
             {"name": "meta", "attrs": {"name": "author"}},
             {"name": "meta", "attrs": {"property": "article:author"}},
@@ -315,6 +402,11 @@ class ParseManager:
         return None
 
     def _extract_date(self, soup: BeautifulSoup) -> Optional[str]:
+        """Extract publication date from meta tags or JSON-LD.
+
+        Returns:
+            ISO-formatted date string or None if not found.
+        """
         date_tags = [
             {"property": "article:published_time"},
             {"name": "pubdate"},
@@ -336,7 +428,15 @@ class ParseManager:
         return None
 
     def _extract_jsonld_property(self, prop: str, soup: BeautifulSoup) -> Optional[str]:
-        scripts = soup.find_all("script", type="application/ld+json")
+        """Extract a property from JSON-LD script tags.
+
+        Args:
+            prop: Property name to extract (e.g., 'headline', 'author', 'datePublished').
+            soup: BeautifulSoup document.
+
+        Returns:
+            Property value or None if not found in any JSON-LD block.
+        """
 
         for script in scripts:
             if not script.string:

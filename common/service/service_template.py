@@ -1,3 +1,10 @@
+"""Base service infrastructure for Sentinel Backend microservices.
+
+This module provides the core foundation for all Sentinel microservices, handling
+Redis stream consumption, batch processing, concurrent execution, error handling,
+and failure stream routing. Services inherit from ServiceTemplate to implement
+custom message processing logic.
+"""
 import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,12 +24,28 @@ from common.redis_client.publisher_router import RedisPublisherRouter
 
 
 class ProcessingError(Exception):
+    """Raised when message processing fails unexpectedly.
+
+    This exception is raised during the _process_message() contract when a service
+    encounters an unrecoverable error while processing a single message. It triggers
+    the failure stream routing logic, sending the failed message to the configured
+    failure_output_stream for manual replay or analysis.
+    """
+
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
 
 
 class RoutingError(Exception):
+    """Raised when a processed message cannot be routed to any output stream.
+
+    This exception is raised when a service's _process_message() returns a message
+    that does not match any routing key patterns defined in the output_streams
+    configuration. The failed message is sent to the failure_output_stream for
+    investigation and manual intervention.
+    """
+
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
@@ -30,6 +53,38 @@ class RoutingError(Exception):
 
 @dataclass()
 class ServiceConfig:
+    """Configuration container for ServiceTemplate subclasses.
+
+    Defines the contract between a service and its Redis infrastructure, including
+    input/output streams, consumer groups, batch processing, concurrency settings,
+    and message routing behavior.
+
+    Attributes:
+        service_name: Identifier used for logging and consumer group naming.
+        input_streams: Redis stream names to consume messages from (e.g.,
+            ['user:to.be.scraped', 'background:to.be.scraped']).
+        output_streams: Redis stream names to publish processed messages to
+            (e.g., ['user:to.be.nlp', 'background:to.be.nlp']).
+        router_key_values: Message field values to route on (e.g.,
+            ['user', 'background']); used to determine target output_stream.
+        group_name: Redis consumer group name for coordinating multiple instances.
+        consumer_name: Unique consumer identifier within the group.
+        block_prioritisation_level: Priority weight for this service's streams
+            (determines read time allocation vs. other priority levels).
+        failure_output_stream: Stream name for failed messages; if None, failed
+            messages remain pending for next cycle retry.
+        routing_key: Pydantic path to extract the routing value from a message
+            (default: ['header', 'type']; navigates message.header.type).
+        is_concurrent: If True, processes messages in parallel using ThreadPoolExecutor;
+            if False, processes sequentially.
+        max_workers: Maximum worker threads for concurrent mode.
+        batch_size: Number of messages to fetch per processing cycle.
+        is_cut_and_paste_mode: If True, deletes consumed messages after successful
+            processing; if False, only acknowledges (allows replay on failure).
+        retry_failure_mode: If True, appends failure_output_stream to input_streams
+            so failed messages are retried on next cycle.
+    """
+
     service_name: str
     input_streams: List[str]
     output_streams: List[str]
@@ -49,7 +104,32 @@ class ServiceConfig:
 
 
 class ServiceTemplate(ABC):
-    """Concurrently scrapes, parses, and publishes messages"""
+    """Base class for all Sentinel Backend microservices.
+
+    This is the contract all microservices must implement. It manages the full
+    lifecycle of message processing: consuming from Redis streams, parsing and
+    validating messages, delegating to custom business logic (_process_message),
+    publishing results, and routing failures. Services inherit this class and
+    override _process_message() to implement their specific transformation logic.
+
+    The service handles:
+      - Prioritized Redis stream consumption (user jobs before background jobs).
+      - Batch processing (sequential or concurrent) with configurable batch sizes.
+      - Message parsing and Pydantic validation.
+      - Graceful shutdown on SIGTERM/SIGINT.
+      - Automatic failure stream routing with optional retry logic.
+
+    Subclasses MUST implement:
+      - _process_message(message: StreamMessage) -> StreamMessage: Transform the
+        input message and return an output message with updated data.
+
+    The _process_message contract:
+      - Input: StreamMessage with validated Pydantic data.
+      - Output: StreamMessage with transformed data (or raise ProcessingError).
+      - Failure handling: Catch any exception; ServiceTemplate will route to failure stream.
+      - Routing: Output message data must contain routing key field (e.g., header.type)
+        that matches one of the configured router_key_values to determine target stream.
+    """
 
     def __init__(self, config: ServiceConfig) -> None:
         self.logger: Logger = getLogger(config.service_name)

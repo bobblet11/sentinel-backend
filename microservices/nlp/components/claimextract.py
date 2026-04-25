@@ -33,37 +33,29 @@ logger = logging.getLogger(__name__)
 
 
 class ClaimExtraction(ArticleProcessor):
-    """
-    THE PIPELINE ORCHESTRATOR
+    """NLP Pipeline Orchestrator.
 
-    Wires all downstream NLP components into a deterministic, staged processing
-    sequence. This class owns the entire lifetime of the local
-    List[SentenceScore] object — it is the *only* component that writes to
-    result.claims_in_article and result.entities_in_article.
+    Central hub that sequences 9 NLP stages in a deterministic, stateful pipeline:
+      1. Preprocessor:         Clean & sentence-split text
+      2. EntityRecognizer:     Extract entities (NER)
+      3. SentenceExtraction:   Deduplicate & rank sentences
+      4. Decontextualizer:     Rewrite sentences as self-contained (optional)
+      5. CheckWorthinessFilter: Mark check-worthy claims
+      5.5. Entity Mapping:      Link entities to sentences
+      6. Embedder:             Generate 384-dim embeddings
+      7. Sentence→Claim:       Commit claims to result
+      8. BiasDetector:         Political/sentiment bias (optional)
+      9. TopicClassifier:      Topic assignment (optional)
 
-    Pipeline Execution Order:
-    ┌─────────────────────────────────────────────────────────────────────┐
-    │ Stage 1  Preprocessor        text → List[SentenceScore] (local)    │
-    │ Stage 2  EntityRecognizer    sentences → result.entities_in_article │
-    │ Stage 3  SentenceExtraction  sentences → top-k deduplicated subset  │
-    │ Stage 4  Decontextualizer    rewrites each sentence to be           │
-    │                              self-contained (original_text stored)  │
-    │ Stage 5  CheckWorthinessFilter  scores confidence + is_checkworthy  │
-    │ Stage 5.5 Entity Mapping     links global entities to sentences     │
-    │ Stage 6  Embedder            produces dense vectors                 │
-    │ Stage 7  Sentence→Claim      commits List[SentenceScore] →          │
-    │                              result.claims_in_article               │
-    │ Stage 8  BiasDetector        article-level political + tone analysis│
-    │                              → result.bias_profile (optional)       │
-    │ Stage 9  TopicClassifier     cosine-similarity topic assignment      │
-    │                              → result.topic_label (optional)        │
-    └─────────────────────────────────────────────────────────────────────┘
+    Pipeline Contract:
+        Input:  StreamMessage with Article
+        Output: StreamMessage with NLPResult containing claims_in_article,
+                entities_in_article, bias_profile, and topic_label
 
-    The ModelManager is accepted as an optional parameter to centralise model
-    lifecycle management. When provided it is stored for reference; individual
-    components load their own models via direct imports. Call
-    model_manager.load_all() before instantiating ClaimExtraction to ensure
-    all models are pre-warmed.
+    This class owns the complete lifecycle of local List[SentenceScore].
+    All writes to result.claims_in_article and result.entities_in_article
+    are exclusively managed here. Individual components are lazily initialized
+    or fetched from an optional ModelManager for centralized model lifecycle.
     """
 
     def __init__(self, device_config: DeviceConfig = None, model_manager=None):
@@ -123,10 +115,15 @@ class ClaimExtraction(ArticleProcessor):
         sentences: List[SentenceScore],
         result: NLPResult,
     ) -> None:
-        """
-        Links article-level entities onto individual sentences by
-        case-insensitive substring match.
-        Operates in-place on each SentenceScore.entities list.
+        """Link article-level entities to sentences via substring matching.
+
+        For each sentence, finds all entities from result.entities_in_article
+        that appear as substrings (case-insensitive) and assigns them.
+        Modifies each SentenceScore.entities list in-place.
+
+        Args:
+            sentences: List of SentenceScore objects to annotate
+            result: NLPResult containing entities_in_article to map
         """
         if not sentences or not result.entities_in_article:
             return
@@ -140,10 +137,22 @@ class ClaimExtraction(ArticleProcessor):
     def run(
         self, article: Article, message: StreamMessage, options: NLPOptions
     ) -> None:
-        """
-        Executes the full NLP pipeline end-to-end.
-        Writes final data to result.claims_in_article, result.entities_in_article,
-        and (if enabled) result.bias_profile.
+        """Execute full NLP pipeline end-to-end.
+
+        Orchestrates all 9 pipeline stages in order, logging timing and results
+        at each stage. Writes final claims to result.claims_in_article (Stage 7),
+        entities to result.entities_in_article (Stage 2), and optional
+        bias_profile (Stage 8) and topic_label (Stage 9).
+
+        Args:
+            article: Article object containing text/summary and metadata
+            message: StreamMessage to read initial payload and populate with NLPResult
+            options: NLPOptions controlling decontextualization, bias detection, confidence thresholds
+
+        Raises:
+            Exception: Any stage failure logs and re-raises (critical path).
+                       BiasDetector and TopicClassifier failures are non-critical
+                       and fall back gracefully without stopping the pipeline.
         """
         pipeline_start = time.time()
         message.add_timestamp(JobStage.NLP_START)

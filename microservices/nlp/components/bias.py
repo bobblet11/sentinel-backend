@@ -24,32 +24,33 @@ logger = logging.getLogger(__name__)
 
 
 class BiasDetector(ArticleProcessor):
-    """
-    MODULAR BIAS DETECTION LAYER
+    """Article-Level Political Bias and Tone Classifier.
 
-    Performs article-level political bias classification and emotional tone
-    analysis using two lightweight NLI/sentiment transformer pipelines.
+    Performs two-stage analysis on article text:
+    1. Political Bias: Left/Center/Right classification
+    2. Emotional Tone: Negative/Neutral/Positive sentiment
 
-    Strategies Applied:
-    1.  Political Bias via Direct Classification (premsa/political-bias-prediction-allsides-BERT):
-        The article text (truncated to BIAS_MAX_CHARS characters) is classified into
-        one of three categories: Left, Center, or Right. The model is fine-tuned on
-        AllSides-rated news articles (F1=0.904). Label mapping: LABEL_0=Left,
-        LABEL_1=Center, LABEL_2=Right (AllSides dataset standard ordering).
-    2.  Emotional Tone via Sentiment Analysis (cardiffnlp/twitter-roberta-base-sentiment-latest):
-        The same truncated text is scored for emotional polarity.
-        The top label from {negative, neutral, positive} is mapped to
-        a human-readable tone string ("Negative", "Neutral", "Positive") and
-        stored in BiasProfile.emotional_tone.
-    3.  Text Truncation: Analysis is bounded to the first BIAS_MAX_CHARS
-        (default 2000) characters of the article body. This keeps inference
-        fast (< 1 s on CPU for most articles) while capturing the lede and early
-        paragraphs that typically set the article's framing.
-    4.  FP16: Both pipelines use float16 on CUDA to reduce memory usage.
-    5.  Graceful Degradation: On any inference failure, a neutral / zero-confidence
-        BiasProfile is stored and the error is logged — the pipeline is never blocked.
+    Model Details:
+        Political Model: premsa/political-bias-prediction-allsides-BERT
+            - Fine-tuned on AllSides-rated news articles (F1=0.904)
+            - Labels: LABEL_0=Left, LABEL_1=Center, LABEL_2=Right
+            - Optimized for political lean detection
 
-    Writes to result.bias_profile only; does NOT modify sentences.
+        Sentiment Model: cardiffnlp/twitter-roberta-base-sentiment-latest
+            - RoBERTa model trained on Twitter text
+            - Outputs: negative, neutral, positive
+            - Maps to human-readable tone strings
+
+    Processing:
+        - Input text truncated to BIAS_MAX_CHARS (default 2000) for speed
+        - Inference time < 1s on CPU for most articles
+        - FP16 support on CUDA for memory efficiency
+        - Graceful degradation: failures fall back to neutral profile
+
+    Contract:
+        Input:  Article with text or summary
+        Output: result.bias_profile with bias_category, bias_analysis_confidence,
+                sentiment_category, sentiment_analysis_confidence
     """
 
     # premsa/political-bias-prediction-allsides-BERT label mapping
@@ -118,7 +119,11 @@ class BiasDetector(ArticleProcessor):
             raise
 
     def _neutral_profile(self) -> BiasProfile:
-        """Returns a zero-confidence neutral bias profile for graceful degradation."""
+        """Return zero-confidence neutral profile for graceful degradation.
+
+        Returns:
+            BiasProfile with Center bias, Neutral sentiment, confidence 0.0
+        """
         return BiasProfile(
             bias_category="Center",
             bias_analysis_confidence=0.0,
@@ -129,10 +134,24 @@ class BiasDetector(ArticleProcessor):
     def run(
         self, article: Article, message: StreamMessage, options: NLPOptions
     ) -> None:
-        """
-        Classifies the article's political lean and emotional tone.
-        Writes the result to result.bias_profile.
-        Does NOT return a value.
+        """Classify article political bias and emotional tone.
+
+        Performs two-stage classification on article text (truncated to
+        BIAS_MAX_CHARS). Updates result.bias_profile with political lean
+        (Left/Center/Right) and emotional tone (Negative/Neutral/Positive)
+        along with confidence scores.
+
+        Args:
+            article: Article with text or summary to analyze
+            message: StreamMessage to read/write bias result
+            options: NLPOptions (for logging context)
+
+        Returns:
+            None (writes directly to message via set_nlp_result)
+
+        Side Effects:
+            Updates message.data.payload.bias_profile. On failure, stores
+            neutral profile with confidence 0.0 and logs error (non-critical).
         """
         text = (article.text or article.summary or "").strip()
         if not text:

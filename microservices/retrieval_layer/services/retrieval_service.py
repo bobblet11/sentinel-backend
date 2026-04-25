@@ -1,3 +1,19 @@
+"""Semantic search and claim matching service using pgvector embeddings.
+
+This module implements the Retrieval Layer service for the Sentinel Backend pipeline.
+It processes NLP-enriched articles with extracted claims and embeddings, stores them
+in PostgreSQL with pgvector indexing, and performs semantic search to find evidence
+for claim verification. Claims are matched against existing knowledge base using
+cosine distance similarity on 768-dimensional embeddings, with NLI classification
+to determine support/contradiction relations.
+
+Key responsibilities:
+  - Index claim embeddings in pgvector HNSW index for fast semantic search
+  - Multi-stage evidence retrieval: keyword filtering → similarity search → NLI classification
+  - Calculate verdicts and confidence scores based on evidence matches
+  - Store article metadata, claims, entities, and NER tags in PostgreSQL
+  - Handle both user-submitted and background ingestor jobs with priority streams
+"""
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -61,6 +77,13 @@ EMBEDDING_DIM = 768
 
 
 class RetrievalService(ServiceTemplate):
+    """Semantic search and evidence retrieval service for claim verification.
+
+    Consumes NLP-enriched articles from Redis streams, indexes claim embeddings in
+    pgvector, performs multi-stage semantic search with similarity filtering and
+    NLI classification, and stores results for user-submitted jobs in a Redis hash store.
+    """
+
     def __init__(self, config):
         super().__init__(config)
         self.hash_store = RedisHashStore(hash_namespace=HASH_STORE_NAMESPACE)
@@ -82,6 +105,21 @@ class RetrievalService(ServiceTemplate):
         related_articles: int,
         error_type: Optional[str] = None,
     ) -> None:
+        """Log processing statistics for analytics and debugging.
+
+        Args:
+            news_outlet: Name of news outlet being processed.
+            input_claims_evaluated: Number of claims extracted from article.
+            evidence_matches: Total evidence matches found across all claims.
+            verdicts: List of verdicts for each claim.
+            confidences: List of confidence scores (0-100) for each claim.
+            related_articles: Number of contextual related articles.
+            error_type: Optional error category for failure tracking.
+
+        Note:
+            Maintains a rolling 30-day stats log in stats.json for outlet/daily aggregation.
+            Used for performance monitoring and bias detection at scale.
+        """
 
         data = self.stats_json_handler.read_json()
         day_key = datetime.now().date().isoformat()
@@ -183,7 +221,20 @@ class RetrievalService(ServiceTemplate):
 
     @staticmethod
     def _normalize_embedding(embedding: List[float] | None) -> List[float] | None:
-        """Coerce embeddings to the pgvector dimension (pad/truncate) while preserving values."""
+        """Normalize embeddings to pgvector dimension (768) by padding or truncating.
+
+        Args:
+            embedding: List of floats or None. Embedding vector to normalize.
+
+        Returns:
+            List of 768 float values, zero-padded if shorter or truncated if longer,
+            or None if embedding is invalid/not a list.
+
+        Note:
+            pgvector HNSW index requires fixed-dimension vectors (768). This method
+            handles variable-length embeddings from different models (e.g., 384-dim
+            MiniLM) by zero-padding shorter vectors or truncating longer ones.
+        """
         if embedding is None:
             return None
         if not isinstance(embedding, list):
@@ -205,11 +256,22 @@ class RetrievalService(ServiceTemplate):
     def _calculate_verdict_and_confidence(
         self, matches: List[Dict[str, Any]]
     ) -> tuple[str, int]:
-        """
-        Calculate verdict and confidence for a claim based on its retrieval matches.
+        """Calculate verdict and confidence for a claim based on retrieval matches.
 
-        Verdict: "true" | "mostly-true" | "mixed" | "mostly-false" | "false" | "unverified"
-        Confidence: 0-100 integer
+        Args:
+            matches: List of evidence match dictionaries, each containing:
+                "relation": "support", "contradict", or "irrelevant" (from NLI).
+                "similarity": float between 0 and 1 (cosine distance score).
+                "confidence": float between 0 and 1 (NLI confidence).
+
+        Returns:
+            Tuple of (verdict, confidence) where:
+            - verdict: one of "true", "mostly-true", "mixed", "mostly-false", "false", "unverified"
+            - confidence: int from 0-100 representing overall confidence.
+
+        Note:
+            High-similarity irrelevant matches (≥0.6) are treated as soft support to
+            prevent over-neutral verdicts from suppressing valid evidence.
         """
 
         if not matches:
@@ -275,6 +337,25 @@ class RetrievalService(ServiceTemplate):
         return verdict, confidence
 
     def _save_data_into_postgres(self, db: Session, message: StreamMessage):
+        """Store article, claims, embeddings, and NER entities in PostgreSQL.
+
+        Args:
+            db: SQLAlchemy session for database transaction.
+            message: StreamMessage containing NLP-processed article and claims.
+
+        Returns:
+            Dict with keys:
+            - "article_entry_id": database ID of stored article.
+            - "all_claim_ids_added": list of claim IDs added.
+            - "all_entity_ids_added": list of entity IDs linked to claims.
+
+        Raises:
+            Exception: Rolls back transaction on database errors.
+
+        Note:
+            Embeddings are normalized to 768 dimensions for pgvector HNSW indexing.
+            Handles None bias_profile gracefully (known edge case when NLP fails).
+        """
 
         claims: List[Claim] = message.all_claims or []
 
@@ -379,6 +460,32 @@ class RetrievalService(ServiceTemplate):
         original_article_id: int,
         publish_date: str | None = None,
     ) -> List[int | str]:
+        """Retrieve and rank evidence for a single claim via multi-stage filtering.
+
+        Args:
+            db: SQLAlchemy session for database queries.
+            claim: Claim object with embedding and NER entities.
+            original_article_id: ID of article containing the input claim.
+            publish_date: ISO 8601 publication date for temporal filtering (±30 days).
+
+        Returns:
+            Dict with keys:
+            - "query_claim": input claim text.
+            - "verdict": "true", "mostly-true", "mixed", "mostly-false", "false", or "unverified".
+            - "confidence": int 0-100.
+            - "matches": list of evidence match dicts with similarity and NLI relation.
+            - "match_count": number of evidence matches found.
+
+        Processing pipeline:
+            1. Keyword filtering: find claims matching input claim keywords.
+            2. Entity filtering: find claims matching NER entities from input claim.
+            3. Similarity filtering: rank by cosine distance on embeddings (MIN_SIMILARITY=0.25).
+            4. NLI classification: determine support/contradiction/irrelevant relations.
+
+        Note:
+            Capped at 100 candidates after filtering, 10 after similarity search.
+            Uses cosine distance on normalized 768-dim pgvector embeddings.
+        """
         input_claim_text = claim.decontextualised_claim_text or ""
         claim_candidates = set()
 
@@ -529,6 +636,22 @@ class RetrievalService(ServiceTemplate):
     def _retrieve_evidence(
         self, db: Session, message: StreamMessage, original_article_id: int
     ):
+        """Retrieve evidence matches for all claims in an article.
+
+        Args:
+            db: SQLAlchemy session for database queries.
+            message: StreamMessage with all extracted claims.
+            original_article_id: Database ID of the article being processed.
+
+        Returns:
+            Tuple of:
+            - claim_results: List of verdict dicts, one per input claim.
+            - related_articles: List of article IDs providing evidence.
+
+        Note:
+            Processes each input claim separately (no deduplication by text).
+            Related articles are derived from evidence claims found.
+        """
         # Evaluate each input claim to get evidence matches, verdict, and confidence.
         # Keep one output row per input claim (do not merge by claim text).
         claim_results: List[Dict[str, Any]] = []
@@ -563,6 +686,19 @@ class RetrievalService(ServiceTemplate):
         return claim_results, related_articles
 
     def _save_job_into_postgres(self, db: Session, message: StreamMessage):
+        """Mark a user job as complete and store final status in database.
+
+        Args:
+            db: SQLAlchemy session for database transaction.
+            message: StreamMessage with job header and stage timestamps.
+
+        Returns:
+            Dict with keys:
+            - "job_id": database ID of job record.
+            - "job_uid": unique identifier of job.
+            - "status": JobStatus.COMPLETE.
+            - "type": JobType of the job (USER or BACKGROUND).
+        """
         job_dto = UpdateJob(
             message.header.id,
             message.header.uid,
@@ -585,7 +721,17 @@ class RetrievalService(ServiceTemplate):
         }
 
     def _process_and_publish_worker(self, message: StreamMessage) -> Tuple[str, str]:
-        """Worker for concurrent mode. Processes, then publishes."""
+        """Process a message and publish result for concurrent execution.
+
+        Args:
+            message: StreamMessage to process.
+
+        Returns:
+            Tuple of (old_redis_id, new_redis_id) tracking message flow.
+
+        Raises:
+            Exception: Caught and routed to failure stream via _handle_failure.
+        """
         try:
             processed_message: StreamMessage = self._process_message(message)
 
@@ -638,6 +784,15 @@ class RetrievalService(ServiceTemplate):
             raise
 
     def _process_batch_sequentially(self, raw_messages: List[Dict[str, Any]]) -> None:
+        """Process a batch of messages sequentially without concurrent execution.
+
+        Args:
+            raw_messages: List of raw Redis stream message dictionaries.
+
+        Note:
+            Slower than concurrent batch processing but safer for single-threaded contexts.
+            Failed messages are routed to failure streams automatically.
+        """
 
         stream_messages: List[StreamMessage] = [
             msg for m in raw_messages if (msg := self._parse_message(m))
@@ -709,6 +864,16 @@ class RetrievalService(ServiceTemplate):
     def _process_batch_concurrently(
         self, executor: ThreadPoolExecutor, raw_messages: List[Dict[str, Any]]
     ):
+        """Process a batch of messages concurrently using thread pool.
+
+        Args:
+            executor: ThreadPoolExecutor for parallel worker execution.
+            raw_messages: List of raw Redis stream message dictionaries.
+
+        Note:
+            Workers process and publish independently. Failures are logged but do not
+            halt batch processing. Use retrieve_from_db=False (default) for standard flow.
+        """
         stream_messages = [msg for m in raw_messages if (msg := self._parse_message(m))]
 
         future_to_message = {
@@ -730,8 +895,30 @@ class RetrievalService(ServiceTemplate):
                 )
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
-        # one db session to make sure the entire thing is 1 transaction
-        # just raise an exception and it will roll back everything
+        """Process an NLP-enriched article: store claims, retrieve evidence, compute verdicts.
+
+        Args:
+            message: StreamMessage from NLP service containing article and extracted claims.
+
+        Returns:
+            Updated StreamMessage with retrieval results, verdicts, and evidence matches.
+
+        Processing stages:
+            1. Store article, claims, and embeddings in PostgreSQL with pgvector indexing.
+            2. For user jobs only: semantic search with multi-stage filtering and NLI.
+            3. Calculate verdict and confidence for each claim.
+            4. Store related articles for client display.
+            5. Mark job as complete in database.
+            6. Cache results in Redis hash store for fast retrieval.
+
+        Raises:
+            Exception: Rolls back entire transaction on any error. Failed message is
+                routed to failure stream by ServiceTemplate._handle_failure.
+
+        Note:
+            Background ingestor jobs skip evidence retrieval (stage 2) for efficiency.
+            Uses single database transaction to ensure atomicity.
+        """
         with get_db_transaction() as db:
             message.add_timestamp(JobStage.SAVE_DATA_IN)
             save_data_result = self._save_data_into_postgres(db, message)

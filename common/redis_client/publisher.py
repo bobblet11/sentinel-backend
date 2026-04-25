@@ -1,3 +1,10 @@
+"""High-level Redis stream publisher for ordered, reliable message delivery.
+
+This module provides RedisPublisher, a publisher wrapper that encapsulates the details
+of stream naming conventions, JSON serialization, and batch operations for publishing
+messages to Redis Streams. Ensures FIFO ordering and memory-bounded stream length.
+"""
+
 import json
 from logging import Logger, getLogger
 from typing import Any, Dict, List
@@ -8,14 +15,36 @@ from common.redis_client.connection import redis_connection
 
 
 class RedisPublisher:
-    """
-    A high-level, reliable wrapper for Redis stream-based FIFO queues.
+    """Publisher for adding messages to Redis Streams.
+
+    Provides a high-level interface for publishing JSON-serialized messages to Redis Streams
+    with automatic memory management (bounded stream length via MAXLEN) and batch
+    operations via pipelining.
+
+    Stream Naming Conventions:
+        - Active streams: "{job_type}:to.be.{stage}"
+          Examples: user:to.be.scraped, background:to.be.nlp
+        - Failure streams: "{job_type}:failed.{stage}"
+        - job_type is "user" or "background" (priority lanes)
+        - stage is the processing stage (scraped, nlp, retrieval, etc.)
+
+    Message Format:
+        Messages are stored as {"payload": "<JSON string>"}. The JSON-serialized
+        message data is wrapped in a "payload" field for consistency with the consumer.
     """
 
     def __init__(self, stream_name: str):
-        """
+        """Initialize a Redis Stream publisher.
+
         Args:
-        stream_name (str): The name of the Redis stream to publish to.
+            stream_name (str): Name of the target Redis stream. Use naming convention:
+                "{job_type}:to.be.{stage}" for consistency.
+
+        Raises:
+            ValueError: If stream_name is empty or not a string.
+
+        Example:
+            publisher = RedisPublisher("user:to.be.scraped")
         """
 
         if not isinstance(stream_name, str) or not stream_name:
@@ -27,14 +56,20 @@ class RedisPublisher:
         self.client: redis.Redis = redis_connection.get_client()
 
     def publish_one(self, message_payload: Dict[Any, Any]) -> str:
-        """
-        Serializes a dictionary to JSON and adds it to the stream.
+        """Serialize and publish a single message to the stream.
 
         Args:
-                message: a message object that has been deserialised into a dictionary, that is waiting to be published
+            message_payload: Dictionary to JSON-serialize and publish.
 
         Returns:
-                str: The unique message ID if successful, otherwise None.
+            str: Unique Redis message ID (e.g., "1692345600000-0").
+
+        Raises:
+            Exception: If message_payload is empty/None.
+
+        Ordering:
+            Messages are assigned monotonically increasing IDs by Redis, guaranteeing
+            stream order and FIFO consumption by consumer groups.
         """
         if not message_payload:
             raise Exception("No message to publish")
@@ -49,15 +84,20 @@ class RedisPublisher:
         return redis_message_id
 
     def publish_many(self, messages: List[Dict[Any, Any]]) -> List[str]:
-        """
-        Serializes messages dictionaries to JSON and adds all to the stream.
+        """Serialize and publish multiple messages to the stream via pipelining.
 
         Args:
-                messages: A list of JSON-serializable dictionaries, where each
-                        dictionary represents a message to be published.
+            messages: List of dictionaries to JSON-serialize and publish.
+
         Returns:
-                A list of the unique Redis message IDs for the published messages
-                if successful, otherwise None.
+            List of Redis message IDs for each published message, in order.
+
+        Raises:
+            Exception: If messages list is empty or None.
+
+        Semantics:
+            Uses a Redis pipeline (transaction=True) to batch operations, reducing
+            round-trip latency. Messages are ordered by their position in the list.
         """
 
         if not messages or len(messages) == 0:

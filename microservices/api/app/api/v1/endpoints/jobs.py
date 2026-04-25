@@ -192,6 +192,24 @@ def _transform_retrieval_to_frontend_format(
 @router.post("", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 @router.post("/", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
+    """Submit a new article for analysis.
+    
+    Creates a job submission for an article URL and routes it through the processing
+    pipeline (scraping → NLP → retrieval). Reuses existing completed jobs for the same
+    URL to avoid redundant processing. Returns 202 Accepted immediately while processing
+    occurs asynchronously via Redis Streams (user:to.be.scraped priority lane).
+    
+    Args:
+        job_in: Job submission request with article URL and metadata.
+        db: Database session for persistence.
+    
+    Returns:
+        JobResponse: Job UUID and initial status (pending).
+        
+    Raises:
+        HTTPException(409): Article already submitted or in-progress with conflicting data.
+        HTTPException(500): Unexpected error during job creation or publishing.
+    """
     try:
         requested_job_type = (
             JobType.BACKGROUND.value if job_in.is_background else JobType.USER.value
@@ -277,6 +295,21 @@ def submit_job(job_in: JobCreate, db: Session = Depends(get_db)):
 
 @router.get("/{job_id}", response_model=JobResponse, status_code=status.HTTP_200_OK)
 def read_job_status(job_id: int, db: Session = Depends(get_db)):
+    """Check job status and metadata by job ID.
+    
+    Retrieves current job status (pending, in-progress, or complete) and metadata
+    for tracking processing progress. Use job_uid for result retrieval once complete.
+    
+    Args:
+        job_id: Unique job database identifier.
+        db: Database session for queries.
+    
+    Returns:
+        JobResponse: Job metadata including status, UUID, and timestamps.
+        
+    Raises:
+        HTTPException(404): Job ID not found in database.
+    """
     job = get_job(db=db, job_id=job_id)
 
     if job is None:
@@ -300,13 +333,25 @@ def read_job_status(job_id: int, db: Session = Depends(get_db)):
 async def get_retrieval_result(
     job_uid: UUID, timeout: int = Query(30, ge=5, le=60), db: Session = Depends(get_db)
 ):
-    """
-    Poll Redis for retrieval results matching the job_uid.
-
-    Extension calls this endpoint every 5s until it gets a result.
-    - Returns 200 with formatted result when retrieval completes
-    - Returns 404 if result not found after timeout
-    """
+    """Poll for retrieval result matching a completed job UUID.
+    
+    Retrieves the final formatted analysis result (bias analysis, key claims, evidence)
+    once the job completes all pipeline stages (scraping → NLP → retrieval). Polls Redis
+    with configurable timeout. Clients should call this endpoint every 5 seconds after
+    job submission until receiving a result (200) or timeout (404).
+    
+    Args:
+        job_uid: Job UUID returned from POST /jobs submission.
+        timeout: Maximum wait time in seconds (5-60, default 30).
+        db: Database session for article retrieval and formatting.
+    
+    Returns:
+        dict: Complete result in frontend format including trustScore, biasAnalysis,
+            keyClaims, and relatedArticles (see expected_response.md for schema).
+            
+    Raises:
+        HTTPException(404): Result not found within timeout window.
+        HTTPException(500): Error retrieving or formatting result."""
     try:
         start_time = asyncio.get_event_loop().time()
         search_for_uid = str(job_uid)

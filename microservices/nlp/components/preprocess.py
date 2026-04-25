@@ -19,16 +19,31 @@ logger = logging.getLogger(__name__)
 
 
 class Preprocessor(SentenceProcessor):
-    """
-    "Universal Janitor" Preprocessor.
+    """Text Cleaning and Sentence Extraction.
 
-    Strategies applied:
-    1. Regex Cleaning: Removes distinct artifacts (Dates, UI buttons, Footers) using strict patterns.
-    2. Footer Cutoff: Stops processing the text entirely once footer keywords are detected.
-    3. Linguistic Filtering: Uses Spacy's POS tagger to remove short lines (< 7 tokens)
-       that look like sentences but lack verbs (e.g., "Politics", "Frank Gardner").
+    Cleans raw article text and segments it into sentences suitable for
+    downstream NLP processing. Removes metadata, UI elements, photo credits,
+    and other non-content artifacts using aggressive regex and linguistic filters.
 
-    Returns sentences via a local list; does NOT write to result.sentences.
+    Cleaning Strategy:
+        1. Regex Cleaning: Removes distinct artifacts using strict patterns
+           - Footer keywords (BBC footer, Related stories, Newsletters, etc.)
+           - Time metadata (publication dates, "updated X ago", "X min read")
+           - UI elements (Sign in, Share, Subscribe, Menu, etc.)
+           - Photo credits (Getty, Reuters, EPA, Shutterstock, etc.)
+           - Bylines and reporter names
+           - Junk/telemetry fragments
+        2. Footer Cutoff: Stops processing text entirely once footer keywords detected
+        3. Linguistic Filtering: Uses spaCy POS tagger to remove short fragments
+           - Requires minimum 7 tokens (configurable via PREPROCESS_MIN_TOKENS)
+           - Requires presence of VERB/AUX token (except for questions)
+           - Filters short slash-separated photo credits with no verbs
+        4. Structural Repair: Forces punctuation on unpunctuated headers/claims
+
+    Contract:
+        Input:  Article with text or content field
+        Output: List[SentenceScore] with index, text, score (0.0 initially), embedding (None)
+                Does NOT write to message.payload
     """
 
     def __init__(self, nlp=None):
@@ -246,8 +261,24 @@ class Preprocessor(SentenceProcessor):
     def run(
         self, article: Article, message: StreamMessage, options: NLPOptions
     ) -> List[SentenceScore]:
-        """
-        Cleans and tokenizes the article text into local SentenceScore objects.
+        """Clean article text and segment into sentences.
+
+        Applies aggressive cleaning (footer removal, metadata filtering,
+        UI element removal, photo credit filtering) and linguistic filtering
+        (minimum token count, POS validation). Returns a local list of
+        SentenceScore objects ready for downstream processing.
+
+        Args:
+            article: Article with text or content field to clean
+            message: StreamMessage (for logging context)
+            options: NLPOptions (for logging context)
+
+        Returns:
+            List[SentenceScore] with index, text, score (0.0), embedding (None).
+                Empty list if all text was filtered or article is empty.
+
+        Side Effects:
+            None (does NOT modify message payload)
         """
         raw_text = getattr(article, "text", getattr(article, "content", ""))
         clean_text = self._clean_and_repair_structure(raw_text)

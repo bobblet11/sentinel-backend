@@ -1,3 +1,33 @@
+"""Centralized ML model lifecycle management for the NLP pipeline.
+
+This module provides a thread-safe ModelManager singleton that handles model
+registration, loading (with sequential GPU loading to prevent meta-device state
+corruption), retrieval with blocking during load operations, health reporting,
+and resource cleanup. Models are cached in memory after successful loading to
+avoid redundant I/O and initialization overhead.
+
+The manager respects device policies per model (CPU_ONLY, PREFER_GPU) and
+automatically resolves device placement based on system configuration and model
+requirements. GPU models are loaded with fp16 precision when CUDA is available
+to reduce memory footprint.
+
+Key features:
+    - Singleton model cache with thread-safe blocking during load operations.
+    - Device-aware loading: GPU models use cuda:0 with fp16 precision; CPU
+      models force CPU placement regardless of system device.
+    - Sequential model loading to eliminate meta-device state corruption bugs
+      in transformers >= 4.38 (which uses init_empty_weights() internally).
+    - HuggingFace cache validation to detect and clean corrupted downloads.
+    - Flexible loader dispatch: spacy, sentence_transformer, transformers
+      pipelines, and seq2seq/QA models.
+
+Typical usage:
+    manager = ModelManager(device="cuda", dummy_mode=False)
+    manager.register_defaults()
+    manager.load_all()
+    embedder = manager.get("EMBEDDING")
+"""
+
 import json
 import logging
 import os
@@ -16,14 +46,40 @@ logger = logging.getLogger(__name__)
 
 
 class ModelManager:
-    """
-    Centralized model lifecycle manager for the NLP pipeline.
+    """Singleton model cache manager with device configuration and lifecycle control.
 
-    Handles registration, loading (sequential on GPU / parallel on CPU),
-    retrieval with blocking during loading, health reporting, and cleanup.
+    Manages the full lifecycle of ML models: registration, device-aware loading,
+    thread-safe retrieval with blocking during load operations, state tracking,
+    health reporting, and cleanup. Implements a caching strategy to store loaded
+    models in memory and avoid redundant I/O.
+
+    Device placement logic:
+        - Models with DevicePolicy.CPU_ONLY are always loaded to CPU.
+        - Models with DevicePolicy.PREFER_GPU use the instance device (cuda or cpu).
+        - GPU models (device == "cuda") are loaded with float16 precision to
+          reduce memory footprint.
+        - Sequential loading on GPU prevents meta-device state corruption bugs.
+
+    Thread safety: Uses threading.Event objects per model key to block get() calls
+    until a model transitions from LOADING to READY or ERROR state.
+
+    Typical flow:
+        1. Instantiate: manager = ModelManager(device="cuda")
+        2. Register: manager.register_defaults()
+        3. Load: manager.load_all()  # Sequential; respects dummy_mode
+        4. Retrieve: model = manager.get("EMBEDDING")  # Blocks if loading
+        5. Cleanup: manager.unload_all()
     """
 
     def __init__(self, device: str = "cpu", dummy_mode: bool = False) -> None:
+        """Initialize the ModelManager with device configuration.
+
+        Args:
+            device: Target device for GPU-supported models ("cuda" or "cpu").
+                    CPU_ONLY models always use CPU regardless of this setting.
+            dummy_mode: If True, skip all model loading. Used for testing and
+                       local development without GPU/large model dependencies.
+        """
         self._device = device
         self._dummy_mode = dummy_mode
         self._registry: Dict[str, ModelEntry] = {}
@@ -34,12 +90,28 @@ class ModelManager:
     # ------------------------------------------------------------------
 
     def register(self, entry: ModelEntry) -> None:
-        """Add a ModelEntry to the internal registry."""
+        """Register a ModelEntry in the internal registry.
+
+        Args:
+            entry: ModelEntry with key, model_name, task_type, device_policy, etc.
+
+        Raises:
+            ValueError: If the entry key is already registered (overwrites silently).
+        """
         self._registry[entry.key] = entry
         self._events[entry.key] = threading.Event()
 
     def register_defaults(self) -> None:
-        """Register all default NLP models."""
+        """Register all default NLP pipeline models from environment or hardcoded defaults.
+
+        Registers 6 core models (SPACY_SENT, EMBEDDING, BIAS_POLITICAL, BIAS_SENTIMENT,
+        NER, CHECKWORTHY) plus optional decontextualization models if
+        ENABLE_DECONTEXTUALIZATION=true. Each model specifies device_policy,
+        estimated_memory_mb, and loader dispatch type.
+
+        Models are registered in order of memory footprint (smallest first) to
+        surface OOM failures early on memory-limited devices when load_all() runs.
+        """
         defaults = [
             ModelEntry(
                 key="SPACY_SENT",
@@ -212,7 +284,18 @@ class ModelManager:
     # ------------------------------------------------------------------
 
     def load(self, key: str) -> None:
-        """Load a single model by key. Transitions: UNLOADED -> LOADING -> READY/ERROR."""
+        """Load a single model by key; transition: UNLOADED -> LOADING -> READY/ERROR.
+
+        Clears the threading event before loading so concurrent get() calls block.
+        Sets the event after loading (whether success or error) so blocked get()
+        calls proceed. Catches all exceptions and stores them in entry.error.
+
+        Args:
+            key: Model key to load (must be registered).
+
+        Raises:
+            ModelNotFoundError: If key is not registered.
+        """
         if key not in self._registry:
             raise ModelNotFoundError(f"Model key '{key}' is not registered.")
 
@@ -237,14 +320,19 @@ class ModelManager:
             self._events[key].set()
 
     def load_all(self, keys: Optional[List[str]] = None) -> None:
-        """Load all (or specified) models. Always sequential.
+        """Load all (or specified) registered models sequentially.
 
-        Parallel CPU loading was removed because transformers >= 4.38 uses
-        init_empty_weights() (meta device) internally during pipeline()
-        construction. This meta-device state is global within a process and
-        bleeds across threads, leaving model weights on the meta device at
-        inference time even when loading appears to succeed. Sequential loading
-        eliminates this entirely with no correctness risk.
+        Parallel loading was removed: transformers >= 4.38 uses init_empty_weights()
+        (meta device) during pipeline() construction. This meta-device state is
+        global per process and bleeds across threads, leaving model weights on the
+        meta device at inference time even when loading succeeds. Sequential loading
+        eliminates this with no correctness risk.
+
+        In dummy_mode, skips loading entirely (no-op).
+
+        Args:
+            keys: Specific model keys to load. If None, loads all registered keys.
+                  Only loads models not already in READY state.
         """
         if self._dummy_mode:
             logger.info("ModelManager: dummy mode — skipping all model loading.")
@@ -263,13 +351,22 @@ class ModelManager:
     # ------------------------------------------------------------------
 
     def get(self, key: str) -> Any:
-        """
-        Return the loaded model instance for key.
+        """Retrieve loaded model instance by key; blocks if currently loading.
 
-        Blocks if the model is currently loading.
-        Raises ModelLoadError if in ERROR state.
-        Raises ModelNotReadyError if UNLOADED.
-        Raises ModelNotFoundError if not registered.
+        If the model is in LOADING state, waits on the threading event until the
+        state transitions to READY or ERROR. Respects the caching strategy by
+        returning the same instance object for repeated calls.
+
+        Args:
+            key: Registered model key.
+
+        Returns:
+            The loaded model instance.
+
+        Raises:
+            ModelNotFoundError: If key is not registered.
+            ModelLoadError: If model is in ERROR state (load failed).
+            ModelNotReadyError: If model is UNLOADED (never loaded).
         """
         if key not in self._registry:
             raise ModelNotFoundError(f"Model key '{key}' is not registered.")
@@ -294,7 +391,17 @@ class ModelManager:
         )
 
     def get_state(self, key: str) -> ModelState:
-        """Return the current ModelState for the given key."""
+        """Get the current ModelState (UNLOADED, LOADING, READY, ERROR) for a key.
+
+        Args:
+            key: Registered model key.
+
+        Returns:
+            The ModelState enum value.
+
+        Raises:
+            ModelNotFoundError: If key is not registered.
+        """
         if key not in self._registry:
             raise ModelNotFoundError(f"Model key '{key}' is not registered.")
         return self._registry[key].state
@@ -304,11 +411,26 @@ class ModelManager:
     # ------------------------------------------------------------------
 
     def health_check(self) -> Dict[str, str]:
-        """Return {key: state.value} for all registered models."""
+        """Get health status of all registered models.
+
+        Returns:
+            Dict mapping model keys to their ModelState.value (unloaded, loading,
+            ready, error).
+        """
         return {key: entry.state.value for key, entry in self._registry.items()}
 
     def unload(self, key: str) -> None:
-        """Unload a model and free its instance reference."""
+        """Unload a single model and free its instance reference from cache.
+
+        Clears the model's threading event so subsequent get() calls raise
+        ModelNotReadyError until load() is called again.
+
+        Args:
+            key: Registered model key.
+
+        Raises:
+            ModelNotFoundError: If key is not registered.
+        """
         if key not in self._registry:
             raise ModelNotFoundError(f"Model key '{key}' is not registered.")
         entry = self._registry[key]
@@ -318,7 +440,7 @@ class ModelManager:
         logger.info("ModelManager: '%s' unloaded.", key)
 
     def unload_all(self) -> None:
-        """Unload all registered models."""
+        """Unload all registered models and free their cached instances."""
         for key in list(self._registry.keys()):
             self.unload(key)
 
@@ -327,28 +449,43 @@ class ModelManager:
     # ------------------------------------------------------------------
 
     def _resolve_device(self, policy: DevicePolicy) -> str:
-        if policy == DevicePolicy.CPU_ONLY:
-            return "cpu"
-        # PREFER_GPU and GPU_REQUIRED both defer to the instance device.
-        return self._device
+        """Resolve device placement for a model based on its DevicePolicy.
+
+        Device selection logic:
+            - DevicePolicy.CPU_ONLY: Always return "cpu" regardless of instance device.
+            - DevicePolicy.PREFER_GPU: Return instance device ("cuda" or "cpu").
+            - DevicePolicy.GPU_REQUIRED: Return instance device (caller enforces GPU).
+
+        Args:
+            policy: The model's DevicePolicy enum.
+
+        Returns:
+            Device string: "cpu" or "cuda".
+        """
 
     def _validate_hf_cache(self, model_name: str) -> None:
-        """
-        Check the HuggingFace cache for corrupted files (e.g. empty JSON from
-        interrupted downloads) and remove them so ``from_pretrained`` will
-        re-download cleanly.
+        """Validate HuggingFace cache for corrupted files; delegate to static method.
+
+        Args:
+            model_name: HuggingFace model identifier (e.g., "dslim/bert-base-NER").
         """
         ModelManager.validate_hf_cache(model_name)
 
     @staticmethod
     def validate_hf_cache(model_name: str) -> None:
-        """
-        Check the HuggingFace cache for corrupted files (e.g. empty JSON from
-        interrupted downloads) and remove them so ``from_pretrained`` will
-        re-download cleanly.
+        """Detect and clean corrupted files in HuggingFace cache.
 
-        Can be called as a standalone utility without a ModelManager instance:
-            ``ModelManager.validate_hf_cache("dslim/bert-base-NER-uncased")``
+        Scans the HuggingFace cache directory for:
+            - Empty JSON files (incomplete downloads).
+            - JSON files with invalid UTF-8 or unparseable JSON.
+            - Broken symlinks in snapshot directories.
+
+        Corrupted files are removed so from_pretrained() will re-download cleanly.
+        Can be called as a standalone utility without a ModelManager instance.
+
+        Args:
+            model_name: HuggingFace model identifier (e.g., "dslim/bert-base-NER").
+                       Converted to safe cache path: models--<org>--<name>.
         """
         hf_home = os.environ.get("HF_HOME") or os.environ.get(
             "TRANSFORMERS_CACHE",
@@ -413,7 +550,14 @@ class ModelManager:
             )
 
     def _resolve_hf_task(self, entry: ModelEntry) -> str:
-        """Map a ModelEntry's task_type to the HuggingFace pipeline task string."""
+        """Map a ModelEntry's task_type to a HuggingFace pipeline task string.
+
+        Args:
+            entry: ModelEntry with task_type field.
+
+        Returns:
+            HuggingFace task string (e.g., "token-classification" for NER).
+        """
         _TASK_MAP = {
             "zero_shot_classification": "zero-shot-classification",
             "token_classification": "token-classification",
@@ -423,7 +567,32 @@ class ModelManager:
         return _TASK_MAP.get(entry.task_type, entry.task_type)
 
     def _load_model(self, entry: ModelEntry) -> Any:
-        """Dispatch to the appropriate loader based on entry.loader."""
+        """Load a model instance by dispatching to the appropriate loader.
+
+        Device placement:
+            - Resolves device per model's DevicePolicy (CPU_ONLY vs PREFER_GPU).
+            - GPU models (device == "cuda") are loaded with float16 precision to
+              reduce memory footprint.
+            - For transformers pipelines: device=0 for cuda (GPU), device=-1 for CPU.
+
+        Loader dispatch:
+            - "spacy": Load spacy NLP model (CPU_ONLY).
+            - "sentence_transformer": SentenceTransformer with device placement.
+            - "transformers_pipeline": HuggingFace pipeline (auto-dtype on GPU).
+            - "auto_model_seq2seq": Seq2seq model (T5, etc).
+            - "auto_model_qa": Question-answering model.
+            - "auto_tokenizer": Tokenizer only (no device).
+
+        Args:
+            entry: ModelEntry specifying loader, model_name, device_policy, etc.
+
+        Returns:
+            Loaded model instance (type depends on loader).
+
+        Raises:
+            ValueError: If loader type is unknown.
+            Exception: Any exception from underlying model libraries (stored in entry.error).
+        """
         # Validate HF cache before loading to detect corrupted downloads.
         if entry.loader != "spacy":
             self._validate_hf_cache(entry.model_name)

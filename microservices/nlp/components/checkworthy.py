@@ -21,16 +21,32 @@ logger = logging.getLogger(__name__)
 
 
 class CheckWorthinessFilter(SentenceProcessor):
-    """
-    Filters sentences to identify factual claims worth checking.
-    Uses text classification (ClaimBuster-DeBERTaV2) to categorize sentences.
+    """Check-Worthiness Filter for Fact-Check Candidate Detection.
 
-    Model: whispAI/ClaimBuster-DeBERTaV2
-    Labels: NFS (Non-Factual) / UFS (Unimportant Factual) / CFS (Check-worthy Factual)
+    Filters sentences to identify factual claims that warrant fact-checking.
+    Uses a text classification model trained on claim check-worthiness.
 
-    Now implements SentenceProcessor: accepts sentences list as parameter,
-    modifies is_checkworthy/claim_type/confidence in-place, stores claims in result,
-    and returns the sentence list.
+    Model Details:
+        - Model: whispAI/ClaimBuster-DeBERTaV2
+        - Framework: DeBERTaV2 (enhanced BERT variant)
+        - Output Classes: 3 labels
+            - NFS: Non-Factual Statement
+            - UFS: Unimportant Factual Statement
+            - CFS: Check-worthy Factual Statement (target)
+        - Confidence: Continuous score [0.0, 1.0] for CFS probability
+        - Default Threshold: 0.50 (configurable)
+
+    Filtering Strategy:
+        1. Ranks all sentences by centrality score (from SentenceExtraction)
+        2. Limits inference to top MAX_SENTENCES_FOR_CHECKWORTHY candidates
+        3. Classifies each selected sentence
+        4. Marks is_checkworthy=True if CFS score >= threshold
+        5. Later stages filter on is_checkworthy and confidence thresholds
+
+    Contract:
+        Input:  List[SentenceScore] with text, score, entities
+        Output: Same list with is_checkworthy, claim_type, confidence populated
+                (in-place); also stores claims in result.claims_in_article
     """
 
     def __init__(
@@ -39,12 +55,13 @@ class CheckWorthinessFilter(SentenceProcessor):
         classifier: Any = None,
         threshold: float = 0.50,
     ):
-        """
+        """Initialize check-worthiness classifier.
+
         Args:
-            device_config: Unified device configuration (unused directly — model
-                           is loaded via ModelManager which owns device placement).
-            classifier: Loaded pipeline("text-classification")
-            threshold: Minimum CFS score to mark a sentence as check-worthy
+            device_config: Device configuration (unused; classifier device
+                          managed by ModelManager)
+            classifier: Pre-loaded text-classification pipeline (optional)
+            threshold: Minimum CFS confidence to mark sentence as check-worthy
         """
         self.classifier = classifier
         self.threshold = threshold
@@ -70,11 +87,26 @@ class CheckWorthinessFilter(SentenceProcessor):
         options: NLPOptions,
         sentences: List[SentenceScore],
     ) -> List[SentenceScore]:
-        """
-        Classifies each sentence in the provided list.
-        Adds 'is_checkworthy', 'claim_type', and 'confidence' attributes to each sentence.
-        Stores check-worthy sentences as claims in result.claims_in_article.
-        Returns the same sentence list (possibly filtered or modified).
+        """Classify and filter sentences by check-worthiness.
+
+        Performs batch inference on top-ranked sentences. For each classified
+        sentence, populates is_checkworthy (CFS score >= threshold), claim_type,
+        and confidence. Stores check-worthy sentences as Claim objects in
+        result.claims_in_article for later filtering by min_confidence threshold.
+
+        Args:
+            article: Article object (for logging)
+            message: StreamMessage to populate claims
+            options: NLPOptions (for logging)
+            sentences: List[SentenceScore] with text, score, entities; modified in-place
+
+        Returns:
+            Same sentence list with is_checkworthy, claim_type, confidence fields set
+
+        Side Effects:
+            Updates message.data.payload.claims_in_article with check-worthy claims.
+            If classifier unavailable, all sentences marked is_checkworthy=False
+            and pipeline continues gracefully.
         """
         if not sentences:
             return sentences

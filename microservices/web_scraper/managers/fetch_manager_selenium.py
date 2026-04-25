@@ -1,3 +1,21 @@
+"""Selenium-based browser automation for fetching article HTML.
+
+This module implements the FetchManager using Selenium with anti-bot evasion:
+rotating proxies, sticky user agents, country-specific headers, and undetected
+ChromeDriver. Handles popup/cookie modal closing and screenshot capture.
+
+Key Features:
+    - Thread-safe singleton with per-thread driver isolation
+    - Rotating proxy selection via ProxyManagerPaid with bad proxy reporting
+    - Sticky user agents per proxy for consistent browser fingerprinting
+    - Country-specific Accept-Language headers from proxy IP geolocation
+    - Pop-up detection and automatic modal closing via XPath selectors
+    - Page scrolling and dynamic content loading
+    - Exponential retry with jitter for timeout resilience
+    - Screenshot capture for debugging and monitoring
+
+The public interface is fetch_article_html(url) which returns the full HTML page.
+"""
 import hashlib
 import json
 import os
@@ -91,8 +109,19 @@ class DriverConfig:
 
 
 class FetchManagerSelenium:
-    """
-    A thread-safe Singleton class that fetches news URLs.
+    """Thread-safe singleton for Selenium-based article HTML fetching.
+
+    Manages browser driver pool with per-thread isolation. Coordinates proxy
+    rotation, sticky user agents, pop-up handling, and retry logic with
+    exponential backoff and proxy health tracking.
+
+    Attributes:
+        proxy_manager: ProxyManagerPaid instance for rotating proxy selection.
+        default_timeout: (connect_timeout, read_timeout) tuple in seconds.
+        display: Virtual X11 display for headless browser execution.
+        base_driver_path: Path to master chromedriver binary.
+        hint_config: JSON config for pop-up XPath selectors per outlet.
+        x_path_config: Pre-compiled XPath dictionary for each news source.
     """
 
     _instance = None
@@ -113,12 +142,31 @@ class FetchManagerSelenium:
         hint_path: Path = CURRENT_DIR / "combined_hints.json",
         screenshot_handler: RotatingScreenshotHandler = RotatingScreenshotHandler(),
     ):
+        """Initialize browser automation environment, download driver, start display.
 
+        Detects Chrome/Chromium binary, downloads/patches matching chromedriver,
+        starts virtual X11 display, and initializes proxy and hint configs.
+        Raises SystemExit if proxy_manager is missing or browser binary not found.
+
+        Args:
+            default_timeout: (connect_s, read_s) tuple for Selenium waits.
+            proxy_manager: ProxyManagerPaid instance (required).
+            hint_path: Path to JSON config with pop-up XPath selectors.
+            screenshot_handler: RotatingScreenshotHandler for capture storage.
+
+        Raises:
+            SystemExit: If proxy_manager missing or Chrome binary not found.
+            FileNotFoundError: If Chrome/Chromium not installed.
+        """
         if getattr(self, "_initialized", False):
             return
 
-        self.logger: Logger = getLogger("fetch_manager_SELENIUM")
-        self.logger.info("Starting initialisation")
+        with self._init_lock:
+            if getattr(self, "_initialized", False):
+                return
+
+            self.logger: Logger = getLogger("fetch_manager_SELENIUM")
+            self.logger.info("Starting initialisation")
 
         if not proxy_manager:
             self.logger.error("No proxy manager available!")
@@ -456,7 +504,16 @@ class FetchManagerSelenium:
         return xpath_dict
 
     def _handle_pop_ups(self, source_name: str, driver: Chrome) -> None:
-        self.logger.debug(f"Looking for pop ups in {source_name}")
+        """Detect and close pop-ups/modals using XPath selectors from hint config.
+
+        Attempts to locate and click close buttons for each outlet. Falls back to
+        searching within iframes if main content fails. All clicks raise failure
+        stream routing but do not stop processing.
+
+        Args:
+            source_name: Outlet name to look up XPath rules.
+            driver: Selenium Chrome driver instance.
+        """
         x_paths_for_buttons: List[str] = self.x_path_config.get(source_name, [])
 
         if not x_paths_for_buttons:
@@ -549,7 +606,20 @@ class FetchManagerSelenium:
             return
 
     def _create_driver_config(self, article_url: str) -> DriverConfig:
-        source_name: str = self._extract_source_name(article_url)
+        """Build driver configuration: proxy, user agent, headers, outlet name.
+
+        Selects rotating proxy via proxy_manager, looks up country code from proxy IP,
+        gets sticky user agent for that proxy, and creates country-specific headers.
+
+        Args:
+            article_url: URL to identify outlet and select proxy.
+
+        Returns:
+            DriverConfig with proxy_url, browser_profile, headers, and locale info.
+
+        Raises:
+            Exception: If proxy_url not found in proxy dict.
+        """
         self.logger.debug(
             f"Identified source as: '{source_name}' for URL: {article_url}"
         )
@@ -591,7 +661,19 @@ class FetchManagerSelenium:
     def _scroll_and_close_popups(
         self, driver: Chrome, article_url: str, source_name: str
     ) -> None:
-        """Scrolls to bottom, waits, then closes any pop ups"""
+        """Scroll page, handle pop-ups/modals, and capture screenshots for debugging.
+
+        Scrolls to bottom (lazy loads content), closes detected pop-ups via XPath,
+        and takes screenshots before/after for failure analysis.
+
+        Args:
+            driver: Selenium Chrome driver instance.
+            article_url: URL being fetched (for screenshot naming).
+            source_name: Outlet name to select appropriate pop-up rules.
+
+        Raises:
+            Exception: If scroll/pop-up handling fails (raised as generic exception).
+        """
         self.logger.debug("Attempting to execute scroll and close commands in page")
         try:
             self._handle_scroll(driver)
@@ -641,11 +723,22 @@ class FetchManagerSelenium:
         on_exceptions=(RequestException, WebDriverException, Exception),
     )
     def fetch_article_html(self, article_url: str) -> str:
-        """
-        Fetches the HTML of a webpage using rotating proxies, sticky user agents,
-        and country specific langugage strings for headers.
-        This method is wrapped by a retry decorator. It is responsible for
-        a SINGLE fetch attempt and for reporting bad proxies.
+        """Fetch full HTML from article URL using rotating proxies and browser automation.
+
+        Selects rotating proxy and sticky user agent, launches undetected ChromeDriver,
+        scrolls page, closes pop-ups, and extracts HTML. On failure, reports proxy
+        as bad via proxy_manager. Wrapped by exponential retry decorator for resilience.
+
+        Args:
+            article_url: URL of article to fetch.
+
+        Returns:
+            Full HTML page source as string (page_source).
+
+        Raises:
+            TimeoutException: Page load exceeded timeout; proxy likely bad.
+            WebDriverException: Selenium/browser error; proxy likely bad.
+            Exception: Other errors (SSL, rendering failures).
         """
         driver: Chrome = None
         driver_config: DriverConfig = None

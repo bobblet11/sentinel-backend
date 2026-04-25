@@ -21,32 +21,29 @@ logger = logging.getLogger(__name__)
 
 
 class Embedder(SentenceProcessor):
-    """
-    MODULAR EMBEDDER LAYER
+    """Sentence Embedding Layer.
 
-    Generates 768-dimensional dense vector embeddings for every extracted
-    sentence using 'sentence-transformers/all-mpnet-base-v2'.
+    Generates dense vector embeddings for sentences using the
+    'all-MiniLM-L6-v2' model (384-dimensional). Designed for efficient
+    semantic similarity search and document retrieval.
 
-    Strategies Applied:
-    1.  Model: all-mpnet-base-v2 (768-dim) — strong semantic benchmark performance,
-        widely used for asymmetric semantic search and similarity tasks.
-    2.  FP16 Inference: On CUDA devices the model weights are cast to float16 before
-        encoding to halve memory footprint and increase throughput with negligible
-        quality loss.
-    3.  HuggingFace Dataset Batching: Texts are wrapped in a datasets.Dataset object
-        before calling model.encode(), enabling Arrow-backed zero-copy batching.
-        batch_size=32 is a stable default for both GPU and CPU inference.
-    4.  Progress Bar: Suppressed (show_progress_bar=False) for clean production logs;
-        enabled automatically when the sentence count exceeds BATCH_SIZE.
-    5.  Raw Embeddings: normalize_embeddings=False — downstream consumers (pgvector,
-        LexRank centrality) expect un-normalised L2 magnitude vectors.
-    6.  Document Embedding: After per-sentence encoding, the arithmetic mean of all
-        sentence vectors is computed (numpy mean axis=0) and stored as a document-level
-        embedding that can be used for article-level similarity search.
+    Model Details:
+        - Architecture: all-MiniLM-L6-v2 (384-dim MiniLM variant)
+        - Training: Trained on 215M sentence pairs for semantic similarity
+        - Performance: Fast, efficient, suitable for pgvector storage
+        - FP16 Support: Weights cast to float16 on CUDA for memory efficiency
 
-    Accepts and returns a local sentences list (embedding field populated in-place);
-    also stores the doc-level mean vector in result (future use).
-    Does NOT otherwise modify result.
+    Processing Strategy:
+        1. Batch inference via HuggingFace SentenceTransformer
+        2. Texts wrapped in datasets.Dataset for zero-copy Arrow batching
+        3. Batch size 32 (stable on GPU and CPU)
+        4. Un-normalized embeddings (L2 magnitude preserved for downstream consumers)
+        5. Document-level mean embedding computed for article-level similarity
+
+    Contract:
+        Input:  List[SentenceScore] with text populated
+        Output: Same list with embedding field populated (in-place);
+                does NOT modify article or message payload
     """
 
     def __init__(
@@ -92,10 +89,24 @@ class Embedder(SentenceProcessor):
         options: NLPOptions,
         sentences: List[SentenceScore],
     ) -> List[SentenceScore]:
-        """
-        Generates embeddings for every sentence in the local list.
-        Updates each SentenceScore.embedding in-place.
-        Returns the same list; does NOT modify result beyond storing doc_embedding.
+        """Generate dense embeddings for all sentences.
+
+        Encodes each sentence's text into a 384-dimensional vector using
+        all-MiniLM-L6-v2 model. Updates SentenceScore.embedding in-place
+        for each sentence with un-normalized vectors suitable for pgvector
+        storage and semantic similarity search.
+
+        Args:
+            article: Article object (used for logging context)
+            message: StreamMessage (used for logging context)
+            options: NLPOptions (used for logging context)
+            sentences: List[SentenceScore] to embed; text field required
+
+        Returns:
+            Same sentence list with embedding fields populated (384-dim lists)
+
+        Raises:
+            Exception: Encoding failure (model inference error, OOM, etc.)
         """
         if not sentences:
             logger.info("Embedder: No sentences to process.")

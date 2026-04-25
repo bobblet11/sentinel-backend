@@ -1,3 +1,19 @@
+"""Sentinel API Gateway entry point.
+
+This module sets up the FastAPI application for the Sentinel API Gateway service,
+which is the primary entry point for job submission and result retrieval. It handles
+CORS configuration, request middleware, exception handling, and routes all v1 API
+endpoints through the unified router.
+
+The service is responsible for:
+  - Accepting article submission requests from clients (POST /api/v1/jobs)
+  - Providing job status checks (GET /api/v1/jobs/{job_id})
+  - Retrieving processed results (GET /api/v1/jobs/{job_uid}/result)
+  - Health checking and service availability verification
+
+All inter-service communication is handled asynchronously via Redis Streams.
+"""
+
 import uvicorn
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +34,7 @@ app = FastAPI(title=FAST_API_NAME, version=FAST_API_VERSION)
 # Middleware to remove trailing slashes
 @app.middleware("http")
 async def remove_trailing_slash(request: Request, call_next):
+    """Strip trailing slashes from request paths to normalize routing."""
     if request.url.path.endswith("/") and request.url.path != "/":
         request.scope["path"] = request.url.path.rstrip("/")
     return await call_next(request)
@@ -26,21 +43,34 @@ async def remove_trailing_slash(request: Request, call_next):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=True,
 )
+"""CORS middleware configuration for browser-based client access.
+
+Allows all origins, methods, and headers to enable browser extension and web UI
+clients to communicate with the API without cross-origin restrictions.
+"""
 
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Service health check endpoint.
+    
+    Returns:
+        dict: Status indicator and database availability verification.
+    """
     return {"status": "healthy", "service": "database"}
 
 
 @app.get("/")
 async def root():
-    """Root endpoint"""
+    """Root API endpoint providing service metadata.
+    
+    Returns:
+        dict: Service name and API version information.
+    """
     return {"service": "Sentinel Database Service", "version": "0.1.0"}
 
 

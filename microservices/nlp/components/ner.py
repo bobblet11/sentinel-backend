@@ -20,11 +20,28 @@ logger = logging.getLogger(__name__)
 
 
 class EntityRecognizer(ArticleProcessor):
-    """
-    Named Entity Recognition using the model specified in config.NER_MODEL.
+    """Named Entity Recognition for Article Analysis.
 
-    Processes the sentences list and writes deduplicated entities
-    into result.entities_in_article.
+    Extracts entities (PERSON, ORG, GPE, PRODUCT, DATE, etc.) from all
+    extracted sentences using a fine-tuned transformer-based NER model.
+
+    Model Details:
+        - Model: flair/ner-english-large (default, configurable via NER_MODEL)
+        - Framework: Flair (token classification with pooling)
+        - Entity Types: PERSON, ORG, GPE, LOC, PRODUCT, DATE, EVENT, etc.
+        - Aggregation: Simple (per-token scores averaged within entity spans)
+        - Batch Size: 8 (stable batching for inference)
+
+    Processing:
+        1. Filters empty/whitespace-only sentences before inference
+        2. Builds cumulative character offsets for article-relative positioning
+        3. Deduplicates entities by (text.lower(), label) pair
+        4. Keeps highest-confidence occurrence of each unique entity
+
+    Contract:
+        Input:  List[SentenceScore] from Preprocessor
+        Output: result.entities_in_article with Entity objects containing
+                text, type, and article-relative character offsets
     """
 
     def __init__(
@@ -84,10 +101,24 @@ class EntityRecognizer(ArticleProcessor):
         options: NLPOptions,
         sentences: List[SentenceScore],
     ) -> None:
-        """
-        Runs NER over all sentences provided by the Preprocessor.
-        Updates result.entities_in_article with unique entities found.
-        Character offsets stored in Entity are article-relative.
+        """Extract entities from sentences via token classification.
+
+        Runs batch NER inference over all provided sentences. Deduplicates
+        entities by (text.lower(), label) pair and keeps highest-confidence
+        occurrence. Character offsets are article-relative.
+
+        Args:
+            article: Article object (for logging context)
+            message: StreamMessage to populate with entities
+            options: NLPOptions (for logging context)
+            sentences: List[SentenceScore] with text populated from Preprocessor
+
+        Side Effects:
+            Updates message.data.payload.entities_in_article with Entity objects.
+            Character offsets in Entity are article-relative (cumulative).
+
+        Raises:
+            Exception: Model loading failure or inference error
         """
         if not sentences:
             logger.warning("EntityRecognizer: No sentences provided to process.")

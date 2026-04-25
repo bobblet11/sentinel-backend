@@ -1,3 +1,20 @@
+"""Web content extraction service for news articles.
+
+This module implements the web scraper microservice, which fetches and parses
+article HTML from URLs using browser automation (Selenium) and multiple parsing
+strategies (hardcoded parsers, trafilatura, fallback DOM extraction).
+
+The ScraperService processes Redis stream messages containing article URLs,
+extracts the full HTML, parses content (title, body text, author, publish date),
+and routes enriched messages to the next pipeline stage (NLP processing).
+
+Key Features:
+    - Browser automation with proxy rotation and anti-bot evasion
+    - Multi-strategy parsing with fallback handling
+    - Automatic outlet/news-source detection
+    - Performance metrics collection (fetch time, parse time, HTML/text sizes)
+    - Error handling with detailed failure stream routing
+"""
 import re
 import time
 from datetime import datetime
@@ -70,9 +87,22 @@ def match_outlet_name(article_url: str) -> Optional[str]:
 
 
 class ScraperService(ServiceTemplate):
-    """Concurrently scrapes, parses, and publishes messages"""
+    """Main web scraping service for article content extraction.
+
+    Inherits from ServiceTemplate to handle Redis stream consumption. Orchestrates
+    HTML fetching and parsing for news articles, collecting performance metrics and
+    routing failures appropriately.
+
+    Attributes:
+        stats_json_handler: JSON file handler for persisting daily performance stats.
+    """
 
     def __init__(self, config: ServiceConfig) -> None:
+        """Initialize the scraper service with config and stats handler.
+
+        Args:
+            config: ServiceConfig with service name, stream names, and worker pool size.
+        """
         super().__init__(config)
         self.stats_json_handler = JsonHandler(filename="stats.json")
 
@@ -85,6 +115,19 @@ class ScraperService(ServiceTemplate):
         parse_time: Optional[float],
         error_type: Optional[str] = None,
     ) -> None:
+        """Record performance metrics for daily statistics tracking.
+
+        Updates rolling 30-day JSON statistics with fetch times, parse times, HTML
+        and text sizes, errors per outlet. Maintains min/max timings and error counts.
+
+        Args:
+            outlet: News outlet name (e.g., "BBC", "Reuters", "Unknown").
+            html_len: Size in bytes of fetched HTML.
+            text_len: Size in bytes of extracted article text.
+            fetch_time: Seconds elapsed for HTTP fetch (None if skipped).
+            parse_time: Seconds elapsed for HTML parsing (None if skipped).
+            error_type: Exception class name if processing failed (None on success).
+        """
         data = self.stats_json_handler.read_json()
 
         # Normalize times
@@ -216,6 +259,20 @@ class ScraperService(ServiceTemplate):
         self.stats_json_handler.write_json(data)
 
     def _fetch_article_and_update(self, message: StreamMessage) -> StreamMessage:
+        """Fetch article HTML from URL using Selenium with proxy rotation.
+
+        Calls FetchManager to retrieve full HTML, validates non-empty result, and
+        stores in message. Raises FailedToFetch on empty HTML or missing URL.
+
+        Args:
+            message: Stream message containing article URL (message.link).
+
+        Returns:
+            Updated message with raw_html populated.
+
+        Raises:
+            FailedToFetch: If URL missing, fetch fails, or HTML is empty.
+        """
         try:
             article_url: Optional[str] = message.link
             if not article_url:
@@ -247,6 +304,20 @@ class ScraperService(ServiceTemplate):
             raise
 
     def _parse_article_and_update(self, message: StreamMessage) -> StreamMessage:
+        """Parse HTML into structured article fields (text, title, author, date).
+
+        Calls ParseManager which tries hardcoded parsers, trafilatura, and fallback
+        DOM extraction. Validates text length > 0 and stores result in message.
+
+        Args:
+            message: Stream message with html populated and article URL.
+
+        Returns:
+            Updated message with parsed_result (ParseResult) stored.
+
+        Raises:
+            FailedToParse: If URL/HTML missing, parse fails, or resulting text is empty.
+        """
         try:
             article_url: Optional[str] = message.link
             article_html: Optional[str] = message.html
@@ -288,6 +359,22 @@ class ScraperService(ServiceTemplate):
             raise e
 
     def _process_message(self, message: StreamMessage) -> StreamMessage:
+        """Process a single article through fetch and parse stages.
+
+        Main orchestration method. Detects outlet name, fetches HTML (if needed),
+        parses to text/metadata (if needed), adds timestamps, validates output,
+        logs statistics, and raises exceptions on failure for failure stream routing.
+
+        Args:
+            message: Redis stream message with article URL (message.link).
+
+        Returns:
+            Enriched message with html and parsed_result populated.
+
+        Raises:
+            FailedToFetch: If URL fetch fails after retries.
+            FailedToParse: If HTML parsing fails.
+        """
 
         fetch_time, parse_time, html_len, text_len, error_type = (
             None,

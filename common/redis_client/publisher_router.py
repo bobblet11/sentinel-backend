@@ -1,3 +1,21 @@
+"""Router for publishing messages to multiple output streams based on routing keys.
+
+This module provides message routing logic that forwards messages to different Redis
+streams based on a configurable routing key within the message. This is used to
+separate user-submitted jobs from background/ingestor jobs into different processing
+queues.
+
+Key features:
+    - Inspects message content to determine destination stream
+    - Routes user and background jobs to separate stream families
+    - Supports batch publishing with grouping by destination
+    - Lazy initializes publishers for each destination stream
+
+Example:
+    User jobs route to 'user:to.be.nlp'; background jobs to 'background:to.be.nlp'
+    based on the 'job_type' field in the message payload.
+"""
+
 import hashlib
 from logging import Logger, getLogger
 from typing import Any, Dict, List
@@ -15,32 +33,41 @@ def get_nested_value(d: Dict, keys: List[str]) -> Any:
 
 
 class RedisPublisherRouter:
-    """
-    A higher-level publisher that acts as a router, forwarding messages
-    to different Redis streams based on a specific key within the message.
+    """Routes messages to different Redis streams based on message content.
 
-    This class creates and manages multiple RedisPublisher instances, one for
-    each destination stream defined in the routing map.
+    This router acts as a multiplexer, forwarding messages to different output streams
+    determined by inspecting a configurable routing key within each message payload.
+
+    Use cases:
+        - Separate user (high-priority) jobs from background (low-priority) jobs
+        - Route to pipeline stages based on job type or processing context
+        - Implement priority-based job queue separation
+
+    Routing logic:
+        1. Extract the routing key value from the message (e.g., 'job_type' -> 'user')
+        2. Look up the destination stream in the routing map (e.g., 'user' -> 'user:to.be.nlp')
+        3. Use the appropriate publisher to send the message to that stream
 
     Example:
-        splitter = RedisPublisherRouter({'user':'123', 'background' : '456'}, 'type')
-        splitter.publish_one({'type':'user'})           //publishes to 123
-        splitter.publish_one({'type':'background'})     //publishes to 456
-        splitter.publish_one({'type':'unknown'})        //fails, unknown mapping
+        >>> routing_map = {'user': 'user:to.be.nlp', 'background': 'background:to.be.nlp'}
+        >>> router = RedisPublisherRouter(routing_map, ['job_type'])
+        >>> router.publish_one({'job_type': 'user', 'data': {...}})
+        >>> # Message published to 'user:to.be.nlp'
     """
 
     def __init__(self, routing_map: Dict[str, str], routing_key: List[str]):
-        """
-        Initializes the RedisPublisherRouter with a map of message types to stream names.
+        """Initializes the RedisPublisherRouter with routing rules.
 
         Args:
-            routing_map (Dict[str, str]): A dictionary where keys are the expected
-                                         message types (e.g., "user", "background")
-                                         and values are the target Redis stream names
-                                         (e.g., "user-nlp-jobs", "background-nlp-jobs").
+            routing_map: Dict mapping routing values to destination stream names.
+                Key: routing value (e.g., 'user', 'background')
+                Value: destination Redis stream name (e.g., 'user:to.be.nlp')
+            routing_key: List of nested keys to extract routing value from message.
+                For flat messages: ['job_type']
+                For nested: ['metadata', 'job_type']
 
-            routing_key (List[str]): The key within an incoming message dictionary that
-                               contains the message type string.
+        Raises:
+            ValueError: If routing_map or routing_key is empty.
         """
 
         if not isinstance(routing_map, dict) or not routing_map:
@@ -63,10 +90,20 @@ class RedisPublisherRouter:
         self.logger.info(f"PublisherRouter ready: {routing_map}")
 
     def _get_nested_value(self, payload: Dict[str, Any], keys: List[str]) -> Any:
-        """
-        Sets a value deep inside the data dictionary.
-        Creates intermediate dictionaries if they don't exist.
-        Usage: msg.set_nested(html_content, "data", "data", "html")
+        """Extracts a value from nested dictionary using a list of keys.
+
+        Navigates through nested dicts using the provided key path. Raises an exception
+        if any intermediate key is missing or the traversal path is invalid.
+
+        Args:
+            payload: Dict to traverse.
+            keys: List of keys representing the path to the target value.
+
+        Returns:
+            The value at the end of the key path.
+
+        Raises:
+            Exception: If missing arguments, key not found, or intermediate value is not a dict.
         """
         if not keys or not payload:
             raise Exception("Missing arguments")
@@ -83,16 +120,21 @@ class RedisPublisherRouter:
         return value
 
     def publish_one(self, message_payload: Dict[str, Any]) -> str:
-        """
-        Inspects a message, determines its type using the routing_key, and
-        forwards it to the correct Redis stream publisher.
+        """Routes and publishes a single message to the appropriate stream.
+
+        Extracts the routing value from the message using routing_key, looks up the
+        destination stream in the routing map, and publishes to that stream.
 
         Args:
-            message: The message dictionary to be published. It must contain
-                     the routing_key.
+            message_payload: Message dict to route and publish. Must contain
+                the nested keys specified in routing_key.
 
         Returns:
-            The unique Redis message ID if publishing was successful, otherwise None.
+            The unique Redis message ID (e.g., '1234567890-0').
+
+        Raises:
+            Exception: If routing key not found, no publisher configured for routing value,
+                or publishing fails.
         """
 
         # 1. Determine the route
@@ -117,15 +159,17 @@ class RedisPublisherRouter:
         return publisher.publish_one(message_payload)
 
     def publish_many(self, message_payloads: List[Dict[str, Any]]) -> Dict[str, int]:
-        """
-        Groups a list of messages by their type and publishes each group
-        to its corresponding stream in an efficient batch.
+        """Routes and batch-publishes multiple messages to their respective streams.
+
+        Groups messages by routing value, then publishes each group to its corresponding
+        stream in an efficient batch operation. Unroutable messages are tracked separately.
 
         Args:
-            messages: A list of message dictionaries to be published.
+            message_payloads: List of message dicts to route and publish.
 
         Returns:
-            A dictionary summarizing the count of messages published to each stream.
+            Dict with keys as stream names and values as lists of Redis message IDs,
+            plus an 'unroutable' key containing any messages that couldn't be routed.
         """
 
         # 1. Group messages by their destination stream
@@ -166,7 +210,22 @@ class RedisPublisherRouter:
     def generate_router_mapping(
         output_streams: List[str], router_key_values: List[str]
     ):
-        """Assume that the order of the list of input streams indicated priority order. First is highest priority."""
+        """Generates a routing map from parallel lists of values and stream names.
+
+        Creates a dict mapping each router key value to its corresponding output stream.
+        Used to bootstrap the routing_map constructor parameter.
+
+        Args:
+            output_streams: List of destination Redis stream names (e.g., ['user:to.be.nlp', 'background:to.be.nlp']).
+            router_key_values: Corresponding list of routing values (e.g., ['user', 'background']).
+                Must be same length as output_streams.
+
+        Returns:
+            Dict mapping routing value -> stream name (e.g., {'user': 'user:to.be.nlp', ...}).
+
+        Raises:
+            ValueError: If either list is empty or lengths don't match.
+        """
         if not output_streams:
             raise ValueError("Missing output_streams")
 
