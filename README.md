@@ -39,6 +39,16 @@ On the backend, the platform performs four core tasks:
 - [Tech Stack](#tech-stack)
 - [Service Documentation](#service-documentation)
 
+
+## Accompanying Publications
+
+### Poster
+![Alt Text](report/poster.png)
+
+
+### Report
+
+
 ## Running the Project
 
 ### Prerequisites
@@ -326,9 +336,3 @@ Full setup instructions, config options, service profiles, and deployment comman
 The complete environment variable reference is in [configs/.env.template](./configs/.env.template).
 
 
-## Poster
-
-![Alt Text](report/poster.png)
-
-
-## Report
