@@ -324,3 +324,11 @@ Database setup and schema assets live under `microservices/db/`, with migration-
 Full setup instructions, config options, service profiles, and deployment commands are covered in the [Running the Project](#running-the-project) section above.
 
 The complete environment variable reference is in [configs/.env.template](./configs/.env.template).
+
+
+## Poster
+
+![Alt Text](report/poster.png)
+
+
+## Report
