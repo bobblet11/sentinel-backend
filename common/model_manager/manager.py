@@ -5,9 +5,11 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from common.model_manager.exceptions import (ModelLoadError,
-                                             ModelNotFoundError,
-                                             ModelNotReadyError)
+from common.model_manager.exceptions import (
+    ModelLoadError,
+    ModelNotFoundError,
+    ModelNotReadyError,
+)
 from common.model_manager.registry import DevicePolicy, ModelEntry, ModelState
 
 logger = logging.getLogger(__name__)
@@ -150,7 +152,9 @@ class ModelManager:
                     ),
                     ModelEntry(
                         key="DECONTEXT_QG_MODEL",
-                        model_name=os.environ.get("NLP_QG_MODEL", "Salesforce/mixqg-base"),
+                        model_name=os.environ.get(
+                            "NLP_QG_MODEL", "Salesforce/mixqg-base"
+                        ),
                         task_type="seq2seq_generation",
                         owner_component="Decontextualizer",
                         loader="auto_model_seq2seq",
@@ -160,7 +164,9 @@ class ModelManager:
                     ),
                     ModelEntry(
                         key="DECONTEXT_QG_TOKENIZER",
-                        model_name=os.environ.get("NLP_QG_MODEL", "Salesforce/mixqg-base"),
+                        model_name=os.environ.get(
+                            "NLP_QG_MODEL", "Salesforce/mixqg-base"
+                        ),
                         task_type="tokenizer",
                         owner_component="Decontextualizer",
                         loader="auto_tokenizer",
@@ -170,7 +176,9 @@ class ModelManager:
                     ),
                     ModelEntry(
                         key="DECONTEXT_QA_MODEL",
-                        model_name=os.environ.get("NLP_QA_MODEL", "deepset/roberta-base-squad2"),
+                        model_name=os.environ.get(
+                            "NLP_QA_MODEL", "deepset/roberta-base-squad2"
+                        ),
                         task_type="question_answering",
                         owner_component="Decontextualizer",
                         loader="auto_model_qa",
@@ -180,7 +188,9 @@ class ModelManager:
                     ),
                     ModelEntry(
                         key="DECONTEXT_QA_TOKENIZER",
-                        model_name=os.environ.get("NLP_QA_MODEL", "deepset/roberta-base-squad2"),
+                        model_name=os.environ.get(
+                            "NLP_QA_MODEL", "deepset/roberta-base-squad2"
+                        ),
                         task_type="tokenizer",
                         owner_component="Decontextualizer",
                         loader="auto_tokenizer",
@@ -215,7 +225,9 @@ class ModelManager:
             instance = self._load_model(entry)
             entry.instance = instance
             entry.state = ModelState.READY
-            logger.info("ModelManager: '%s' loaded successfully (%s).", key, entry.loader)
+            logger.info(
+                "ModelManager: '%s' loaded successfully (%s).", key, entry.loader
+            )
         except Exception as exc:
             entry.error = exc
             entry.state = ModelState.ERROR
@@ -440,9 +452,7 @@ class ModelManager:
             kwargs = dict(entry.loader_kwargs)
             if device == "cuda":
                 kwargs["dtype"] = _torch.float16
-            return pipeline(
-                task, model=entry.model_name, device=hf_device, **kwargs
-            )
+            return pipeline(task, model=entry.model_name, device=hf_device, **kwargs)
 
         elif entry.loader == "auto_model_seq2seq":
             import torch as _torch

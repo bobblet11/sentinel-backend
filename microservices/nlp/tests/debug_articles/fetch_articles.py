@@ -176,7 +176,9 @@ def collect_and_save(source: dict) -> bool:
     article = pick_best_entry(entries)
 
     if not article:
-        log.error(f"[{source['name']}] Could not extract text from any entry — skipping.")
+        log.error(
+            f"[{source['name']}] Could not extract text from any entry — skipping."
+        )
         return False
 
     # Build output document matching the format used by test_pipeline.py
@@ -193,9 +195,9 @@ def collect_and_save(source: dict) -> bool:
         "characteristics": {
             "bias": source["bias"],
             "length_category": (
-                "short" if len(article["text"].split()) < 300
-                else "medium" if len(article["text"].split()) < 800
-                else "long"
+                "short"
+                if len(article["text"].split()) < 300
+                else "medium" if len(article["text"].split()) < 800 else "long"
             ),
         },
     }
@@ -204,9 +206,7 @@ def collect_and_save(source: dict) -> bool:
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(doc, f, indent=2, ensure_ascii=False)
 
-    log.info(
-        f"[{source['name']}] Saved {doc['word_count']} words → {out_path.name}"
-    )
+    log.info(f"[{source['name']}] Saved {doc['word_count']} words → {out_path.name}")
     return True
 
 

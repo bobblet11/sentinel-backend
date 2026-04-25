@@ -30,7 +30,10 @@ def delete_streams_and_sets():
         if cursor == 0:
             break
 
-    print(f"[INFO] Cleanup complete: {deleted_streams} streams and {deleted_sets} sets deleted.")
+    print(
+        f"[INFO] Cleanup complete: {deleted_streams} streams and {deleted_sets} sets deleted."
+    )
+
 
 if __name__ == "__main__":
     delete_streams_and_sets()

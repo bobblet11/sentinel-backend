@@ -108,13 +108,18 @@ import transformers  # noqa: E402, F401
 # ---------------------------------------------------------------------------
 # Project imports (after sys.path and env vars are set)
 # ---------------------------------------------------------------------------
-from common.models.api.redis_models import (Article, Message,  # noqa: E402
-                                            MessageHeader, MessagePayload,
-                                            NLPOptions, NLPResult,
-                                            SentenceScore, StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    Message,  # noqa: E402
+    MessageHeader,
+    MessagePayload,
+    NLPOptions,
+    NLPResult,
+    SentenceScore,
+    StreamMessage,
+)
 from microservices.nlp.components.bias import BiasDetector  # noqa: E402
-from microservices.nlp.components.checkworthy import \
-    CheckWorthinessFilter  # noqa: E402
+from microservices.nlp.components.checkworthy import CheckWorthinessFilter  # noqa: E402
 from microservices.nlp.components.embedder import Embedder  # noqa: E402
 from microservices.nlp.components.ner import EntityRecognizer  # noqa: E402
 from microservices.nlp.components.preprocess import Preprocessor  # noqa: E402
@@ -154,16 +159,23 @@ COMPONENT_MODEL_KEYS = {
     "ner": ["SPACY_SENT", "EMBEDDING", "NER"],
     "bias": ["SPACY_SENT", "EMBEDDING", "BIAS_POLITICAL", "BIAS_SENTIMENT"],
     "checkworthy": ["SPACY_SENT", "EMBEDDING", "NER", "CHECKWORTHY"],
-    "all": ["SPACY_SENT", "EMBEDDING", "NER", "BIAS_POLITICAL", "BIAS_SENTIMENT", "CHECKWORTHY"],
+    "all": [
+        "SPACY_SENT",
+        "EMBEDDING",
+        "NER",
+        "BIAS_POLITICAL",
+        "BIAS_SENTIMENT",
+        "CHECKWORTHY",
+    ],
 }
 
 # Component type tags for dispatch (matching run_pipeline_tests.py)
 COMPONENT_TYPES = {
-    "preprocessor": "SentenceGenerator",   # run(article, result, options) -> List[SentenceScore]
-    "embedder": "SentenceProcessor",       # run(article, result, options, sentences) -> List[SentenceScore]
-    "ner": "SentenceConsumer",             # run(article, result, options, sentences) -> None
-    "bias": "ArticleProcessor",            # run(article, result, options) -> None
-    "checkworthy": "SentenceProcessor",    # run(article, result, options, sentences) -> List[SentenceScore]
+    "preprocessor": "SentenceGenerator",  # run(article, result, options) -> List[SentenceScore]
+    "embedder": "SentenceProcessor",  # run(article, result, options, sentences) -> List[SentenceScore]
+    "ner": "SentenceConsumer",  # run(article, result, options, sentences) -> None
+    "bias": "ArticleProcessor",  # run(article, result, options) -> None
+    "checkworthy": "SentenceProcessor",  # run(article, result, options, sentences) -> List[SentenceScore]
 }
 
 SEP = "\u2550" * 70  # ══════...
@@ -264,7 +276,9 @@ def print_checkworthy(result: NLPResult, sentences: list) -> None:
     print(f"\n  Sentence classifications ({len(classified)} classified):")
     for s in classified:
         flag = " [CHECK-WORTHY]" if s.is_checkworthy else ""
-        print(f"    [{s.index:02d}] type={s.claim_type:<8} conf={s.confidence:.3f}{flag}")
+        print(
+            f"    [{s.index:02d}] type={s.claim_type:<8} conf={s.confidence:.3f}{flag}"
+        )
         print(f"         {s.text[:90]}")
 
     if claims:
@@ -336,6 +350,7 @@ def run_component(
     # Instantiate with correct constructor args per component
     if name == "preprocessor":
         import spacy as _spacy
+
         _nlp_sm = _spacy.load("en_core_web_sm", disable=["lemmatizer"])
         component = cls(nlp=_nlp_sm)
     elif name in ("bias", "ner", "embedder"):

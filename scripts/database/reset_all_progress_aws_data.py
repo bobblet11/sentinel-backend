@@ -8,12 +8,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from scripts.database.inspect_aws import inspect_redis
 
-POSTGRES_USER:str = str(os.getenv("POSTGRES_USER", None))
-POSTGRES_PASSWORD:str = str(os.getenv("POSTGRES_PASSWORD", None))
-POSTGRES_HOST:str = str(os.getenv("POSTGRES_HOST", None))
-POSTGRES_DB:str = str(os.getenv("POSTGRES_DB", None))
-POSTGRES_PORT:int = int(os.getenv("POSTGRES_PORT", None))
-POSTGRES_SSLMODE:str = str(os.getenv("POSTGRES_SSLMODE", "disable"))
+POSTGRES_USER: str = str(os.getenv("POSTGRES_USER", None))
+POSTGRES_PASSWORD: str = str(os.getenv("POSTGRES_PASSWORD", None))
+POSTGRES_HOST: str = str(os.getenv("POSTGRES_HOST", None))
+POSTGRES_DB: str = str(os.getenv("POSTGRES_DB", None))
+POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", None))
+POSTGRES_SSLMODE: str = str(os.getenv("POSTGRES_SSLMODE", "disable"))
 
 # Load environment
 load_dotenv(dotenv_path="configs/aws/.env")
@@ -25,14 +25,10 @@ from common.redis_client.connection import redis_connection
 STREAMS_TO_DELETE = [
     "background:to.be.nlp",
     "background:to.be.retrieval",
-    
     "user:to.be.scraped",
     "user:to.be.nlp",
     "user:to.be.retrieval",
-
-    
     "all:benchmark.output",
-    
     "failure:to.be.scraped",
     "failure:to.be.nlp",
     "failure:to.be.retrieval",
@@ -43,19 +39,15 @@ STREAMS_WITH_GROUPS = [
     "background:to.be.scraped",
     "background:to.be.nlp",
     "background:to.be.retrieval",
-    
     "user:to.be.scraped",
     "user:to.be.nlp",
     "user:to.be.retrieval",
-    
     "failure:to.be.scraped",
     "failure:to.be.nlp",
     "failure:to.be.retrieval",
 ]
 
-HASH_SETS_TO_DELETE = [
-    "retrieval:hash.store"
-]
+HASH_SETS_TO_DELETE = ["retrieval:hash.store"]
 
 SETS_TO_DELETE = [
     "retrieval:uid.store",
@@ -69,12 +61,14 @@ database_url: str = (
 engine = create_engine(database_url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 def get_db() -> Session:
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
 
 # Redis cleanup
 def delete_streams_sets_hashes():
@@ -123,6 +117,7 @@ def delete_streams_sets_hashes():
         f"{deleted_sets} sets, {deleted_hashes} hashes, {deleted_keys} other keys deleted."
     )
 
+
 # Reset consumer groups
 def reset_consumer_groups():
     r = redis_connection.get_client()
@@ -133,12 +128,13 @@ def reset_consumer_groups():
 
         groups = r.xinfo_groups(stream)
         for group in groups:
-            group_name = group['name']
+            group_name = group["name"]
             r.xgroup_destroy(stream, group_name)
             print(f"Destroyed consumer group {group_name} on stream {stream}")
 
     print("Consumer groups reset complete.")
-    
+
+
 # Postgres cleanup
 def truncate_all_postgres_tables():
     try:
@@ -159,6 +155,7 @@ def truncate_all_postgres_tables():
     except OperationalError as e:
         print(f"Could not connect to Postgres: {e}")
 
+
 if __name__ == "__main__":
     print("--- BEFORE DELETE ---")
     inspect_redis()
@@ -166,7 +163,6 @@ if __name__ == "__main__":
     delete_streams_sets_hashes()
     truncate_all_postgres_tables()
     reset_consumer_groups()
-    
+
     print("--- BEFORE DELETE ---")
     inspect_redis()
-

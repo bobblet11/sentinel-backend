@@ -40,7 +40,9 @@ ARTICLES_DIR = WORKSPACE_ROOT / "microservices" / "nlp" / "tests" / "debug_artic
 # ---------------------------------------------------------------------------
 # Argument parsing (before imports so env vars are set before config loads)
 # ---------------------------------------------------------------------------
-parser = argparse.ArgumentParser(description="E2E NLP pipeline test using production code path.")
+parser = argparse.ArgumentParser(
+    description="E2E NLP pipeline test using production code path."
+)
 parser.add_argument("--debug", action="store_true", help="Enable DEBUG logging")
 parser.add_argument(
     "--articles",
@@ -57,7 +59,9 @@ os.environ.setdefault("DUMMY_NLP_MODE", "false")
 os.environ.setdefault("USE_GPU", "false")
 os.environ.setdefault("ENABLE_DECONTEXTUALIZATION", "true")
 
-_NLP_TEST_CACHE = WORKSPACE_ROOT / "microservices" / "nlp" / "tests" / ".cache" / "huggingface"
+_NLP_TEST_CACHE = (
+    WORKSPACE_ROOT / "microservices" / "nlp" / "tests" / ".cache" / "huggingface"
+)
 os.environ.setdefault("HF_HOME", str(_NLP_TEST_CACHE))
 os.environ.setdefault("TRANSFORMERS_CACHE", str(_NLP_TEST_CACHE / "hub"))
 
@@ -91,7 +95,14 @@ logging.basicConfig(
     force=True,
 )
 if not args.debug:
-    for noisy in ("transformers", "sentence_transformers", "torch", "filelock", "urllib3", "flair"):
+    for noisy in (
+        "transformers",
+        "sentence_transformers",
+        "torch",
+        "filelock",
+        "urllib3",
+        "flair",
+    ):
         logging.getLogger(noisy).setLevel(logging.ERROR)
 
 log = logging.getLogger("test_nlp_e2e")
@@ -102,16 +113,20 @@ log = logging.getLogger("test_nlp_e2e")
 import sentence_transformers  # noqa: E402, F401 — prime before parallel model load
 import transformers  # noqa: E402, F401
 
-from common.models.api.redis_models import (Article, Message,  # noqa: E402
-                                            MessageHeader, MessagePayload,
-                                            NLPOptions, StreamMessage)
-from microservices.nlp.components.claimextract import \
-    ClaimExtraction  # noqa: E402
-from microservices.nlp.config import (DEVICE_CONFIG,  # noqa: E402
-                                      TOPIC_LABELS, model_manager)
+from common.models.api.redis_models import (
+    Article,
+    Message,  # noqa: E402
+    MessageHeader,
+    MessagePayload,
+    NLPOptions,
+    StreamMessage,
+)
+from microservices.nlp.components.claimextract import ClaimExtraction  # noqa: E402
+from microservices.nlp.config import DEVICE_CONFIG  # noqa: E402
+from microservices.nlp.config import TOPIC_LABELS, model_manager
 
 EMBEDDING_DIM = 768
-SEP  = "=" * 78
+SEP = "=" * 78
 SEP2 = "-" * 78
 
 # Set of valid topic labels for validation (includes "General").
@@ -121,6 +136,7 @@ _VALID_TOPICS = set(TOPIC_LABELS)
 # ---------------------------------------------------------------------------
 # StreamMessage construction — mirrors the scraper's output message exactly
 # ---------------------------------------------------------------------------
+
 
 def build_stream_message(
     article_url: str,
@@ -152,14 +168,19 @@ def build_stream_message(
         summary=summary,
     )
     message = Message(header=header, payload=payload, stage_timestamps=[])
-    return StreamMessage(stream="user:to.be.nlp", redis_id="0-0", priority=1, data=message)
+    return StreamMessage(
+        stream="user:to.be.nlp", redis_id="0-0", priority=1, data=message
+    )
 
 
 # ---------------------------------------------------------------------------
 # Production pipeline runner
 # ---------------------------------------------------------------------------
 
-def run_pipeline(message: StreamMessage, pipeline: ClaimExtraction, options: NLPOptions) -> float:
+
+def run_pipeline(
+    message: StreamMessage, pipeline: ClaimExtraction, options: NLPOptions
+) -> float:
     """
     Runs the pipeline exactly as NLPService._analyze_html_and_update() does:
       1. Build Article from message fields
@@ -181,6 +202,7 @@ def run_pipeline(message: StreamMessage, pipeline: ClaimExtraction, options: NLP
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
+
 
 def validate(message: StreamMessage) -> Tuple[bool, List[str]]:
     """
@@ -205,12 +227,17 @@ def validate(message: StreamMessage) -> Tuple[bool, List[str]]:
     if not claims:
         failures.append("claims_in_article is empty")
     else:
-        null_emb = [i for i, c in enumerate(claims) if c.decontextualised_claim_embedding is None]
+        null_emb = [
+            i
+            for i, c in enumerate(claims)
+            if c.decontextualised_claim_embedding is None
+        ]
         if null_emb:
             failures.append(f"claims with null embedding: indices {null_emb}")
 
         wrong_dim = [
-            i for i, c in enumerate(claims)
+            i
+            for i, c in enumerate(claims)
             if c.decontextualised_claim_embedding is not None
             and len(c.decontextualised_claim_embedding) != EMBEDDING_DIM
         ]
@@ -250,7 +277,10 @@ def validate(message: StreamMessage) -> Tuple[bool, List[str]]:
 # Pretty printer
 # ---------------------------------------------------------------------------
 
-def print_result(article_name: str, message: StreamMessage, elapsed: float, failures: List[str]) -> None:
+
+def print_result(
+    article_name: str, message: StreamMessage, elapsed: float, failures: List[str]
+) -> None:
     payload = message.data.payload
     passed = len(failures) == 0
 
@@ -262,14 +292,22 @@ def print_result(article_name: str, message: StreamMessage, elapsed: float, fail
     # Bias
     bp = payload.bias_profile
     if bp:
-        print(f"  Bias      : {bp.bias_category}  (conf={bp.bias_analysis_confidence:.3f})")
-        print(f"  Sentiment : {bp.sentiment_category}  (conf={bp.sentiment_analysis_confidence:.3f})")
+        print(
+            f"  Bias      : {bp.bias_category}  (conf={bp.bias_analysis_confidence:.3f})"
+        )
+        print(
+            f"  Sentiment : {bp.sentiment_category}  (conf={bp.sentiment_analysis_confidence:.3f})"
+        )
     else:
         print("  Bias      : MISSING")
 
     # Topic (Stage 9)
     if payload.topic_label is not None:
-        conf_str = f"{payload.topic_confidence:.3f}" if payload.topic_confidence is not None else "N/A"
+        conf_str = (
+            f"{payload.topic_confidence:.3f}"
+            if payload.topic_confidence is not None
+            else "N/A"
+        )
         print(f"  Topic     : {payload.topic_label}  (conf={conf_str})")
     else:
         print("  Topic     : MISSING")
@@ -278,10 +316,17 @@ def print_result(article_name: str, message: StreamMessage, elapsed: float, fail
     claims = payload.claims_in_article or []
     print(f"  Claims    : {len(claims)}")
     for i, c in enumerate(claims[:3]):
-        emb_status = f"{len(c.decontextualised_claim_embedding)}-dim" if c.decontextualised_claim_embedding else "NO EMBEDDING"
-        ents = ", ".join(f"{e.entity_text}[{e.type_of_entity}]" for e in c.NER_entities) or "—"
+        emb_status = (
+            f"{len(c.decontextualised_claim_embedding)}-dim"
+            if c.decontextualised_claim_embedding
+            else "NO EMBEDDING"
+        )
+        ents = (
+            ", ".join(f"{e.entity_text}[{e.type_of_entity}]" for e in c.NER_entities)
+            or "—"
+        )
         print(f"    [{i}] conf={c.confidence:.2f}  emb={emb_status}")
-        print(f"         \"{c.decontextualised_claim_text[:90]}\"")
+        print(f'         "{c.decontextualised_claim_text[:90]}"')
         print(f"         entities: {ents}")
     if len(claims) > 3:
         print(f"    ... and {len(claims) - 3} more")
@@ -304,6 +349,7 @@ def print_result(article_name: str, message: StreamMessage, elapsed: float, fail
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     # Resolve article files
@@ -337,7 +383,10 @@ def main() -> None:
         if v == "error" and not model_manager._registry[k].required
     }
     if optional_errors:
-        log.warning("Optional models failed to load (pipeline will degrade gracefully): %s", list(optional_errors))
+        log.warning(
+            "Optional models failed to load (pipeline will degrade gracefully): %s",
+            list(optional_errors),
+        )
     if required_errors:
         log.error("Required models failed — cannot run pipeline: %s", required_errors)
         if "SPACY_SENT" in required_errors:
@@ -355,13 +404,13 @@ def main() -> None:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
-        article_url   = data.get("article_url", data.get("url", "http://unknown"))
-        title         = data.get("article_title", "")
-        parsed_text   = data.get("article_text", "")
-        news_outlet   = data.get("source", data.get("news_outlet", path.stem))
-        publish_date  = data.get("scraped_at")
-        author        = data.get("author")
-        summary       = data.get("article_summary", "")
+        article_url = data.get("article_url", data.get("url", "http://unknown"))
+        title = data.get("article_title", "")
+        parsed_text = data.get("article_text", "")
+        news_outlet = data.get("source", data.get("news_outlet", path.stem))
+        publish_date = data.get("scraped_at")
+        author = data.get("author")
+        summary = data.get("article_summary", "")
 
         message = build_stream_message(
             article_url=article_url,
@@ -384,12 +433,19 @@ def main() -> None:
             failures = [f"CRASH: {exc}"]
 
         print_result(path.name, message, elapsed, failures)
-        results.append({"file": path.name, "passed": passed, "failures": failures, "elapsed": elapsed})
+        results.append(
+            {
+                "file": path.name,
+                "passed": passed,
+                "failures": failures,
+                "elapsed": elapsed,
+            }
+        )
 
     # Summary
-    total   = len(results)
-    n_passed  = sum(1 for r in results if r["passed"])
-    failed  = total - n_passed
+    total = len(results)
+    n_passed = sum(1 for r in results if r["passed"])
+    failed = total - n_passed
 
     print(f"\n{SEP}")
     print(f"SUMMARY  {n_passed}/{total} passed")
@@ -430,7 +486,9 @@ ARTICLES_DIR = WORKSPACE_ROOT / "microservices" / "nlp" / "tests" / "debug_artic
 # ---------------------------------------------------------------------------
 # Argument parsing (before imports so env vars are set before config loads)
 # ---------------------------------------------------------------------------
-parser = argparse.ArgumentParser(description="E2E NLP pipeline test using production code path.")
+parser = argparse.ArgumentParser(
+    description="E2E NLP pipeline test using production code path."
+)
 parser.add_argument("--debug", action="store_true", help="Enable DEBUG logging")
 parser.add_argument(
     "--articles",
@@ -447,7 +505,9 @@ os.environ.setdefault("DUMMY_NLP_MODE", "false")
 os.environ.setdefault("USE_GPU", "false")
 os.environ.setdefault("ENABLE_DECONTEXTUALIZATION", "true")
 
-_NLP_TEST_CACHE = WORKSPACE_ROOT / "microservices" / "nlp" / "tests" / ".cache" / "huggingface"
+_NLP_TEST_CACHE = (
+    WORKSPACE_ROOT / "microservices" / "nlp" / "tests" / ".cache" / "huggingface"
+)
 os.environ.setdefault("HF_HOME", str(_NLP_TEST_CACHE))
 os.environ.setdefault("TRANSFORMERS_CACHE", str(_NLP_TEST_CACHE / "hub"))
 
@@ -480,7 +540,14 @@ logging.basicConfig(
     force=True,
 )
 if not args.debug:
-    for noisy in ("transformers", "sentence_transformers", "torch", "filelock", "urllib3", "flair"):
+    for noisy in (
+        "transformers",
+        "sentence_transformers",
+        "torch",
+        "filelock",
+        "urllib3",
+        "flair",
+    ):
         logging.getLogger(noisy).setLevel(logging.ERROR)
 
 log = logging.getLogger("test_nlp_e2e")
@@ -491,21 +558,26 @@ log = logging.getLogger("test_nlp_e2e")
 import sentence_transformers  # noqa: E402, F401 — prime before parallel model load
 import transformers  # noqa: E402, F401
 
-from common.models.api.redis_models import (Article, Message,  # noqa: E402
-                                            MessageHeader, MessagePayload,
-                                            NLPOptions, StreamMessage)
-from microservices.nlp.components.claimextract import \
-    ClaimExtraction  # noqa: E402
+from common.models.api.redis_models import (
+    Article,
+    Message,  # noqa: E402
+    MessageHeader,
+    MessagePayload,
+    NLPOptions,
+    StreamMessage,
+)
+from microservices.nlp.components.claimextract import ClaimExtraction  # noqa: E402
 from microservices.nlp.config import DEVICE_CONFIG, model_manager  # noqa: E402
 
 EMBEDDING_DIM = 768
-SEP  = "=" * 78
+SEP = "=" * 78
 SEP2 = "-" * 78
 
 
 # ---------------------------------------------------------------------------
 # StreamMessage construction — mirrors the scraper's output message exactly
 # ---------------------------------------------------------------------------
+
 
 def build_stream_message(
     article_url: str,
@@ -537,14 +609,19 @@ def build_stream_message(
         summary=summary,
     )
     message = Message(header=header, payload=payload, stage_timestamps=[])
-    return StreamMessage(stream="user:to.be.nlp", redis_id="0-0", priority=1, data=message)
+    return StreamMessage(
+        stream="user:to.be.nlp", redis_id="0-0", priority=1, data=message
+    )
 
 
 # ---------------------------------------------------------------------------
 # Production pipeline runner
 # ---------------------------------------------------------------------------
 
-def run_pipeline(message: StreamMessage, pipeline: ClaimExtraction, options: NLPOptions) -> float:
+
+def run_pipeline(
+    message: StreamMessage, pipeline: ClaimExtraction, options: NLPOptions
+) -> float:
     """
     Runs the pipeline exactly as NLPService._analyze_html_and_update() does:
       1. Build Article from message fields
@@ -566,6 +643,7 @@ def run_pipeline(message: StreamMessage, pipeline: ClaimExtraction, options: NLP
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
+
 
 def validate(message: StreamMessage) -> Tuple[bool, List[str]]:
     """
@@ -590,12 +668,17 @@ def validate(message: StreamMessage) -> Tuple[bool, List[str]]:
     if not claims:
         failures.append("claims_in_article is empty")
     else:
-        null_emb = [i for i, c in enumerate(claims) if c.decontextualised_claim_embedding is None]
+        null_emb = [
+            i
+            for i, c in enumerate(claims)
+            if c.decontextualised_claim_embedding is None
+        ]
         if null_emb:
             failures.append(f"claims with null embedding: indices {null_emb}")
 
         wrong_dim = [
-            i for i, c in enumerate(claims)
+            i
+            for i, c in enumerate(claims)
             if c.decontextualised_claim_embedding is not None
             and len(c.decontextualised_claim_embedding) != EMBEDDING_DIM
         ]
@@ -616,7 +699,10 @@ def validate(message: StreamMessage) -> Tuple[bool, List[str]]:
 # Pretty printer
 # ---------------------------------------------------------------------------
 
-def print_result(article_name: str, message: StreamMessage, elapsed: float, failures: List[str]) -> None:
+
+def print_result(
+    article_name: str, message: StreamMessage, elapsed: float, failures: List[str]
+) -> None:
     payload = message.data.payload
     passed = len(failures) == 0
 
@@ -628,8 +714,12 @@ def print_result(article_name: str, message: StreamMessage, elapsed: float, fail
     # Bias
     bp = payload.bias_profile
     if bp:
-        print(f"  Bias      : {bp.bias_category}  (conf={bp.bias_analysis_confidence:.3f})")
-        print(f"  Sentiment : {bp.sentiment_category}  (conf={bp.sentiment_analysis_confidence:.3f})")
+        print(
+            f"  Bias      : {bp.bias_category}  (conf={bp.bias_analysis_confidence:.3f})"
+        )
+        print(
+            f"  Sentiment : {bp.sentiment_category}  (conf={bp.sentiment_analysis_confidence:.3f})"
+        )
     else:
         print("  Bias      : MISSING")
 
@@ -637,10 +727,17 @@ def print_result(article_name: str, message: StreamMessage, elapsed: float, fail
     claims = payload.claims_in_article or []
     print(f"  Claims    : {len(claims)}")
     for i, c in enumerate(claims[:3]):
-        emb_status = f"{len(c.decontextualised_claim_embedding)}-dim" if c.decontextualised_claim_embedding else "NO EMBEDDING"
-        ents = ", ".join(f"{e.entity_text}[{e.type_of_entity}]" for e in c.NER_entities) or "—"
+        emb_status = (
+            f"{len(c.decontextualised_claim_embedding)}-dim"
+            if c.decontextualised_claim_embedding
+            else "NO EMBEDDING"
+        )
+        ents = (
+            ", ".join(f"{e.entity_text}[{e.type_of_entity}]" for e in c.NER_entities)
+            or "—"
+        )
         print(f"    [{i}] conf={c.confidence:.2f}  emb={emb_status}")
-        print(f"         \"{c.decontextualised_claim_text[:90]}\"")
+        print(f'         "{c.decontextualised_claim_text[:90]}"')
         print(f"         entities: {ents}")
     if len(claims) > 3:
         print(f"    ... and {len(claims) - 3} more")
@@ -663,6 +760,7 @@ def print_result(article_name: str, message: StreamMessage, elapsed: float, fail
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     # Resolve article files
@@ -696,7 +794,10 @@ def main() -> None:
         if v == "error" and not model_manager._registry[k].required
     }
     if optional_errors:
-        log.warning("Optional models failed to load (pipeline will degrade gracefully): %s", list(optional_errors))
+        log.warning(
+            "Optional models failed to load (pipeline will degrade gracefully): %s",
+            list(optional_errors),
+        )
     if required_errors:
         log.error("Required models failed — cannot run pipeline: %s", required_errors)
         if "SPACY_SENT" in required_errors:
@@ -714,13 +815,13 @@ def main() -> None:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
-        article_url   = data.get("article_url", data.get("url", "http://unknown"))
-        title         = data.get("article_title", "")
-        parsed_text   = data.get("article_text", "")
-        news_outlet   = data.get("source", data.get("news_outlet", path.stem))
-        publish_date  = data.get("scraped_at")
-        author        = data.get("author")
-        summary       = data.get("article_summary", "")
+        article_url = data.get("article_url", data.get("url", "http://unknown"))
+        title = data.get("article_title", "")
+        parsed_text = data.get("article_text", "")
+        news_outlet = data.get("source", data.get("news_outlet", path.stem))
+        publish_date = data.get("scraped_at")
+        author = data.get("author")
+        summary = data.get("article_summary", "")
 
         message = build_stream_message(
             article_url=article_url,
@@ -743,12 +844,19 @@ def main() -> None:
             failures = [f"CRASH: {exc}"]
 
         print_result(path.name, message, elapsed, failures)
-        results.append({"file": path.name, "passed": passed, "failures": failures, "elapsed": elapsed})
+        results.append(
+            {
+                "file": path.name,
+                "passed": passed,
+                "failures": failures,
+                "elapsed": elapsed,
+            }
+        )
 
     # Summary
-    total   = len(results)
-    passed  = sum(1 for r in results if r["passed"])
-    failed  = total - passed
+    total = len(results)
+    passed = sum(1 for r in results if r["passed"])
+    failed = total - passed
 
     print(f"\n{SEP}")
     print(f"SUMMARY  {passed}/{total} passed")

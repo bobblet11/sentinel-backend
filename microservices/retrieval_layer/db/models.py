@@ -1,6 +1,15 @@
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import (Column, DateTime, Float, ForeignKey, Integer, String,
-                        Table, Text, func)
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    func,
+)
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -12,6 +21,7 @@ claim_to_entity_table = Table(
     Column("entity_id", Integer, ForeignKey("entity.id"), primary_key=True),
 )
 
+
 class Entity(Base):
     __tablename__ = "entity"
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -19,7 +29,9 @@ class Entity(Base):
     type = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    claims = relationship("Claim", secondary=claim_to_entity_table, back_populates="entities")
+    claims = relationship(
+        "Claim", secondary=claim_to_entity_table, back_populates="entities"
+    )
 
 
 class Claim(Base):
@@ -32,7 +44,9 @@ class Claim(Base):
     article_id = Column(Integer, ForeignKey("article.id"), nullable=False)
 
     article = relationship("Article", back_populates="claims")
-    entities = relationship("Entity", secondary=claim_to_entity_table, back_populates="claims")
+    entities = relationship(
+        "Entity", secondary=claim_to_entity_table, back_populates="claims"
+    )
 
 
 class NewsOutlet(Base):
@@ -57,7 +71,7 @@ class Article(Base):
     title = Column(String(1024), nullable=True)
     text = Column(Text, nullable=True)
     html = Column(Text, nullable=True)
-    publishedAt = Column('publishedat', DateTime(timezone=True), nullable=True)
+    publishedAt = Column("publishedat", DateTime(timezone=True), nullable=True)
     sentiment_id = Column(Integer, ForeignKey("sentiment_analysis.id"), nullable=True)
     outlet_id = Column(Integer, ForeignKey("news_outlet.id"), nullable=True)
     author_id = Column(Integer, ForeignKey("author.id"), nullable=True)
@@ -107,8 +121,15 @@ class Topic(Base):
 class ArticleTopic(Base):
     __tablename__ = "article_topic"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    article_id = Column(Integer, ForeignKey("article.id", ondelete="CASCADE"), nullable=False, unique=True)
-    topic_id = Column(Integer, ForeignKey("topic.id", ondelete="RESTRICT"), nullable=False)
+    article_id = Column(
+        Integer,
+        ForeignKey("article.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    topic_id = Column(
+        Integer, ForeignKey("topic.id", ondelete="RESTRICT"), nullable=False
+    )
     confidence = Column(Float, nullable=False)
 
     topic = relationship("Topic", back_populates="article_topics")

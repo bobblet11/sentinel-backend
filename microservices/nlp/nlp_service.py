@@ -7,17 +7,32 @@ from typing import List, Optional
 import torch
 
 from common.io.json_updater import JsonHandler
-from common.models.api.redis_models import (Article, BiasProfile, Claim,
-                                            Entity, NLPOptions, NLPResult,
-                                            SentenceScore, StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    BiasProfile,
+    Claim,
+    Entity,
+    NLPOptions,
+    NLPResult,
+    SentenceScore,
+    StreamMessage,
+)
 from common.models.api.validation_helpers import (
-    get_pretty_print_stream_message, validate_after_nlp)
-from common.service.service_template import (ProcessingError, ServiceConfig,
-                                             ServiceTemplate)
+    get_pretty_print_stream_message,
+    validate_after_nlp,
+)
+from common.service.service_template import (
+    ProcessingError,
+    ServiceConfig,
+    ServiceTemplate,
+)
 from microservices.nlp.components.claimextract import ClaimExtraction
-from microservices.nlp.config import (DEVICE_CONFIG, DUMMY_NLP_MODE,
-                                      ENABLE_DECONTEXTUALIZATION,
-                                      model_manager)
+from microservices.nlp.config import (
+    DEVICE_CONFIG,
+    DUMMY_NLP_MODE,
+    ENABLE_DECONTEXTUALIZATION,
+    model_manager,
+)
 
 logger = getLogger("NLP")
 EMBEDDING_DIM = 768
@@ -50,7 +65,9 @@ def _build_dummy_result() -> NLPResult:
     ]
 
     entities = [
-        Entity(entity_text="Government", type_of_entity="ORG", start_char=0, end_char=10),
+        Entity(
+            entity_text="Government", type_of_entity="ORG", start_char=0, end_char=10
+        ),
         Entity(entity_text="taxes", type_of_entity="TOPIC", start_char=11, end_char=16),
     ]
 
@@ -106,37 +123,50 @@ class NLPService(ServiceTemplate):
             # and dispatched via typed tags (SentenceGenerator, SentenceProcessor,
             # SentenceConsumer, ArticleProcessor).
             self.pipeline = [
-                (name, cls(device_config=DEVICE_CONFIG, model_manager=model_manager), ctype)
+                (
+                    name,
+                    cls(device_config=DEVICE_CONFIG, model_manager=model_manager),
+                    ctype,
+                )
                 for name, cls, ctype in PIPELINE_ORDER
             ]
             logger.info("Model health: %s", model_manager.health_check())
-        
+
         self.stats_json_handler = JsonHandler(filename="stats.json")
-        
-    def _log_stats(self,
-               news_outlet: str,
-               len_claims_extracted: int,
-               entities_extracted: List[Entity],
-               bias_profile: BiasProfile,
-               error_type: Optional[str] = None) -> None:
+
+    def _log_stats(
+        self,
+        news_outlet: str,
+        len_claims_extracted: int,
+        entities_extracted: List[Entity],
+        bias_profile: BiasProfile,
+        error_type: Optional[str] = None,
+    ) -> None:
 
         data = self.stats_json_handler.read_json()
         day_key = datetime.now().date().isoformat()
 
-        entry = data.setdefault(day_key, {
-            "jobs_processed": 0,
-            "claims_extracted": 0,
-            "entities_extracted": 0,
-            "bias_profiles": {
-                "left": 0, "right": 0, "center": 0,
-                "subjective": 0, "objective": 0,
-                "emotive": 0, "non_emotive": 0
+        entry = data.setdefault(
+            day_key,
+            {
+                "jobs_processed": 0,
+                "claims_extracted": 0,
+                "entities_extracted": 0,
+                "bias_profiles": {
+                    "left": 0,
+                    "right": 0,
+                    "center": 0,
+                    "subjective": 0,
+                    "objective": 0,
+                    "emotive": 0,
+                    "non_emotive": 0,
+                },
+                "entity_distribution": {},
+                "outlet_stats": {},
+                "errors": {},
             },
-            "entity_distribution": {},
-            "outlet_stats": {},
-            "errors": {}
-        })
-        
+        )
+
         # Update global totals
         entry["jobs_processed"] += 1
         entry["claims_extracted"] += len_claims_extracted
@@ -163,18 +193,25 @@ class NLPService(ServiceTemplate):
             entry["errors"][error_type] = entry["errors"].get(error_type, 0) + 1
 
         # --- Outlet‑level stats ---
-        outlet_entry = entry["outlet_stats"].setdefault(news_outlet, {
-            "jobs_processed": 0,
-            "claims_extracted": 0,
-            "entities_extracted": 0,
-            "entity_distribution": {},
-            "bias_profiles": {
-                "left": 0, "right": 0, "center": 0,
-                "subjective": 0, "objective": 0,
-                "emotive": 0, "non_emotive": 0
+        outlet_entry = entry["outlet_stats"].setdefault(
+            news_outlet,
+            {
+                "jobs_processed": 0,
+                "claims_extracted": 0,
+                "entities_extracted": 0,
+                "entity_distribution": {},
+                "bias_profiles": {
+                    "left": 0,
+                    "right": 0,
+                    "center": 0,
+                    "subjective": 0,
+                    "objective": 0,
+                    "emotive": 0,
+                    "non_emotive": 0,
+                },
+                "errors": {},
             },
-            "errors": {}
-        })
+        )
 
         outlet_entry["jobs_processed"] += 1
         outlet_entry["claims_extracted"] += len_claims_extracted
@@ -199,7 +236,9 @@ class NLPService(ServiceTemplate):
 
         # Outlet errors
         if error_type:
-            outlet_entry["errors"][error_type] = outlet_entry["errors"].get(error_type, 0) + 1
+            outlet_entry["errors"][error_type] = (
+                outlet_entry["errors"].get(error_type, 0) + 1
+            )
 
         # Prune to last 30 days
         MAX_DAYS = 30
@@ -209,7 +248,6 @@ class NLPService(ServiceTemplate):
                 del data[old_date]
 
         self.stats_json_handler.write_json(data)
-
 
     def _analyze_html_and_update(self, message: StreamMessage) -> StreamMessage:
         """
@@ -229,9 +267,7 @@ class NLPService(ServiceTemplate):
                 if component_type == "SentenceGenerator":
                     sentences = component.run(article, message, self.options)
                 elif component_type == "SentenceProcessor":
-                    sentences = component.run(
-                        article, message, self.options, sentences
-                    )
+                    sentences = component.run(article, message, self.options, sentences)
                 elif component_type == "SentenceConsumer":
                     component.run(article, message, self.options, sentences)
                 else:  # ArticleProcessor
@@ -256,7 +292,7 @@ class NLPService(ServiceTemplate):
         #     result = message.create_nlp_result()
         #     result.sentences = sentences
         #     message.set_nlp_result(result)
-        
+
         validate_after_nlp(stream_message=message, message=None)
         self.logger.debug(get_pretty_print_stream_message(message))
         return message
@@ -269,23 +305,21 @@ class NLPService(ServiceTemplate):
                 return message
 
             self._analyze_html_and_update(message)
-            
-            
-            
+
             self._log_stats(
                 news_outlet=message.data.payload.news_outlet,
                 len_claims_extracted=len(message.all_claims),
                 entities_extracted=message.all_entities,
-                bias_profile=message.bias_profile
+                bias_profile=message.bias_profile,
             )
-            
+
             return message
         except Exception as e:
             self._log_stats(
                 news_outlet=message.data.payload.news_outlet,
                 len_claims_extracted=len(message.all_claims),
                 entities_extracted=message.all_entities,
-                bias_profile=message.bias_profile
+                bias_profile=message.bias_profile,
             )
             raise ProcessingError(f"Failed to analyze {message.link}: {e}")
         finally:

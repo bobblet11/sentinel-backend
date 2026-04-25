@@ -18,23 +18,25 @@ class RedisConsumer:
         group_name (str): The name of the Redis group to listen to.
         consumer_name (str): The name redis is told when a message is consumed.
         """
-        
+
         if not isinstance(stream_name, str) or not stream_name:
             raise ValueError("stream_name must be a non-empty str.")
-        
+
         if not isinstance(consumer_name, str) or not consumer_name:
             raise ValueError("consumer_name must be a non-empty string.")
-        
+
         if not isinstance(group_name, str) or not group_name:
             raise ValueError("group_name must be a non-empty string.")
 
         self.logger: Logger = getLogger(f"{consumer_name}.redis_consumer")
-        self.stream_name:str = stream_name
-        self.group_name:str = group_name
-        self.consumer_name:str = consumer_name
-        self.client:redis.Redis = redis_connection.get_client()
+        self.stream_name: str = stream_name
+        self.group_name: str = group_name
+        self.consumer_name: str = consumer_name
+        self.client: redis.Redis = redis_connection.get_client()
         self._create_group()
-        self.logger.info(f"RedisConsumer ready: stream='{self.stream_name}', group='{self.group_name}'")
+        self.logger.info(
+            f"RedisConsumer ready: stream='{self.stream_name}', group='{self.group_name}'"
+        )
 
     def _create_group(self) -> None:
         """
@@ -44,40 +46,46 @@ class RedisConsumer:
             # XGROUP CREATE <stream> <group> $ MKSTREAM
             # '$' means start reading from the end of the stream (only new messages).
             # MKSTREAM will create the stream if it doesn't exist.
-            
-            
-            
+
             # 0: This special ID signifies that the consumer group should start reading from the very beginning of the stream, consuming every message that has ever been published to it.[1][2]
             # $: This special ID tells the consumer group to only start consuming new messages that arrive after the group was created. It will not receive any of the messages that are already in the stream.[1]
             # A specific message ID: You can provide any valid message ID. The consumer group will then start reading messages that come after that specific ID.
-            
+
             self.client.xgroup_create(
                 self.stream_name, self.group_name, id="0", mkstream=True
             )
-            
-            self.logger.info(f"Created group '{self.group_name}' on stream '{self.stream_name}'.")
+
+            self.logger.info(
+                f"Created group '{self.group_name}' on stream '{self.stream_name}'."
+            )
 
         except redis.exceptions.ResponseError as e:
             if "BUSYGROUP" not in str(e):
                 raise e
-            self.logger.debug(f"Group '{self.group_name}' already exists on stream '{self.stream_name}'.")
+            self.logger.debug(
+                f"Group '{self.group_name}' already exists on stream '{self.stream_name}'."
+            )
 
-    def _decode_one_message(self, stream_name:str, redis_message_id:str, fields:Dict[str, Any]) -> Dict[str, Any]:
+    def _decode_one_message(
+        self, stream_name: str, redis_message_id: str, fields: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Decodes a single raw message from Redis, handling byte conversion and JSON parsing.
         """
         decoded_fields: Dict[str, Any] = fields
-        message_data:Dict[str, Any] = {}
-        
+        message_data: Dict[str, Any] = {}
+
         if "payload" in decoded_fields:
             message_data = json.loads(decoded_fields["payload"])
         else:
-            self.logger.warning(f"Message {redis_message_id} is missing 'payload' field.")
+            self.logger.warning(
+                f"Message {redis_message_id} is missing 'payload' field."
+            )
             message_data = decoded_fields
 
         return {
             "stream": stream_name,
-            "redis_message_id": redis_message_id, 
+            "redis_message_id": redis_message_id,
             "data": message_data,
         }
 
@@ -108,10 +116,10 @@ class RedisConsumer:
                 ["stream_name_B", (message1, message2, ...)]
             ]
             """
-            
-            stream_name:str
+
+            stream_name: str
             messages: List[str]
-            
+
             stream_name, messages = response[0]
             redis_message_id, fields = messages[0]
 
@@ -120,7 +128,6 @@ class RedisConsumer:
         except Exception as e:
             self.logger.error(f"Could not consume a single message: {e}")
             raise e
-
 
     def consume_many(
         self, num_to_consume: int = 1, block: int = 0
@@ -149,13 +156,13 @@ class RedisConsumer:
             for stream_name, messages in response:
                 for redis_message_id, fields in messages:
                     try:
-                        
-                        message_dict:Dict[str, Any] = self._decode_one_message(
+
+                        message_dict: Dict[str, Any] = self._decode_one_message(
                             stream_name, redis_message_id, fields
                         )
-                        
+
                         all_messages.append(message_dict)
-                        
+
                     except json.JSONDecodeError as e:
                         self.logger.error(
                             f"Skipping message {redis_message_id}... Could not decode message from stream '{stream_name}' due to JSON decode error: {e}"
@@ -189,7 +196,7 @@ class RedisConsumer:
             for stream_name, messages in response:
                 for redis_message_id, fields in messages:
                     try:
-                        message_dict:Dict[str, Any] = self._decode_one_message(
+                        message_dict: Dict[str, Any] = self._decode_one_message(
                             stream_name, redis_message_id, fields
                         )
                         all_messages.append(message_dict)
@@ -208,37 +215,49 @@ class RedisConsumer:
         """
         Acknowledges that a message from a specific stream has been processed.
         """
-        
+
         try:
             result = self.client.xack(
                 self.stream_name, self.group_name, redis_message_id
             )
             if result == 0:
                 raise Exception("Failed to ack")
-            self.client.hincrby(f"stream:{self.stream_name}:group:{self.group_name}:acks", self.consumer_name, 1)
+            self.client.hincrby(
+                f"stream:{self.stream_name}:group:{self.group_name}:acks",
+                self.consumer_name,
+                1,
+            )
             self.logger.debug(f"Successfully acknowledged {redis_message_id}")
-            
+
         except Exception as e:
             self.logger.error(
                 f"Failed to acknowledging message {redis_message_id} on stream {self.stream_name}: {e}"
             )
             raise e
-    
+
     def acknowledge_and_delete(self, stream_name: str, redis_message_id: str) -> None:
         """
         Acknowledges that a message from a specific stream has been processed and deletes it from last stream
         """
-        
+
         try:
-            ack_result = self.client.xack(stream_name, self.group_name, redis_message_id)
+            ack_result = self.client.xack(
+                stream_name, self.group_name, redis_message_id
+            )
             if ack_result == 0:
                 raise Exception("Failed to ack")
-            self.client.hincrby(f"stream:{self.stream_name}:group:{self.group_name}:acks", self.consumer_name, 1)
+            self.client.hincrby(
+                f"stream:{self.stream_name}:group:{self.group_name}:acks",
+                self.consumer_name,
+                1,
+            )
             del_result = self.client.xdel(stream_name, redis_message_id)
             if del_result == 0:
                 raise Exception("Failed to del")
-            
-            self.logger.debug(f"Successfully acknowledged and cleaned up {redis_message_id}")
+
+            self.logger.debug(
+                f"Successfully acknowledged and cleaned up {redis_message_id}"
+            )
         except Exception as e:
             self.logger.error(
                 f"Failed to acknowledging message {redis_message_id} on stream {stream_name}: {e}"

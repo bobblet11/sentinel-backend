@@ -27,13 +27,16 @@ import numpy as np
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from scripts.topic_clustering.poc_cluster import (CONFIDENCE_THRESHOLD,
-                                                  PREDEFINED_TOPICS,
-                                                  TOPIC_DESCRIPTIONS,
-                                                  _build_docs, _clean_doc,
-                                                  get_engine,
-                                                  load_embedding_model,
-                                                  load_env)
+from scripts.topic_clustering.poc_cluster import (
+    CONFIDENCE_THRESHOLD,
+    PREDEFINED_TOPICS,
+    TOPIC_DESCRIPTIONS,
+    _build_docs,
+    _clean_doc,
+    get_engine,
+    load_embedding_model,
+    load_env,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,8 +47,7 @@ logger = logging.getLogger(__name__)
 
 # ── SQL ──────────────────────────────────────────────────────────────────────
 
-_SQL_FETCH_UNCOVERED = text(
-    """
+_SQL_FETCH_UNCOVERED = text("""
     SELECT a.id, a.title, top_c.top_claims
     FROM article a
     LEFT JOIN article_topic at ON at.article_id = a.id
@@ -64,11 +66,9 @@ _SQL_FETCH_UNCOVERED = text(
       AND at.article_id IS NULL
     ORDER BY a.id
     LIMIT :limit OFFSET :offset
-    """
-)
+    """)
 
-_SQL_FETCH_ALL = text(
-    """
+_SQL_FETCH_ALL = text("""
     SELECT a.id, a.title, top_c.top_claims
     FROM article a
     LEFT JOIN LATERAL (
@@ -85,23 +85,21 @@ _SQL_FETCH_ALL = text(
     WHERE a.title IS NOT NULL AND a.title != ''
     ORDER BY a.id
     LIMIT :limit OFFSET :offset
-    """
-)
+    """)
 
 _SQL_FETCH_TOPIC_ID = text("SELECT id FROM topic WHERE name = :name")
 
-_SQL_UPSERT_ARTICLE_TOPIC = text(
-    """
+_SQL_UPSERT_ARTICLE_TOPIC = text("""
     INSERT INTO article_topic (article_id, topic_id, confidence)
     VALUES (:article_id, :topic_id, :confidence)
     ON CONFLICT (article_id)
     DO UPDATE SET topic_id   = EXCLUDED.topic_id,
                   confidence = EXCLUDED.confidence
-    """
-)
+    """)
 
 
 # ── Classification helpers ────────────────────────────────────────────────────
+
 
 def classify_batch(
     rows: list,
@@ -135,7 +133,10 @@ def classify_batch(
     if non_empty_indices:
         texts_to_encode = [docs[i] for i in non_empty_indices]
         doc_embs = model.encode(
-            texts_to_encode, normalize_embeddings=True, show_progress_bar=False, batch_size=64
+            texts_to_encode,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+            batch_size=64,
         )
         sims = doc_embs @ topic_embs.T
 
@@ -157,6 +158,7 @@ def classify_batch(
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
+
 
 def run_backfill(
     engine: Engine,
@@ -194,7 +196,8 @@ def run_backfill(
             row = conn.execute(_SQL_FETCH_TOPIC_ID, {"name": name}).fetchone()
             if row is None:
                 logger.error(
-                    "Topic '%s' not found in DB — run 002_add_topic_tables.sql first", name
+                    "Topic '%s' not found in DB — run 002_add_topic_tables.sql first",
+                    name,
                 )
                 sys.exit(1)
             topic_id_cache[name] = int(row[0])
@@ -208,7 +211,9 @@ def run_backfill(
 
     while True:
         with engine.connect() as conn:
-            rows = conn.execute(fetch_sql, {"limit": batch_size, "offset": offset}).fetchall()
+            rows = conn.execute(
+                fetch_sql, {"limit": batch_size, "offset": offset}
+            ).fetchall()
 
         if not rows:
             break
@@ -221,11 +226,17 @@ def run_backfill(
                     topic_id = topic_id_cache.get(label, topic_id_cache["General"])
                     conn.execute(
                         _SQL_UPSERT_ARTICLE_TOPIC,
-                        {"article_id": article_id, "topic_id": topic_id, "confidence": confidence},
+                        {
+                            "article_id": article_id,
+                            "topic_id": topic_id,
+                            "confidence": confidence,
+                        },
                     )
         else:
             for article_id, label, confidence in assignments:
-                logger.info("[DRY RUN] article_id=%d → %s (%.4f)", article_id, label, confidence)
+                logger.info(
+                    "[DRY RUN] article_id=%d → %s (%.4f)", article_id, label, confidence
+                )
 
         total_processed += len(assignments)
         offset += batch_size
@@ -291,7 +302,9 @@ def main() -> None:
     )
 
     if processed == 0:
-        logger.info("No articles needed backfilling — all articles already have a topic.")
+        logger.info(
+            "No articles needed backfilling — all articles already have a topic."
+        )
     else:
         logger.info("Done. %d articles assigned a topic.", processed)
 

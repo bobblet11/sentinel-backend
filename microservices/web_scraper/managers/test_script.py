@@ -13,10 +13,12 @@ DOMAIN_MAP = {
     "random.html": "https://www.randomnews.com/article/mock-article",
 }
 
+
 def infer_url(path: str) -> str:
     """Return the correct domain URL based on the filename."""
     filename = os.path.basename(path).lower()
     return DOMAIN_MAP.get(filename, None)
+
 
 def run_file(path):
     print("\n==============================")
@@ -40,6 +42,7 @@ def run_file(path):
     print("Words:", len(parsed.get("text", "").split()))
     print("Preview:", parsed.get("text", ""))
     print("\n")
+
 
 if __name__ == "__main__":
     for file_path in glob.glob("microservices/web_scraper/test_html/*.html"):

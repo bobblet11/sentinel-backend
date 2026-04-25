@@ -9,6 +9,7 @@ URL_SPREAD = {
     "euronews": "https://www.euronews.com/2026/03/30/trump-threatens-to-obliterate-irans-kharg-island-oil-hub-if-no-deal-reached-shortly",
 }
 
+
 class WebScraperNLPBenchmark(BenchmarkTemplate):
     """
     Benchmark to see if author, published_date, news_outlet is filled out by the hardcoded parsers in WebScraper.
@@ -34,8 +35,8 @@ class WebScraperNLPBenchmark(BenchmarkTemplate):
         return jobs
 
     def validate_results(
-            self, successfully_processed_jobs: List[Dict[str, Any]]
-        ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        self, successfully_processed_jobs: List[Dict[str, Any]]
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Validate that all fields in Message are non-None."""
         valid, invalid = [], []
         for job in successfully_processed_jobs:
@@ -50,8 +51,12 @@ class WebScraperNLPBenchmark(BenchmarkTemplate):
                 payload_ok = all(
                     getattr(message.payload, field_name) is not None
                     for field_name in message.payload.model_fields.keys()
-                    if field_name not in [
-                        "sentences", "claims_in_article", "entities_in_article", "bias_profile",
+                    if field_name
+                    not in [
+                        "sentences",
+                        "claims_in_article",
+                        "entities_in_article",
+                        "bias_profile",
                     ]
                 )
                 if header_ok and payload_ok:
@@ -61,6 +66,8 @@ class WebScraperNLPBenchmark(BenchmarkTemplate):
             except ValidationError as e:
                 invalid.append({"job": job, "error": str(e)})
         return valid, invalid
+
+
 if __name__ == "__main__":
     benchmark = WebScraperNLPBenchmark()
     results = benchmark.run()

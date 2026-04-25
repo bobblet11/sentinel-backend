@@ -17,6 +17,7 @@ def bar(value, max_value, length=20):
     filled = int((value / max_value) * length)
     return "[" + "*" * filled + "." * (length - filled) + "]"
 
+
 def show_recent_stream_messages(r, stream_name, limit=3):
     try:
         entries = r.xrevrange(stream_name, count=limit)
@@ -72,18 +73,21 @@ def inspect_redis():
         "retrieval": stream_stats.get("failure:to.be.retrieval", 0),
     }
     waiting = {
-        "scraper": stream_stats.get("background:to.be.nlp", 0) + stream_stats.get("user:to.be.nlp", 0),
-        "nlp": stream_stats.get("background:to.be.retrieval", 0) + stream_stats.get("user:to.be.retrieval", 0),
+        "scraper": stream_stats.get("background:to.be.nlp", 0)
+        + stream_stats.get("user:to.be.nlp", 0),
+        "nlp": stream_stats.get("background:to.be.retrieval", 0)
+        + stream_stats.get("user:to.be.retrieval", 0),
         "retrieval": stream_stats.get("retrieval:uid.store", 0),
     }
     completed = set_stats.get("retrieval:uid.store", 0)
-    total_ingested = stream_stats.get("background:to.be.scraped", 0) + stream_stats.get("user:to.be.scraped", 0)
+    total_ingested = stream_stats.get("background:to.be.scraped", 0) + stream_stats.get(
+        "user:to.be.scraped", 0
+    )
 
     num_keys = r.dbsize()
     memory_info = r.info("memory")
     memory_used_bytes = memory_info.get("used_memory", 0)
     memory_used_human = memory_info.get("used_memory_human", "0B")
-
 
     print("\n====================================")
     print("        REDIS PIPELINE DASHBOARD")
@@ -106,16 +110,24 @@ def inspect_redis():
         print()
 
     print(">>> PIPELINE FLOW - BACKGROUND")
-    print(f"[ background:to.be.scraped ] ({stream_stats.get('background:to.be.scraped',0)})")
+    print(
+        f"[ background:to.be.scraped ] ({stream_stats.get('background:to.be.scraped',0)})"
+    )
     print("            |")
     print("            v")
-    print(f"[ background:to.be.nlp ] ({stream_stats.get('background:to.be.nlp',0)}) ----> failure:to.be.scraped ({failures['scraper']})")
+    print(
+        f"[ background:to.be.nlp ] ({stream_stats.get('background:to.be.nlp',0)}) ----> failure:to.be.scraped ({failures['scraper']})"
+    )
     print("            |")
     print("            v")
-    print(f"[ background:to.be.retrieval ] ({stream_stats.get('background:to.be.retrieval',0)}) ----> failure:to.be.nlp ({failures['nlp']})")
+    print(
+        f"[ background:to.be.retrieval ] ({stream_stats.get('background:to.be.retrieval',0)}) ----> failure:to.be.nlp ({failures['nlp']})"
+    )
     print("            |")
     print("            v")
-    print(f"[ retrieval:uid.store ] ({completed} completed) ----> failure:to.be.retrieval ({failures['retrieval']})")
+    print(
+        f"[ retrieval:uid.store ] ({completed} completed) ----> failure:to.be.retrieval ({failures['retrieval']})"
+    )
 
     print("\n>>> PIPELINE FLOW - USER")
     print(f"[ user:to.be.scraped ] ({stream_stats.get('user:to.be.scraped',0)})")
@@ -147,7 +159,9 @@ def inspect_redis():
 
                     # Redis returns hash keys/vals as bytes if decode_responses=False
                     raw_acked = ack_stats.get(
-                        cname if isinstance(next(iter(ack_stats.keys()), None), str) else cname.encode()
+                        cname
+                        if isinstance(next(iter(ack_stats.keys()), None), str)
+                        else cname.encode()
                     )
                     acked = int(raw_acked) if raw_acked is not None else 0
 
@@ -164,12 +178,15 @@ def inspect_redis():
     show_recent_stream_messages(r, "user:to.be.nlp")
     show_recent_stream_messages(r, "user:to.be.retrieval")
 
-    result_keys = sorted([k for k in hash_stats.keys() if k.startswith("retrieval:hash.store:")])
+    result_keys = sorted(
+        [k for k in hash_stats.keys() if k.startswith("retrieval:hash.store:")]
+    )
     print(f"\nStored retrieval result hashes: {len(result_keys)}")
     for key in result_keys[-5:]:
         print(f"  {key}")
 
     print("\n====================================\n")
+
 
 if __name__ == "__main__":
     inspect_redis()

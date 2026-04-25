@@ -3,6 +3,7 @@ from transformers import pipeline
 
 _nli = None
 
+
 def get_nli():
     global _nli
     if _nli is None:
@@ -12,8 +13,9 @@ def get_nli():
             model="typeform/distilbert-base-uncased-mnli",
             device=device_id,
         )
-        
+
     return _nli
+
 
 LABEL_ALIASES = {
     # Common textual labels
@@ -43,14 +45,12 @@ def _normalize_label(raw_label: str) -> str:
         return mapped
     return "irrelevant"
 
+
 def classify_claim_relation(user_claim: str, candidate_claim: str):
     nli = get_nli()
     #             premise            hypothesis
     text_pair = f"{user_claim} [SEP] {candidate_claim}"
-    raw_result = nli(
-        text_pair,
-        truncation=True
-    )
+    raw_result = nli(text_pair, truncation=True)
 
     # Handle output shape differences across transformers versions:
     # - [[{label, score}, ...]]

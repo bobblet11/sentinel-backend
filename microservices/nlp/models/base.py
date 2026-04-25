@@ -1,8 +1,13 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
-from common.models.api.redis_models import (Article, NLPOptions, NLPResult,
-                                            SentenceScore, StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    NLPOptions,
+    NLPResult,
+    SentenceScore,
+    StreamMessage,
+)
 
 
 class NLPComponent(ABC):
@@ -29,7 +34,9 @@ class ArticleProcessor(ABC):
     """
 
     @abstractmethod
-    def run(self, article: Article, message: StreamMessage, options: NLPOptions) -> None:
+    def run(
+        self, article: Article, message: StreamMessage, options: NLPOptions
+    ) -> None:
         """Executes component logic and writes into result in-place."""
 
 

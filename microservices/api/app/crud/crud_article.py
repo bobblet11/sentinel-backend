@@ -1,4 +1,3 @@
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -8,7 +7,9 @@ from microservices.api.app.models.article import Article, NewsOutlet
 
 
 def get_or_create_outlet(db: Session, name: str) -> NewsOutlet:
-    row = db.execute(select(NewsOutlet).where(NewsOutlet.name == name)).scalar_one_or_none()
+    row = db.execute(
+        select(NewsOutlet).where(NewsOutlet.name == name)
+    ).scalar_one_or_none()
     if row:
         return row
     outlet = NewsOutlet(name=name)
@@ -16,7 +17,8 @@ def get_or_create_outlet(db: Session, name: str) -> NewsOutlet:
     db.flush()
     return outlet
 
-def create_article(db: Session, job_in: JobCreate)->Article:
+
+def create_article(db: Session, job_in: JobCreate) -> Article:
     outlet = None
     if job_in.news_outlet:
         outlet = get_or_create_outlet(db, job_in.news_outlet)
@@ -38,11 +40,11 @@ def create_article(db: Session, job_in: JobCreate)->Article:
         return existing_article
 
     db_obj = Article(
-        url = job_in.article_url,
-        title = job_in.article_title,
-        html = job_in.article_html,
-        text = job_in.article_text,
-        outlet_id = outlet.id if outlet else None,
+        url=job_in.article_url,
+        title=job_in.article_title,
+        html=job_in.article_html,
+        text=job_in.article_text,
+        outlet_id=outlet.id if outlet else None,
     )
 
     db.add(db_obj)
@@ -54,4 +56,3 @@ def create_article(db: Session, job_in: JobCreate)->Article:
 
 def get_article_by_url(db: Session, article_url: str) -> Article | None:
     return db.query(Article).filter(Article.url == article_url).first()
-

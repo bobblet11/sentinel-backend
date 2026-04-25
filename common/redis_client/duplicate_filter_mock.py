@@ -1,4 +1,3 @@
-
 from logging import getLogger
 from typing import List
 
@@ -22,7 +21,9 @@ class RedisDuplicateFilterMock:
                 raise Exception("No argument provided for checking")
             return item in self.duplicate_filter
         except Exception as e:
-            self.logger.error(f"Unexpectedly failed to check if item {item} exists in set! {e}")
+            self.logger.error(
+                f"Unexpectedly failed to check if item {item} exists in set! {e}"
+            )
             raise e
 
     def has_many(self, items: list[str]) -> list[str]:
@@ -31,7 +32,7 @@ class RedisDuplicateFilterMock:
 
         This uses a Redis pipeline to perform a multi-SISMEMBER check in a
         single network round-trip.
-        
+
         Returns a sub-list containing only the items that were NOT FOUND in the Redis set.
         """
 
@@ -40,7 +41,9 @@ class RedisDuplicateFilterMock:
                 raise Exception("No items to check")
 
             # The result will be a list of booleans [1, 0, 1, ...]s
-            exists_results:List[bool] = [1 if item in self.duplicate_filter else 0 for item in items]
+            exists_results: List[bool] = [
+                1 if item in self.duplicate_filter else 0 for item in items
+            ]
             unseen_items: List[str] = [
                 item for item, exists in zip(items, exists_results) if not exists
             ]
@@ -61,7 +64,7 @@ class RedisDuplicateFilterMock:
                 raise Exception("No item to add")
 
             self.duplicate_filter.add(item)
-            
+
         except Exception as e:
             self.logger.error(f"Failed to add item {item} to set {e}")
             raise e
@@ -76,9 +79,7 @@ class RedisDuplicateFilterMock:
                 raise Exception("No items to add")
 
             self.duplicate_filter.update(items)
-            
+
         except Exception as e:
-            self.logger.error(
-                f"Failed to add {len(items)} items to set! {e}"
-            )
+            self.logger.error(f"Failed to add {len(items)} items to set! {e}")
             raise e

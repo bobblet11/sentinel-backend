@@ -24,27 +24,35 @@ DB_NAME = os.getenv("POSTGRES_DB", "sentinel_db")
 DB_USER = os.getenv("POSTGRES_USER", "sentinel_user")
 DB_PASS = os.getenv("POSTGRES_PASSWORD", "Sentinel12345")
 
-SEP  = "=" * 80
+SEP = "=" * 80
 SEP2 = "-" * 80
 
 
 def connect():
     try:
         return psycopg2.connect(
-            host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
-            user=DB_USER, password=DB_PASS
+            host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS
         )
     except psycopg2.OperationalError as e:
         # Try to find the current postgres container IP automatically
         try:
-            ip = subprocess.check_output(
-                ["sudo", "docker", "inspect", "sentinel-postgres-container",
-                 "--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}"],
-                stderr=subprocess.DEVNULL
-            ).decode().strip()
+            ip = (
+                subprocess.check_output(
+                    [
+                        "sudo",
+                        "docker",
+                        "inspect",
+                        "sentinel-postgres-container",
+                        "--format",
+                        "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+                    ],
+                    stderr=subprocess.DEVNULL,
+                )
+                .decode()
+                .strip()
+            )
             return psycopg2.connect(
-                host=ip, port=DB_PORT, dbname=DB_NAME,
-                user=DB_USER, password=DB_PASS
+                host=ip, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS
             )
         except Exception:
             raise e
@@ -70,7 +78,8 @@ def get_jobs(cur, uid=None):
 
 
 def get_claims(cur, article_id):
-    cur.execute("""
+    cur.execute(
+        """
         SELECT c.decontextualised_claim, c.centrality_score,
                array_agg(e.name || '[' || COALESCE(e.type, '?') || ']') AS entities
         FROM claim c
@@ -79,13 +88,27 @@ def get_claims(cur, article_id):
         WHERE c.article_id = %s
         GROUP BY c.id, c.decontextualised_claim, c.centrality_score
         ORDER BY c.centrality_score DESC NULLS LAST
-    """, (article_id,))
+    """,
+        (article_id,),
+    )
     return cur.fetchall()
 
 
 def print_job(job, claims):
-    j_id, uid, status, j_type, created_at, article_id, url, title, \
-        bias_cat, bias_conf, sentiment_cat, sentiment_conf = job
+    (
+        j_id,
+        uid,
+        status,
+        j_type,
+        created_at,
+        article_id,
+        url,
+        title,
+        bias_cat,
+        bias_conf,
+        sentiment_cat,
+        sentiment_conf,
+    ) = job
 
     print(SEP)
     print(f"JOB #{j_id}  |  {uid}")
@@ -94,8 +117,15 @@ def print_job(job, claims):
     print(f"  Created   : {created_at}")
     print(f"  Title     : {title or '(none)'}")
     print(f"  URL       : {url}")
-    print(f"  Bias      : {bias_cat or 'N/A'}  (conf={bias_conf:.3f})" if bias_conf is not None else f"  Bias      : N/A")
-    print(f"  Sentiment : {sentiment_cat or 'N/A'}" + (f"  (conf={sentiment_conf:.3f})" if sentiment_conf else ""))
+    print(
+        f"  Bias      : {bias_cat or 'N/A'}  (conf={bias_conf:.3f})"
+        if bias_conf is not None
+        else f"  Bias      : N/A"
+    )
+    print(
+        f"  Sentiment : {sentiment_cat or 'N/A'}"
+        + (f"  (conf={sentiment_conf:.3f})" if sentiment_conf else "")
+    )
 
     print()
     if not claims:

@@ -5,10 +5,15 @@ import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
 
-from common.models.api.redis_models import (Article, NLPOptions, SentenceScore,
-                                            StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    NLPOptions,
+    SentenceScore,
+    StreamMessage,
+)
 from microservices.nlp.components.device import DeviceConfig
 from microservices.nlp.config import EMBEDDER_BATCH_SIZE, EMBEDDING_MODEL
+
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
 
@@ -44,12 +49,19 @@ class Embedder(SentenceProcessor):
     Does NOT otherwise modify result.
     """
 
-    def __init__(self, device_config: DeviceConfig, model_name: str = EMBEDDING_MODEL, model_manager: Optional[Any] = None):
+    def __init__(
+        self,
+        device_config: DeviceConfig,
+        model_name: str = EMBEDDING_MODEL,
+        model_manager: Optional[Any] = None,
+    ):
         self.model_name = model_name
         self.device = device_config.device
 
-        logger.info(f"Embedder: Loading '{self.model_name}' on {self.device} "
-                    f"(fp16={device_config.use_fp16})...")
+        logger.info(
+            f"Embedder: Loading '{self.model_name}' on {self.device} "
+            f"(fp16={device_config.use_fp16})..."
+        )
         try:
             if model_manager is not None:
                 from common.model_manager.registry import ModelState
@@ -104,7 +116,9 @@ class Embedder(SentenceProcessor):
             for i, sent in enumerate(sentences):
                 sent.embedding = embeddings[i].tolist()
 
-            logger.info(f"Embedder: Vectorized {len(texts)} sentences ({embeddings.shape[1]}-dim).")
+            logger.info(
+                f"Embedder: Vectorized {len(texts)} sentences ({embeddings.shape[1]}-dim)."
+            )
 
         except Exception as e:
             logger.error(f"Embedder: Encoding failed: {e}")

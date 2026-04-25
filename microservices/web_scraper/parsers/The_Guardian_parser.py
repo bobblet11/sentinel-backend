@@ -3,18 +3,17 @@ from typing import Optional
 
 from bs4 import BeautifulSoup
 
-from microservices.web_scraper.parsers.base_parser import (BaseParser,
-                                                           ParseResult)
+from microservices.web_scraper.parsers.base_parser import BaseParser, ParseResult
 
 
 class TheGuardianParser(BaseParser):
     def extract(self, soup: BeautifulSoup, article_url: str) -> Optional[ParseResult]:
         # Guardian usually puts content in div[data-gu-name='body'] or main
         container = (
-            soup.find("div", {"data-gu-name": "body"}) or
-            soup.find("article") or
-            soup.find("main") or
-            soup
+            soup.find("div", {"data-gu-name": "body"})
+            or soup.find("article")
+            or soup.find("main")
+            or soup
         )
         self._remove_unwanted(container)
 
@@ -36,14 +35,15 @@ class TheGuardianParser(BaseParser):
             if h1:
                 title = h1.get_text(strip=True)
         if not title and soup.title:
-            title = soup.title.string  
-        
+            title = soup.title.string
+
         # Author & Date
         author = None
         published_at = None
-        
-        
-        meta_author = soup.find("meta", {"name": "author"}) or soup.find("meta", {"property": "article:author"})
+
+        meta_author = soup.find("meta", {"name": "author"}) or soup.find(
+            "meta", {"property": "article:author"}
+        )
         if meta_author and meta_author.get("content"):
             content = meta_author["content"]
             if content.startswith("http"):
@@ -78,6 +78,8 @@ class TheGuardianParser(BaseParser):
                 published_at = time_tag.get("datetime") or time_tag.get_text(strip=True)
 
         if not title or not author or not published_at:
-            print(f"[HARDCODED PARSE ERROR] something is not correct for {article_url}\n\t:text{text}\n\ttitle:{title}\n\tauthor:{author}\n\tpublished:{published_at}") 
+            print(
+                f"[HARDCODED PARSE ERROR] something is not correct for {article_url}\n\t:text{text}\n\ttitle:{title}\n\tauthor:{author}\n\tpublished:{published_at}"
+            )
 
         return ParseResult(text, title, author, published_at)

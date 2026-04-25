@@ -74,7 +74,9 @@ def backup_jobs():
     with open(BACKUP_FILE, "w", encoding="utf-8") as f:
         json.dump(backup_data, f, ensure_ascii=False, indent=2)
 
-    print(f"[INFO] Backup complete: {len(all_jobs)} jobs, {len(urls)} URLs saved to {BACKUP_FILE}")
+    print(
+        f"[INFO] Backup complete: {len(all_jobs)} jobs, {len(urls)} URLs saved to {BACKUP_FILE}"
+    )
 
 
 if __name__ == "__main__":

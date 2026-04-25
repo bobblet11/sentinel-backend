@@ -1,7 +1,6 @@
 from typing import Dict, List, Optional
 
-from microservices.web_scraper.proxy_sources.base_classes import \
-    FileProxySource
+from microservices.web_scraper.proxy_sources.base_classes import FileProxySource
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]
@@ -10,19 +9,17 @@ ProxyRequestDict = Optional[Dict[str, str]]
 
 class TextFileSource(FileProxySource):
     """Loads proxies from a txt file file."""
-    
+
     def __init__(self, name, file_path, str_manip_func):
         super().__init__(name, file_path)
         self.str_manip_func = str_manip_func
-        
-        
+
     def _parse_file_content(self, content: str) -> ProxyDict:
         """Parse TXT file content assuming order: HTTPS, SOCKS4, SOCKS5"""
-        
+
         parsed_proxies: ProxyDict = {"https": [], "socks4": [], "socks5": []}
-        sections:List[str] = content.split("\n\n")
-        
-        
+        sections: List[str] = content.split("\n\n")
+
         if len(sections) > 0:
             parsed_proxies["https"] = [
                 self.str_manip_func(line.strip())

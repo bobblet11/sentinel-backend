@@ -18,6 +18,7 @@ OUTLET_PATTERNS = {
     r"(aljazeera\.com|www\.aljazeera\.com)": "Al Jazeera",
 }
 
+
 def match_outlet_name(article_url: str) -> Optional[str]:
     for pattern, outlet in OUTLET_PATTERNS.items():
         if re.search(pattern, article_url.lower().strip()):
@@ -26,7 +27,7 @@ def match_outlet_name(article_url: str) -> Optional[str]:
 
 
 def get_news_outlet(job_dto: JobCreate) -> Optional[str]:
-	# payload = MessagePayload(article_url=article.url, raw_html=job_dto.article_html, parsed_text=job_dto.article_text, news_outlet=job_dto.news_outlet, title=job_dto.article_title, summary=job_dto.article_summary)
-	matched_outlet = match_outlet_name(job_dto.article_url or "")
-	news_outlet = matched_outlet or job_dto.news_outlet or None
-	return news_outlet
+    # payload = MessagePayload(article_url=article.url, raw_html=job_dto.article_html, parsed_text=job_dto.article_text, news_outlet=job_dto.news_outlet, title=job_dto.article_title, summary=job_dto.article_summary)
+    matched_outlet = match_outlet_name(job_dto.article_url or "")
+    news_outlet = matched_outlet or job_dto.news_outlet or None
+    return news_outlet

@@ -1,6 +1,4 @@
-
-from sqlalchemy import (Column, DateTime, Float, ForeignKey, Integer, String,
-                        Text)
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -35,7 +33,12 @@ class Topic(Base):
 class ArticleTopic(Base):
     __tablename__ = "article_topic"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    article_id = Column(Integer, ForeignKey("article.id", ondelete="CASCADE"), nullable=False, unique=True)
+    article_id = Column(
+        Integer,
+        ForeignKey("article.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
     topic_id = Column(Integer, ForeignKey("topic.id"), nullable=False)
     confidence = Column(Float, nullable=False)
 
@@ -56,5 +59,7 @@ class Article(Base):
     author_id = Column(Integer, nullable=True)
 
     outlet = relationship("NewsOutlet", back_populates="articles")
-    topic_assignment = relationship("ArticleTopic", back_populates="article", uselist=False)
+    topic_assignment = relationship(
+        "ArticleTopic", back_populates="article", uselist=False
+    )
     sentiment = relationship("SentimentAnalysis")

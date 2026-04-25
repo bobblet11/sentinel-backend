@@ -52,7 +52,9 @@ os.environ.setdefault("DUMMY_NLP_MODE", "false")
 # Point HuggingFace to the cache that contains fully-downloaded model weights.
 # microservices/nlp/tests/.cache is the complete cache; the root .cache has only
 # partial downloads (tokenizer/config blobs, no model weights) for some models.
-_NLP_TEST_CACHE = WORKSPACE_ROOT / "microservices" / "nlp" / "tests" / ".cache" / "huggingface"
+_NLP_TEST_CACHE = (
+    WORKSPACE_ROOT / "microservices" / "nlp" / "tests" / ".cache" / "huggingface"
+)
 _HF_CACHE = str(_NLP_TEST_CACHE)
 os.environ.setdefault("HF_HOME", _HF_CACHE)
 os.environ.setdefault("TRANSFORMERS_CACHE", str(_NLP_TEST_CACHE / "hub"))
@@ -99,10 +101,8 @@ import transformers  # noqa: E402, F401
 # ---------------------------------------------------------------------------
 # Project imports (after sys.path is set and env vars are in place)
 # ---------------------------------------------------------------------------
-from common.models.api.redis_models import (Article, NLPOptions,  # noqa: E402
-                                            NLPResult)
-from microservices.nlp.components.claimextract import \
-    ClaimExtraction  # noqa: E402
+from common.models.api.redis_models import Article, NLPOptions, NLPResult  # noqa: E402
+from microservices.nlp.components.claimextract import ClaimExtraction  # noqa: E402
 from microservices.nlp.components.device import DeviceConfig  # noqa: E402
 from microservices.nlp.config import model_manager  # noqa: E402
 
@@ -121,6 +121,7 @@ log.info("Models ready.")
 # Pipeline runner
 # ---------------------------------------------------------------------------
 
+
 def run_pipeline(article: Article, options: NLPOptions) -> Dict[str, Any]:
     """Run the full NLP pipeline via ClaimExtraction. Returns result, timings, and errors."""
     result = NLPResult()
@@ -128,15 +129,15 @@ def run_pipeline(article: Article, options: NLPOptions) -> Dict[str, Any]:
     errors: List[str] = []
 
     device_config = DeviceConfig.resolve(use_gpu=True)
-    claim_extraction = ClaimExtraction(device_config=device_config, model_manager=model_manager)
+    claim_extraction = ClaimExtraction(
+        device_config=device_config, model_manager=model_manager
+    )
 
     t0 = time.monotonic()
     try:
         claim_extraction.run(article, result, options)
         stage_timings["ClaimExtraction"] = round(time.monotonic() - t0, 3)
-        log.info(
-            f"  [ClaimExtraction] done ({stage_timings['ClaimExtraction']:.3f}s)"
-        )
+        log.info(f"  [ClaimExtraction] done ({stage_timings['ClaimExtraction']:.3f}s)")
     except Exception as exc:
         stage_timings["ClaimExtraction"] = round(time.monotonic() - t0, 3)
         errors.append(f"ClaimExtraction: {exc}")
@@ -154,7 +155,10 @@ def run_pipeline(article: Article, options: NLPOptions) -> Dict[str, Any]:
 # Pretty-print NLPResult (no embeddings)
 # ---------------------------------------------------------------------------
 
-def print_result(result: "NLPResult", stage_timings: Dict[str, float], errors: List[str]) -> None:
+
+def print_result(
+    result: "NLPResult", stage_timings: Dict[str, float], errors: List[str]
+) -> None:
     sep = "=" * 70
 
     print(f"\n{sep}")
@@ -182,9 +186,11 @@ def print_result(result: "NLPResult", stage_timings: Dict[str, float], errors: L
     print(f"\nCHECK-WORTHY CLAIMS  ({len(claims)} total)")
     print("-" * 70)
     for i, c in enumerate(claims):
-        print(f"  [{i}] conf={c.confidence:.2f}  \"{c.decontextualised_claim_text}\"")
+        print(f'  [{i}] conf={c.confidence:.2f}  "{c.decontextualised_claim_text}"')
         if c.NER_entities:
-            ents = ", ".join(f"{e.entity_text}[{e.type_of_entity}]" for e in c.NER_entities)
+            ents = ", ".join(
+                f"{e.entity_text}[{e.type_of_entity}]" for e in c.NER_entities
+            )
             print(f"       entities: {ents}")
 
     # --- Timings & Errors ---
@@ -206,6 +212,7 @@ def print_result(result: "NLPResult", stage_timings: Dict[str, float], errors: L
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main():
     SCRIPT_DIR = Path(__file__).resolve().parent

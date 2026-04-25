@@ -26,12 +26,13 @@ class RedisPublisherMock:
         if not message_payload:
             raise Exception("No message to publish")
 
-        payload:Dict[str, Any] = {"payload": json.dumps(message_payload)}
+        payload: Dict[str, Any] = {"payload": json.dumps(message_payload)}
         self.queue.append(payload)
-        redis_message_id:str = len(self.queue) - 1
-        self.logger.debug(f"Published message under id {redis_message_id} to {self.stream_name}")
+        redis_message_id: str = len(self.queue) - 1
+        self.logger.debug(
+            f"Published message under id {redis_message_id} to {self.stream_name}"
+        )
         return redis_message_id
-
 
     def publish_many(self, messages: List[Dict[Any, Any]]) -> List[str]:
         """
@@ -44,7 +45,7 @@ class RedisPublisherMock:
                 A list of the unique Redis message IDs for the published messages
                 if successful, otherwise None.
         """
-        
+
         if not messages or len(messages) == 0:
             raise Exception("No messages to publish")
 
@@ -53,5 +54,7 @@ class RedisPublisherMock:
         self.queue.extend(messages)
         redis_message_ids = list(range(lower_id, upper_id))
 
-        self.logger.debug(f"Published {len(redis_message_ids)} messages to {self.stream_name}.")
+        self.logger.debug(
+            f"Published {len(redis_message_ids)} messages to {self.stream_name}."
+        )
         return redis_message_ids

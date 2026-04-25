@@ -3,12 +3,20 @@ from typing import Any, Dict, Optional
 
 from transformers import pipeline
 
-from common.models.api.redis_models import (Article, BiasProfile, NLPOptions,
-                                            StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    BiasProfile,
+    NLPOptions,
+    StreamMessage,
+)
 from microservices.nlp.components.device import DeviceConfig
-from microservices.nlp.config import (BIAS_MAX_CHARS, BIAS_POLITICAL_MODEL,
-                                      BIAS_SENTIMENT_MAX_LEN,
-                                      BIAS_SENTIMENT_MODEL)
+from microservices.nlp.config import (
+    BIAS_MAX_CHARS,
+    BIAS_POLITICAL_MODEL,
+    BIAS_SENTIMENT_MAX_LEN,
+    BIAS_SENTIMENT_MODEL,
+)
+
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
 
@@ -53,11 +61,13 @@ class BiasDetector(ArticleProcessor):
     }
     _TONE_MAP = {
         "negative": "Negative",
-        "neutral":  "Neutral",
+        "neutral": "Neutral",
         "positive": "Positive",
     }
 
-    def __init__(self, device_config: DeviceConfig, model_manager: Optional[Any] = None):
+    def __init__(
+        self, device_config: DeviceConfig, model_manager: Optional[Any] = None
+    ):
         logger.info(
             f"BiasDetector: Loading models on {device_config.device.upper()} "
             f"(fp16={device_config.use_fp16})..."
@@ -82,7 +92,9 @@ class BiasDetector(ArticleProcessor):
                         model_manager.get_state("BIAS_SENTIMENT").value,
                     )
 
-            _dtype_kwargs = {"dtype": device_config.dtype} if device_config.use_fp16 else {}
+            _dtype_kwargs = (
+                {"dtype": device_config.dtype} if device_config.use_fp16 else {}
+            )
             self.political_classifier = pipeline(
                 "text-classification",
                 model=BIAS_POLITICAL_MODEL,
@@ -114,7 +126,9 @@ class BiasDetector(ArticleProcessor):
             sentiment_analysis_confidence=0.0,
         )
 
-    def run(self, article: Article, message: StreamMessage, options: NLPOptions) -> None:
+    def run(
+        self, article: Article, message: StreamMessage, options: NLPOptions
+    ) -> None:
         """
         Classifies the article's political lean and emotional tone.
         Writes the result to result.bias_profile.
@@ -135,10 +149,14 @@ class BiasDetector(ArticleProcessor):
         try:
             bias_out_raw = self.political_classifier(analysis_text)
             # top_k=None returns [[{label, score}, ...]] for a single string — unwrap batch dim
-            bias_out: list = bias_out_raw[0] if bias_out_raw and isinstance(bias_out_raw[0], list) else bias_out_raw
+            bias_out: list = (
+                bias_out_raw[0]
+                if bias_out_raw and isinstance(bias_out_raw[0], list)
+                else bias_out_raw
+            )
             # Sort descending by score to get top prediction first
             bias_out = sorted(bias_out, key=lambda x: x["score"], reverse=True)
-            raw_label  = bias_out[0]["label"]
+            raw_label = bias_out[0]["label"]
             confidence = float(bias_out[0]["score"])
             scores: Dict[str, float] = {
                 self._LABEL_MAP.get(item["label"], "Center"): float(item["score"])
@@ -156,8 +174,8 @@ class BiasDetector(ArticleProcessor):
         emotional_tone: Optional[str] = None
         tone_out = None
         try:
-            tone_out   = self.sentiment_analyzer(analysis_text[:512])
-            raw_tone   = tone_out[0]["label"].lower() if tone_out else "neutral"
+            tone_out = self.sentiment_analyzer(analysis_text[:512])
+            raw_tone = tone_out[0]["label"].lower() if tone_out else "neutral"
             emotional_tone = self._TONE_MAP.get(raw_tone, raw_tone.capitalize())
         except Exception as e:
             logger.warning(f"BiasDetector: Tone analysis failed (non-critical): {e}")

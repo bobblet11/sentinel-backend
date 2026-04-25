@@ -19,8 +19,8 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import (Dict,  # noqa: F401 (Tuple used in classify signature)
-                    List, Optional, Tuple)
+from typing import Dict  # noqa: F401 (Tuple used in classify signature)
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -127,8 +127,7 @@ TOPIC_DESCRIPTIONS: Dict[str, str] = {
 }
 
 
-_SQL_FETCH_ARTICLES = text(
-    """
+_SQL_FETCH_ARTICLES = text("""
     SELECT a.id, a.title, a.url, top_c.top_claims
     FROM article a
     LEFT JOIN LATERAL (
@@ -144,8 +143,7 @@ _SQL_FETCH_ARTICLES = text(
     ) top_c ON true
     WHERE a.title IS NOT NULL AND a.title != ''
     ORDER BY a.id
-    """
-)
+    """)
 
 
 def load_env(env_file: str = "configs/aws/.env") -> dict:
@@ -250,7 +248,9 @@ def build_results(
         label = topic_labels[i]
         # Stage 2 sub-labels (Crime, Lifestyle…) map to the General topic_id
         topic_id = (
-            PREDEFINED_TOPICS.index(label) if label in PREDEFINED_TOPICS else general_idx
+            PREDEFINED_TOPICS.index(label)
+            if label in PREDEFINED_TOPICS
+            else general_idx
         )
         results.append(
             {
@@ -307,7 +307,9 @@ def print_quality_summary(results: List[dict]) -> None:
     print(f"  Max   : {max_conf:.3f}")
     print(f"  Threshold for 'General' fallback: {CONFIDENCE_THRESHOLD}")
     general_count = topic_counts.get("General", 0)
-    print(f"  Articles below threshold → General: {general_count} ({general_count/total*100:.1f}%)")
+    print(
+        f"  Articles below threshold → General: {general_count} ({general_count/total*100:.1f}%)"
+    )
     print("")
     print("  All articles assigned to predefined topics (0 outliers)")
     print("")
@@ -329,7 +331,9 @@ def save_results(results: List[dict], output_dir: str) -> None:
     results_json_path = out_path / "results.json"
     with open(results_json_path, "w", encoding="utf-8") as fh:
         json.dump(results, fh, indent=2, ensure_ascii=False)
-    logger.info("Saved results.json (%d records) to %s", len(results), results_json_path)
+    logger.info(
+        "Saved results.json (%d records) to %s", len(results), results_json_path
+    )
 
     results_csv_path = out_path / "results.csv"
     pd.DataFrame(results).to_csv(results_csv_path, index=False)
@@ -361,7 +365,9 @@ def save_topic_info(results: List[dict], output_dir: str) -> None:
     topic_info_path = out_path / "topic_info.json"
     with open(topic_info_path, "w", encoding="utf-8") as fh:
         json.dump(topic_info, fh, indent=2, ensure_ascii=False)
-    logger.info("Saved topic_info.json (%d topics) to %s", len(topic_info), topic_info_path)
+    logger.info(
+        "Saved topic_info.json (%d topics) to %s", len(topic_info), topic_info_path
+    )
 
 
 def _build_docs(df: "pd.DataFrame") -> List[str]:
@@ -408,7 +414,13 @@ def _clean_doc(doc: str) -> str:
         flags=re.IGNORECASE,
     )
     # Strip cookie/privacy boilerplate from scraped video pages
-    _PRIVACY_TRIGGERS = ("cookie", "browsing", "consent", "privacy policy", "copy/paste the link")
+    _PRIVACY_TRIGGERS = (
+        "cookie",
+        "browsing",
+        "consent",
+        "privacy policy",
+        "copy/paste the link",
+    )
     if any(t in doc.lower() for t in _PRIVACY_TRIGGERS):
         first_sent = re.split(r"(?<=[.!?])\s", doc)[0]
         doc = first_sent[:120]
@@ -508,7 +520,6 @@ def classify_articles_by_similarity(
     return labels, confidences, doc_embs
 
 
-
 def main() -> None:
     """Entry point for the sentence-similarity topic classification POC.
 
@@ -531,7 +542,9 @@ def main() -> None:
     # Legacy flags kept for backward compatibility with existing test invocations
     parser.add_argument("--min-topic-size", type=int, default=5, help=argparse.SUPPRESS)
     parser.add_argument("--seed", type=int, default=42, help=argparse.SUPPRESS)
-    parser.add_argument("--zeroshot-threshold", type=float, default=0.5, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--zeroshot-threshold", type=float, default=0.5, help=argparse.SUPPRESS
+    )
     # --seed is unused (Stage 2 removed) but kept to avoid breaking existing callers
     args = parser.parse_args()
 

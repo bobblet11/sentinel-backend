@@ -2,8 +2,7 @@ from fastapi import APIRouter
 
 from microservices.api.app.api.v1.endpoints import database, jobs, topics
 from microservices.api.app.api.v1.endpoints.articles import outlets_router
-from microservices.api.app.api.v1.endpoints.articles import \
-    router as articles_router
+from microservices.api.app.api.v1.endpoints.articles import router as articles_router
 
 api_router = APIRouter()
 

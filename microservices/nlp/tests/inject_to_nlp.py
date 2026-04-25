@@ -74,13 +74,18 @@ def main():
     try:
         r.ping()
     except redis.ConnectionError as e:
-        print(f"ERROR: cannot connect to Redis at {REDIS_HOST}:{REDIS_PORT} — {e}", file=sys.stderr)
+        print(
+            f"ERROR: cannot connect to Redis at {REDIS_HOST}:{REDIS_PORT} — {e}",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     redis_id = r.xadd(STREAM, {"payload": json.dumps(message)})
 
     print(f"Injected article into {STREAM}")
-    print(f"  Redis ID : {redis_id.decode() if isinstance(redis_id, bytes) else redis_id}")
+    print(
+        f"  Redis ID : {redis_id.decode() if isinstance(redis_id, bytes) else redis_id}"
+    )
     print(f"  Job UID  : {message['header']['uid']}")
     print(f"  Title    : {message['payload']['title'][:80]}")
     print(f"  Outlet   : {message['payload']['news_outlet']}")

@@ -6,10 +6,17 @@ import redis
 
 from common.requests.retry_request import exponential_retry
 
-REDIS_HOST:str = str(os.getenv("REDIS_HOST", "redis"))
-REDIS_PORT:int = int(os.getenv("REDIS_PORT", 6379))
-REDIS_SSL: bool = str(os.getenv("REDIS_SSL", "false")).strip().lower() in {"1", "true", "yes", "on"}
-REDIS_SSL_CERT_REQS: str = str(os.getenv("REDIS_SSL_CERT_REQS", "required")).strip().lower()
+REDIS_HOST: str = str(os.getenv("REDIS_HOST", "redis"))
+REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6379))
+REDIS_SSL: bool = str(os.getenv("REDIS_SSL", "false")).strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+REDIS_SSL_CERT_REQS: str = (
+    str(os.getenv("REDIS_SSL_CERT_REQS", "required")).strip().lower()
+)
 REDIS_USERNAME: str | None = os.getenv("REDIS_USERNAME") or None
 REDIS_PASSWORD: str | None = os.getenv("REDIS_PASSWORD") or None
 
@@ -18,6 +25,7 @@ print(f"REDIS_PORT: {REDIS_PORT}")
 print(f"REDIS_SSL: {REDIS_SSL}")
 print(f"REDIS_SSL_CERT_REQS: {REDIS_SSL_CERT_REQS}")
 print(f"REDIS_USERNAME: {REDIS_USERNAME}")
+
 
 def _build_connection_kwargs() -> dict[str, Any]:
     """Build Redis connection kwargs from environment variables."""
@@ -56,8 +64,8 @@ class RedisConnection:
 
     _instance = None
     _lock = threading.Lock()
-    MAX_RETRIES:int = 5
-    INITIAL_DELAY_S:int = 1
+    MAX_RETRIES: int = 5
+    INITIAL_DELAY_S: int = 1
 
     def __new__(cls) -> None:
         """
@@ -74,8 +82,8 @@ class RedisConnection:
             if cls._instance is not None:
                 return cls._instance
 
-            cls._instance:RedisConnection = super(RedisConnection, cls).__new__(cls)
-            cls._instance._client= None
+            cls._instance: RedisConnection = super(RedisConnection, cls).__new__(cls)
+            cls._instance._client = None
 
             return cls._instance
 
@@ -85,7 +93,7 @@ class RedisConnection:
         on_exceptions=(
             redis.exceptions.ConnectionError,
             redis.exceptions.TimeoutError,
-            redis.exceptions.BusyLoadingError
+            redis.exceptions.BusyLoadingError,
         ),
     )
     def connect(self) -> bool:
@@ -103,7 +111,6 @@ class RedisConnection:
             # raise error to let the retry mechanism catch it
             raise redis.exceptions.ConnectionError("Redis ping returned False.")
 
-
     def get_client(self) -> redis.Redis:
         """
         Returns the active Redis client. Connects if not already connected.
@@ -117,12 +124,12 @@ class RedisConnection:
                 return self._client
 
             self.connect()
-            
+
         try:
             self._client.ping()
         except redis.exceptions.ConnectionError:
             self.connect()
-            
+
         return self._client
 
     def ping(self) -> bool:
@@ -147,4 +154,5 @@ class RedisConnection:
         self._client.connection_pool.disconnect()
         self._client = None
 
-redis_connection:RedisConnection = RedisConnection()
+
+redis_connection: RedisConnection = RedisConnection()

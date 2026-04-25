@@ -93,9 +93,8 @@ def check_confidence_distribution(results: List[dict]) -> dict:
     return {
         "name": "Confidence Distribution",
         "passed": passed,
-        "details": details + (
-            "" if passed else " [FAIL: >50% of articles have confidence < 0.3]"
-        ),
+        "details": details
+        + ("" if passed else " [FAIL: >50% of articles have confidence < 0.3]"),
     }
 
 
@@ -113,9 +112,10 @@ def check_topic_coverage(results: List[dict], predefined: List[str]) -> dict:
     missing = [t for t in predefined if t.lower() not in assigned_labels]
     covered = [t for t in predefined if t.lower() in assigned_labels]
 
-    details = (
-        f"Covered topics: {covered}. "
-        + (f"Missing topics (zero articles): {missing}" if missing else "All predefined topics covered.")
+    details = f"Covered topics: {covered}. " + (
+        f"Missing topics (zero articles): {missing}"
+        if missing
+        else "All predefined topics covered."
     )
     passed = len(missing) == 0
     return {
@@ -152,9 +152,7 @@ def check_outlier_ratio(results: List[dict]) -> dict:
     return {
         "name": "Outlier Ratio",
         "passed": passed,
-        "details": details + (
-            "" if passed else " [FAIL: outlier ratio exceeds 30%]"
-        ),
+        "details": details + ("" if passed else " [FAIL: outlier ratio exceeds 30%]"),
     }
 
 
@@ -173,7 +171,8 @@ def check_discovered_topics(topic_info: List[dict], results: List[dict]) -> dict
     """
     predefined_lower = {t.lower() for t in PREDEFINED_TOPICS}
     discovered = [
-        ti for ti in topic_info
+        ti
+        for ti in topic_info
         if ti.get("Topic", -1) != -1
         and str(ti.get("Name", "")).lower() not in predefined_lower
     ]
@@ -207,7 +206,8 @@ def spot_check_titles(results: List[dict], n_samples: int = 5) -> None:
     print("--- Spot Check: Sample Titles per Predefined Topic ---")
     for topic in PREDEFINED_TOPICS:
         matching = [
-            r for r in results
+            r
+            for r in results
             if r["is_predefined"] and r["topic_label"].lower() == topic.lower()
         ]
         samples = matching[:n_samples]

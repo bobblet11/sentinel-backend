@@ -4,8 +4,7 @@ from sqlalchemy.orm import Session
 
 from microservices.retrieval_layer.db.models import Claim
 from microservices.retrieval_layer.db.session import get_db_session
-from microservices.retrieval_layer.retrieval.pipeline import \
-    retrieve_candidate_claims
+from microservices.retrieval_layer.retrieval.pipeline import retrieve_candidate_claims
 
 EMBEDDING_DIM = 768  # MUST match pgvector column
 

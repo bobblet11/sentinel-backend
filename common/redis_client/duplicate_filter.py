@@ -20,10 +20,10 @@ class RedisDuplicateFilter:
 
         if not isinstance(key_name, str) or not key_name:
             raise ValueError("key_name must be a non-empty string.")
-        
+
         self.logger = getLogger(f"{key_name}.redis_duplicate_filter")
-        self.key_name:str = key_name
-        self.ttl_s:int = ttl_s
+        self.key_name: str = key_name
+        self.ttl_s: int = ttl_s
         self.client: redis.Redis = redis_connection.get_client()
 
     def has_one(self, item: str) -> bool:
@@ -35,7 +35,9 @@ class RedisDuplicateFilter:
                 raise Exception("No argument provided for checking")
             return self.client.sismember(self.key_name, item)
         except Exception as e:
-            self.logger.error(f"Unexpectedly failed to check if item {item} exists in set {self.key_name}! {e}")
+            self.logger.error(
+                f"Unexpectedly failed to check if item {item} exists in set {self.key_name}! {e}"
+            )
             raise e
 
     def has_many(self, items: list[str]) -> list[str]:
@@ -44,7 +46,7 @@ class RedisDuplicateFilter:
 
         This uses a Redis pipeline to perform a multi-SISMEMBER check in a
         single network round-trip.
-        
+
         Returns a sub-list containing only the items that were NOT FOUND in the Redis set.
         """
 
@@ -53,12 +55,12 @@ class RedisDuplicateFilter:
                 raise Exception("No items to check")
 
             # The result will be a list of booleans [1, 0, 1, ...]s
-            exists_results:List[bool] = self.client.smismember(self.key_name, items)
-            
+            exists_results: List[bool] = self.client.smismember(self.key_name, items)
+
             unseen_items: List[str] = [
                 item for item, exists in zip(items, exists_results) if not exists
             ]
-            
+
             return unseen_items
         except Exception as e:
             self.logger.error(
@@ -77,15 +79,15 @@ class RedisDuplicateFilter:
 
             pipe = self.client.pipeline()
             pipe.sadd(self.key_name, item)
-            
+
             if self.ttl_s > 0:
                 pipe.expire(self.key_name, self.ttl_s)
-                
+
             results = pipe.execute()
-            
+
             if not results[-1]:  # Check expire result
                 self.logger.warning(f"Failed to set TTL on {self.key_name}")
-            
+
         except Exception as e:
             self.logger.error(f"Failed to add item {item} to set {self.key_name}! {e}")
             raise e
@@ -101,12 +103,12 @@ class RedisDuplicateFilter:
 
             pipe = self.client.pipeline()
             pipe.sadd(self.key_name, *items)
-            
+
             if self.ttl_s > 0:
                 pipe.expire(self.key_name, self.ttl_s)
-                
+
             results = pipe.execute()
-            
+
             if not results[-1]:  # Check expire result
                 self.logger.warning(f"Failed to set TTL on {self.key_name}")
         except Exception as e:

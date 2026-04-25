@@ -1,8 +1,7 @@
 import json
 from typing import Dict, List, Optional
 
-from microservices.web_scraper.proxy_sources.base_classes import \
-    FileProxySource
+from microservices.web_scraper.proxy_sources.base_classes import FileProxySource
 
 # --- Type Hinting for Clarity ---
 ProxyDict = Dict[str, List[str]]
@@ -15,8 +14,7 @@ class JsonFileSource(FileProxySource):
     def __init__(self, name, file_path, str_manip_func):
         super().__init__(name, file_path)
         self.str_manip_func = str_manip_func
-        
-    
+
     def _parse_file_content(self, content: str) -> ProxyDict:
         """Parse JSON file content"""
         parsed_proxies: ProxyDict = {"https": [], "socks4": [], "socks5": []}

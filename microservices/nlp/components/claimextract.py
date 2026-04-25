@@ -5,19 +5,27 @@ from typing import List
 import spacy
 
 from common.models.api.dtos.job import JobStage
-from common.models.api.redis_models import (Article, BiasProfile, Claim,
-                                            NLPOptions, NLPResult,
-                                            SentenceScore, StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    BiasProfile,
+    Claim,
+    NLPOptions,
+    NLPResult,
+    SentenceScore,
+    StreamMessage,
+)
 from microservices.nlp.components.bias import BiasDetector
 from microservices.nlp.components.checkworthy import CheckWorthinessFilter
 from microservices.nlp.components.decontext import Decontextualizer
 from microservices.nlp.components.device import DeviceConfig
 from microservices.nlp.components.embedder import Embedder
 from microservices.nlp.components.ner import EntityRecognizer
+
 # Pipeline stage imports
 from microservices.nlp.components.preprocess import Preprocessor
 from microservices.nlp.components.sentenceextract import SentenceExtraction
 from microservices.nlp.config import ENABLE_DECONTEXTUALIZATION
+
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
 
@@ -78,15 +86,23 @@ class ClaimExtraction(ArticleProcessor):
             raise
 
         self.preprocessor = Preprocessor(nlp=nlp_sm)
-        self.entity_recognizer = EntityRecognizer(device_config=device_config, model_manager=model_manager)
+        self.entity_recognizer = EntityRecognizer(
+            device_config=device_config, model_manager=model_manager
+        )
         self.sentence_extractor = SentenceExtraction(device_config=device_config)
         self.decontextualizer = None
         if ENABLE_DECONTEXTUALIZATION:
-            self.decontextualizer = Decontextualizer(device_config=device_config, nlp=nlp_sm, model_manager=model_manager)
+            self.decontextualizer = Decontextualizer(
+                device_config=device_config, nlp=nlp_sm, model_manager=model_manager
+            )
         else:
-            logger.info("ClaimExtraction: Decontextualizer disabled via service configuration.")
+            logger.info(
+                "ClaimExtraction: Decontextualizer disabled via service configuration."
+            )
         self.checkworthiness = CheckWorthinessFilter(device_config=device_config)
-        self.embedder = Embedder(device_config=device_config, model_manager=model_manager)
+        self.embedder = Embedder(
+            device_config=device_config, model_manager=model_manager
+        )
         # Store args for lazy BiasDetector initialization (Stage 8)
         self._bias_device_config = device_config
         self._bias_model_manager = model_manager
@@ -121,7 +137,9 @@ class ClaimExtraction(ArticleProcessor):
                 if ent.entity_text.lower() in s_obj.text.lower()
             ]
 
-    def run(self, article: Article, message: StreamMessage, options: NLPOptions) -> None:
+    def run(
+        self, article: Article, message: StreamMessage, options: NLPOptions
+    ) -> None:
         """
         Executes the full NLP pipeline end-to-end.
         Writes final data to result.claims_in_article, result.entities_in_article,
@@ -178,7 +196,9 @@ class ClaimExtraction(ArticleProcessor):
         t = time.time()
         try:
             message.add_timestamp(JobStage.SENT_EXTRACTION_IN)
-            sentences = self.sentence_extractor.run(article, message, options, sentences)
+            sentences = self.sentence_extractor.run(
+                article, message, options, sentences
+            )
             message.add_timestamp(JobStage.SENT_EXTRACTION_OUT)
         except Exception as e:
             logger.error("ClaimExtraction [Stage 3 SentenceExtraction] failed: %s", e)
@@ -198,39 +218,33 @@ class ClaimExtraction(ArticleProcessor):
                     article, message, options, sentences
                 )
             except Exception as e:
-                logger.error(
-                    "ClaimExtraction [Stage 4 Decontextualizer] failed: %s", e
-                )
+                logger.error("ClaimExtraction [Stage 4 Decontextualizer] failed: %s", e)
                 raise
             logger.info(
                 "[Stage 4 | Decontextualizer] complete in %.2fs", time.time() - t
             )
         elif options.enable_decontextualization:
-            logger.info("[Stage 4 | Decontextualizer] skipped (disabled by service config)")
+            logger.info(
+                "[Stage 4 | Decontextualizer] skipped (disabled by service config)"
+            )
         else:
             logger.info("[Stage 4 | Decontextualizer] skipped (disabled in options)")
 
         message.add_timestamp(JobStage.DECONTEXT_OUT)
-        
+
         # ── Stage 5 — Check-Worthiness Scoring ──────────────────────────────
         t = time.time()
         try:
             message.add_timestamp(JobStage.CHECK_WORTHY_IN)
-            sentences = self.checkworthiness.run(
-                article, message, options, sentences
-            )
+            sentences = self.checkworthiness.run(article, message, options, sentences)
             # Clear claims built by CheckWorthinessFilter; Stage 7 rebuilds them
             # after embeddings and entity mapping are complete.
             message.data.payload.claims_in_article = []
             message.add_timestamp(JobStage.CHECK_WORTHY_OUT)
         except Exception as e:
-            logger.error(
-                "ClaimExtraction [Stage 5 CheckWorthiness] failed: %s", e
-            )
+            logger.error("ClaimExtraction [Stage 5 CheckWorthiness] failed: %s", e)
             raise
-        logger.info(
-            "[Stage 5 | CheckWorthiness] complete in %.2fs", time.time() - t
-        )
+        logger.info("[Stage 5 | CheckWorthiness] complete in %.2fs", time.time() - t)
 
         # ── Stage 5.5 — Entity Mapping ───────────────────────────────────────
         t = time.time()
@@ -238,11 +252,9 @@ class ClaimExtraction(ArticleProcessor):
         result = message.create_nlp_result()
         self._map_entities_to_sentences(sentences, result)
         message.set_nlp_result(result)
-        logger.info(
-            "[Stage 5.5 | EntityMapping] complete in %.2fs", time.time() - t
-        )
+        logger.info("[Stage 5.5 | EntityMapping] complete in %.2fs", time.time() - t)
         message.add_timestamp(JobStage.CHECK_WORTHY_ENTITY_MAPPING_OUT)
-         
+
         # ── Stage 6 — Sentence Embedding ─────────────────────────────────────
         t = time.time()
         try:
@@ -329,8 +341,9 @@ class ClaimExtraction(ArticleProcessor):
         t = time.time()
         try:
             if self._topic_classifier is None:
-                from microservices.nlp.components.topic_classifier import \
-                    TopicClassifier
+                from microservices.nlp.components.topic_classifier import (
+                    TopicClassifier,
+                )
 
                 self._topic_classifier = TopicClassifier(
                     device_config=self._topic_device_config,
@@ -354,5 +367,5 @@ class ClaimExtraction(ArticleProcessor):
             len(message.data.payload.claims_in_article),
             len(message.data.payload.entities_in_article),
         )
-        
+
         message.add_timestamp(JobStage.NLP_END)

@@ -5,20 +5,30 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.amp import autocast
-from transformers import (AutoModel, AutoModelForSequenceClassification,
-                          AutoTokenizer)
+from transformers import AutoModel, AutoModelForSequenceClassification, AutoTokenizer
 
-from common.models.api.redis_models import (Article, NLPOptions, SentenceScore,
-                                            StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    NLPOptions,
+    SentenceScore,
+    StreamMessage,
+)
 from microservices.nlp.components.device import DeviceConfig
-from microservices.nlp.config import (BERT_MAX_LENGTH, BERT_SCORING_MODEL,
-                                      NLI_ENTAILMENT_THRESHOLD, NLI_MAX_PAIRS,
-                                      NLI_MODEL, SENTENCE_EXTRACT_TOP_K,
-                                      SENTENCE_SCORING_BATCH)
+from microservices.nlp.config import (
+    BERT_MAX_LENGTH,
+    BERT_SCORING_MODEL,
+    NLI_ENTAILMENT_THRESHOLD,
+    NLI_MAX_PAIRS,
+    NLI_MODEL,
+    SENTENCE_EXTRACT_TOP_K,
+    SENTENCE_SCORING_BATCH,
+)
+
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
 
 logger = logging.getLogger(__name__)
+
 
 class SentenceExtraction(SentenceProcessor):
     """
@@ -28,12 +38,15 @@ class SentenceExtraction(SentenceProcessor):
 
     Accepts and returns a local sentences list; does NOT touch result.
     """
+
     def __init__(self, device_config: DeviceConfig):
         self.device = device_config.device
         self.use_fp16 = device_config.use_fp16
 
-        logger.info(f"SentenceExtraction: Initializing models on {self.device} "
-                    f"(fp16={self.use_fp16})...")
+        logger.info(
+            f"SentenceExtraction: Initializing models on {self.device} "
+            f"(fp16={self.use_fp16})..."
+        )
 
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(BERT_SCORING_MODEL)
@@ -61,7 +74,10 @@ class SentenceExtraction(SentenceProcessor):
         scores = []
         with torch.no_grad():
             # Use autocast for mixed precision if enabled
-            with autocast(device_type=("cuda" if "cuda" in self.device else "cpu"), enabled=self.use_fp16):
+            with autocast(
+                device_type=("cuda" if "cuda" in self.device else "cpu"),
+                enabled=self.use_fp16,
+            ):
                 for start in range(0, len(sentences), SENTENCE_SCORING_BATCH):
                     batch_texts = sentences[start : start + SENTENCE_SCORING_BATCH]
                     inputs = self.tokenizer(
@@ -71,7 +87,7 @@ class SentenceExtraction(SentenceProcessor):
                         truncation=True,
                         max_length=BERT_MAX_LENGTH,
                     ).to(self.device)
-                    
+
                     outputs = self.scoring_model(**inputs)
                     # Use CLS token vector (index 0) for sentence representation
                     cls_vecs = outputs.last_hidden_state[:, 0, :]
@@ -97,7 +113,10 @@ class SentenceExtraction(SentenceProcessor):
         pairs = pairs[-NLI_MAX_PAIRS:]
 
         with torch.no_grad():
-            with autocast(device_type=("cuda" if "cuda" in self.device else "cpu"), enabled=self.use_fp16):
+            with autocast(
+                device_type=("cuda" if "cuda" in self.device else "cpu"),
+                enabled=self.use_fp16,
+            ):
                 inputs = self.nli_tokenizer(
                     pairs,
                     return_tensors="pt",
@@ -111,8 +130,13 @@ class SentenceExtraction(SentenceProcessor):
                 probs = F.softmax(outputs.logits.float(), dim=-1)
                 return bool((probs[:, 1] > NLI_ENTAILMENT_THRESHOLD).any())
 
-    def run(self, article: Article, message: StreamMessage, options: NLPOptions,
-            sentences: List[SentenceScore]) -> List[SentenceScore]:
+    def run(
+        self,
+        article: Article,
+        message: StreamMessage,
+        options: NLPOptions,
+        sentences: List[SentenceScore],
+    ) -> List[SentenceScore]:
         """
         Scores and deduplicates sentences.
         Returns a filtered local list of high-value sentences.
@@ -126,7 +150,7 @@ class SentenceExtraction(SentenceProcessor):
         # Rank indices by score descending
         ranked_indices = np.argsort(scores)[::-1]
         selected_indices: List[int] = []
-        selected_texts:   List[str] = []
+        selected_texts: List[str] = []
 
         # Get limit from options or fall back to the configured default
         limit = getattr(options, "max_claims", SENTENCE_EXTRACT_TOP_K)
@@ -134,7 +158,7 @@ class SentenceExtraction(SentenceProcessor):
         for idx in ranked_indices:
             if len(selected_indices) >= limit:
                 break
-            
+
             candidate = raw_texts[idx]
             # Cross-Encoder check to ensure this sentence adds new information
             if not self._is_redundant(candidate, selected_texts):
@@ -145,5 +169,7 @@ class SentenceExtraction(SentenceProcessor):
 
         # Return the selected sentences sorted by their original order in the text
         extracted = [sentences[i] for i in sorted(selected_indices)]
-        logger.info(f"SentenceExtraction: Extracted {len(extracted)} salient, unique sentences.")
+        logger.info(
+            f"SentenceExtraction: Extracted {len(extracted)} salient, unique sentences."
+        )
         return extracted

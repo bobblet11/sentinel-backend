@@ -11,7 +11,7 @@ full_message = {
         "type": "user",
         "uid": "unique-id-789",
         "status": "pending",
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
     },
     "payload": {
         "article_url": "https://example.com/article3",
@@ -34,15 +34,15 @@ full_message = {
                         "entity_text": "government",
                         "type_of_entity": "ORG",
                         "start_char": 4,
-                        "end_char": 14
+                        "end_char": 14,
                     },
                     {
                         "entity_text": "taxes",
                         "type_of_entity": "TOPIC",
                         "start_char": 22,
-                        "end_char": 27
-                    }
-                ]
+                        "end_char": 27,
+                    },
+                ],
             }
         ],
         "entities_in_article": [],
@@ -50,22 +50,20 @@ full_message = {
             "bias_category": "center",
             "bias_analysis_confidence": 0.9,
             "sentiment_category": "neutral",
-            "sentiment_analysis_confidence": 0.95
-        }
+            "sentiment_analysis_confidence": 0.95,
+        },
     },
     "stage_timestamps": [
         {
             "job_uid": "unique-id-789",
             "stage_name": "scraped",
             "wall_time": datetime.now().isoformat(),
-            "offset_s": 0.0
+            "offset_s": 0.0,
         }
-    ]
+    ],
 }
 
-fields = {
-    "payload": json.dumps(full_message)
-}
+fields = {"payload": json.dumps(full_message)}
 
 stream = "user:to.be.retrieval"
 res = r.xadd(stream, fields)

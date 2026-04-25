@@ -6,7 +6,9 @@ import redis
 
 from common.redis_client.connection import redis_connection
 
-MAX_TTL_S = 7 * 86_400 #days
+MAX_TTL_S = 7 * 86_400  # days
+
+
 class RedisHashStore:
     """
     A high-level Redis interface for managing collections of dictionaries

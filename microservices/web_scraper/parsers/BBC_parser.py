@@ -5,17 +5,14 @@ from typing import Optional
 
 from bs4 import BeautifulSoup
 
-from microservices.web_scraper.parsers.base_parser import (BaseParser,
-                                                           ParseResult)
+from microservices.web_scraper.parsers.base_parser import BaseParser, ParseResult
 
 
 class BBCParser(BaseParser):
     def extract(self, soup: BeautifulSoup, article_url: str) -> Optional[ParseResult]:
-        container = (
-            soup.find("main") or soup.find("article") or soup
-        )
+        container = soup.find("main") or soup.find("article") or soup
         self._remove_unwanted(container)
-        
+
         # BBC specific cleaning
         for tag in container.find_all(class_=re.compile(r"Metadata|Share|Related")):
             tag.decompose()
@@ -35,7 +32,7 @@ class BBCParser(BaseParser):
             if h1:
                 title = h1.get_text(strip=True)
         if not title and soup.title:
-            title = soup.title.string    
+            title = soup.title.string
 
         # Author
         author = None
@@ -113,10 +110,14 @@ class BBCParser(BaseParser):
         if not published_at:
             time_tag = soup.find("time")
             if time_tag:
-                published_at = time_tag.get("datetime") or time_tag.get_text(" ", strip=True)
+                published_at = time_tag.get("datetime") or time_tag.get_text(
+                    " ", strip=True
+                )
                 if published_at:
                     published_at = published_at.strip()
         if not title or not author or not published_at:
-            print(f"[BBCParser WARNING] Partial parse for {article_url} | title={bool(title)} author={bool(author)} published={bool(published_at)}")
+            print(
+                f"[BBCParser WARNING] Partial parse for {article_url} | title={bool(title)} author={bool(author)} published={bool(published_at)}"
+            )
 
         return ParseResult(text, title, author, published_at)

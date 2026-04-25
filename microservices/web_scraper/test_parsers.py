@@ -9,8 +9,7 @@ from microservices.web_scraper.parsers.CBS_parser import CBSParser
 from microservices.web_scraper.parsers.Euronews_parser import EuronewsParser
 from microservices.web_scraper.parsers.NBC_parser import NBCParser
 from microservices.web_scraper.parsers.NPR_parser import NPRParser
-from microservices.web_scraper.parsers.The_Guardian_parser import \
-    TheGuardianParser
+from microservices.web_scraper.parsers.The_Guardian_parser import TheGuardianParser
 
 PARSER_MAP = {
     "bbc": BBCParser(),

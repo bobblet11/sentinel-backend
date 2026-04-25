@@ -9,18 +9,21 @@ class JobStatus(StrEnum):
     PENDING = "pending"
     COMPLETE = "complete"
     FAILED = "failed"
-    
+
+
 class JobType(StrEnum):
     BACKGROUND = "background"
     USER = "user"
-    
+
+
 class JobStage(StrEnum):
     INGESTED = "ingested"
     FETCHED = "fetched HTML"
     PARSED = "parsed HTML"
     NLP_START = "started NLP"
     NLP_END = "completed NLP"
-    
+
+
 class JobCreate(BaseModel):
     article_url: str
     article_html: str | None = None
@@ -28,10 +31,11 @@ class JobCreate(BaseModel):
     article_title: str | None = None
     article_author: str | None = None
     article_published_at: str | None = None
-    article_summary: str  | None = None
-    
+    article_summary: str | None = None
+
     news_outlet: str | None = None
     is_background: bool = False
+
 
 class JobResponse(BaseModel):
     id: int

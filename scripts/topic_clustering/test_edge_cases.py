@@ -20,8 +20,12 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 from sqlalchemy import text
 
-from scripts.topic_clustering.poc_cluster import (_build_docs, fetch_articles,
-                                                  get_engine, load_env)
+from scripts.topic_clustering.poc_cluster import (
+    _build_docs,
+    fetch_articles,
+    get_engine,
+    load_env,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,7 +46,9 @@ def test_null_title_articles_excluded(engine) -> bool:
     Returns:
         True if the check passes, False otherwise.
     """
-    logger.info("test_null_title_articles_excluded: querying for null/empty-title articles…")
+    logger.info(
+        "test_null_title_articles_excluded: querying for null/empty-title articles…"
+    )
     null_title_sql = text(
         "SELECT COUNT(*) FROM article WHERE title IS NULL OR title = ''"
     )
@@ -73,7 +79,9 @@ def test_long_title_truncation() -> bool:
     Returns:
         True if truncation is applied correctly, False otherwise.
     """
-    logger.info("test_long_title_truncation: testing _build_docs with a 500-char title…")
+    logger.info(
+        "test_long_title_truncation: testing _build_docs with a 500-char title…"
+    )
     long_title = "A" * 500
     df = pd.DataFrame({"title": [long_title], "url": ["http://example.com"]})
     docs = _build_docs(df)
@@ -106,12 +114,21 @@ def test_empty_corpus_handling() -> bool:
     empty_df = pd.DataFrame(columns=["id", "title", "url"])
 
     with patch.object(poc, "fetch_articles", return_value=empty_df):
-        with patch.object(poc, "load_env", return_value={
-            "host": "localhost", "port": "5432", "db": "sentinel",
-            "user": "sentinel", "password": "", "sslmode": "disable",
-        }):
+        with patch.object(
+            poc,
+            "load_env",
+            return_value={
+                "host": "localhost",
+                "port": "5432",
+                "db": "sentinel",
+                "user": "sentinel",
+                "password": "",
+                "sslmode": "disable",
+            },
+        ):
             with patch.object(poc, "get_engine", return_value=MagicMock()):
                 import sys as _sys  # noqa: PLC0415
+
                 old_argv = _sys.argv
                 _sys.argv = ["poc_cluster"]
                 try:
@@ -120,7 +137,9 @@ def test_empty_corpus_handling() -> bool:
                     return True
                 except SystemExit as exc:
                     if exc.code == 0:
-                        logger.info("PASS: main() exited cleanly (code 0) on empty corpus.")
+                        logger.info(
+                            "PASS: main() exited cleanly (code 0) on empty corpus."
+                        )
                         return True
                     logger.error("FAIL: main() exited with non-zero code %s.", exc.code)
                     return False
@@ -149,10 +168,14 @@ def test_fetch_articles_live(engine) -> bool:
 
     for col in ("id", "title", "url"):
         if col not in df.columns:
-            logger.error("FAIL: missing expected column '%s' in fetch_articles output.", col)
+            logger.error(
+                "FAIL: missing expected column '%s' in fetch_articles output.", col
+            )
             return False
 
-    logger.info("PASS: fetch_articles returned %d articles with expected columns.", len(df))
+    logger.info(
+        "PASS: fetch_articles returned %d articles with expected columns.", len(df)
+    )
     return True
 
 
@@ -206,7 +229,10 @@ def main() -> None:
     print("============================================")
 
     tests = [
-        ("Null/empty title articles excluded", lambda: test_null_title_articles_excluded(engine)),
+        (
+            "Null/empty title articles excluded",
+            lambda: test_null_title_articles_excluded(engine),
+        ),
         ("Long title truncation", test_long_title_truncation),
         ("Empty corpus early exit", test_empty_corpus_handling),
         ("fetch_articles live DB check", lambda: test_fetch_articles_live(engine)),

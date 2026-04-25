@@ -109,13 +109,28 @@ def find_cutoff_id(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Skip background queue to newer articles")
-    parser.add_argument("--stream", required=True, help="Stream name, e.g. background:to.be.scraped")
-    parser.add_argument("--group", default="default", help="Consumer group name (default: 'default')")
+    parser = argparse.ArgumentParser(
+        description="Skip background queue to newer articles"
+    )
+    parser.add_argument(
+        "--stream", required=True, help="Stream name, e.g. background:to.be.scraped"
+    )
+    parser.add_argument(
+        "--group", default="default", help="Consumer group name (default: 'default')"
+    )
     parser.add_argument("--days", type=float, help="Keep articles from the last N days")
-    parser.add_argument("--cutoff", help="Keep articles with created_at >= this date (YYYY-MM-DD or ISO)")
-    parser.add_argument("--apply", action="store_true", help="Actually apply the change (default is dry-run)")
-    parser.add_argument("--trim", action="store_true", help="Also XTRIM old messages (destructive)")
+    parser.add_argument(
+        "--cutoff",
+        help="Keep articles with created_at >= this date (YYYY-MM-DD or ISO)",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Actually apply the change (default is dry-run)",
+    )
+    parser.add_argument(
+        "--trim", action="store_true", help="Also XTRIM old messages (destructive)"
+    )
     args = parser.parse_args()
 
     if not args.days and not args.cutoff:
@@ -141,7 +156,9 @@ def main():
     groups = r.xinfo_groups(args.stream)
     current_group = next((g for g in groups if g["name"] == args.group), None)
     if not current_group:
-        print(f"ERROR: Consumer group '{args.group}' not found on stream '{args.stream}'")
+        print(
+            f"ERROR: Consumer group '{args.group}' not found on stream '{args.stream}'"
+        )
         print(f"Available groups: {[g['name'] for g in groups]}")
         sys.exit(1)
 

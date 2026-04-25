@@ -14,10 +14,14 @@ import argparse
 import logging
 from typing import List, Tuple
 
-from scripts.topic_clustering.poc_cluster import (PREDEFINED_TOPICS,
-                                                  _build_docs, fetch_articles,
-                                                  get_engine, load_env,
-                                                  run_zero_shot_bertopic)
+from scripts.topic_clustering.poc_cluster import (
+    PREDEFINED_TOPICS,
+    _build_docs,
+    fetch_articles,
+    get_engine,
+    load_env,
+    run_zero_shot_bertopic,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -178,7 +182,9 @@ def main() -> None:
         agreement_cross = compute_agreement(list(topics_42), list(topics_99))
         pct = agreement_cross * 100
         if agreement_cross >= 0.80:
-            print(f"  PASS — {pct:.1f}% cross-seed agreement ({len(topics_42)} articles).")
+            print(
+                f"  PASS — {pct:.1f}% cross-seed agreement ({len(topics_42)} articles)."
+            )
         else:
             logger.warning(
                 "Cross-seed agreement is %.1f%% — below the 80%% guideline. "

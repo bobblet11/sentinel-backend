@@ -20,11 +20,11 @@ class RedisPublisher:
 
         if not isinstance(stream_name, str) or not stream_name:
             raise ValueError("Stream name must be a non-empty string.")
-        
+
         self.logger: Logger = getLogger(f"{stream_name}.redis_publisher")
-        self.stream_name:str = stream_name
-        self.max_len:int = 100_000
-        self.client:redis.Redis = redis_connection.get_client()
+        self.stream_name: str = stream_name
+        self.max_len: int = 100_000
+        self.client: redis.Redis = redis_connection.get_client()
 
     def publish_one(self, message_payload: Dict[Any, Any]) -> str:
         """
@@ -39,13 +39,14 @@ class RedisPublisher:
         if not message_payload:
             raise Exception("No message to publish")
 
-        payload:Dict[str, Any] = {"payload": json.dumps(message_payload)}
-        redis_message_id:str = self.client.xadd(
+        payload: Dict[str, Any] = {"payload": json.dumps(message_payload)}
+        redis_message_id: str = self.client.xadd(
             self.stream_name, payload, maxlen=self.max_len, approximate=True
         )
-        self.logger.debug(f"Published message under id {redis_message_id} to {self.stream_name}")
+        self.logger.debug(
+            f"Published message under id {redis_message_id} to {self.stream_name}"
+        )
         return redis_message_id
-
 
     def publish_many(self, messages: List[Dict[Any, Any]]) -> List[str]:
         """
@@ -58,18 +59,18 @@ class RedisPublisher:
                 A list of the unique Redis message IDs for the published messages
                 if successful, otherwise None.
         """
-        
+
         if not messages or len(messages) == 0:
             raise Exception("No messages to publish")
 
         pipe = self.client.pipeline(transaction=True)
 
         for message_data in messages:
-            payload:Dict[str,Any] = {"payload": json.dumps(message_data)}
-            pipe.xadd(
-                self.stream_name, payload, maxlen=self.max_len, approximate=True
-            )
-        redis_message_ids:List[str] = pipe.execute()
+            payload: Dict[str, Any] = {"payload": json.dumps(message_data)}
+            pipe.xadd(self.stream_name, payload, maxlen=self.max_len, approximate=True)
+        redis_message_ids: List[str] = pipe.execute()
 
-        self.logger.debug(f"Published {len(redis_message_ids)} messages to {self.stream_name}.")
+        self.logger.debug(
+            f"Published {len(redis_message_ids)} messages to {self.stream_name}."
+        )
         return redis_message_ids

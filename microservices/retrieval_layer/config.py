@@ -18,40 +18,23 @@ POSTGRES_PORT: int = get_env_var("POSTGRES_PORT", int, config_logger)
 POSTGRES_DB: str = get_env_var("POSTGRES_DB", str, config_logger)
 POSTGRES_USER: str = get_env_var("POSTGRES_USER", str, config_logger)
 POSTGRES_PASSWORD: str = get_env_var("POSTGRES_PASSWORD", str, config_logger)
-POSTGRES_SSLMODE: str = get_env_var("POSTGRES_SSLMODE", str, config_logger, default="disable")
+POSTGRES_SSLMODE: str = get_env_var(
+    "POSTGRES_SSLMODE", str, config_logger, default="disable"
+)
 
 # Redis stream configs
-INPUT_STREAMS: List[str] = [x.strip(" ,") for x in get_env_var("INPUT_STREAMS",str, config_logger).split(",")]
-OUTPUT_STREAM: str = get_env_var(
-    "OUTPUT_STREAM",
-    str,
-    config_logger
-)
+INPUT_STREAMS: List[str] = [
+    x.strip(" ,") for x in get_env_var("INPUT_STREAMS", str, config_logger).split(",")
+]
+OUTPUT_STREAM: str = get_env_var("OUTPUT_STREAM", str, config_logger)
 
-FAILURE_OUTPUT_STREAM: str = get_env_var(
-    "FAILURE_OUTPUT_STREAM",
-    str,
-    config_logger
-)
+FAILURE_OUTPUT_STREAM: str = get_env_var("FAILURE_OUTPUT_STREAM", str, config_logger)
 
-GROUP_NAME: str = get_env_var(
-    "GROUP_NAME",
-    str,
-    config_logger
-)
+GROUP_NAME: str = get_env_var("GROUP_NAME", str, config_logger)
 
-CONSUMER_NAME: str = get_env_var(
-    "CONSUMER_NAME",
-    str,
-    config_logger
-)
+CONSUMER_NAME: str = get_env_var("CONSUMER_NAME", str, config_logger)
 
-BATCH_SIZE: int = get_env_var(
-    "BATCH_SIZE",
-    int,
-    config_logger,
-    default=10
-)
+BATCH_SIZE: int = get_env_var("BATCH_SIZE", int, config_logger, default=10)
 
 RETRY_FAILURE_MODE: bool = get_env_var(
     "RETRIEVAL_RETRY_FAILURE_MODE",
@@ -74,15 +57,10 @@ DUMMY_SEED_MODE: bool = get_env_var(
     default=False,
 )
 
-MAX_WORKERS: int = get_env_var(
-    "MAX_WORKERS",
-    int,
-    config_logger,
-    default=1
-)
+MAX_WORKERS: int = get_env_var("MAX_WORKERS", int, config_logger, default=1)
 
-HASH_STORE_NAMESPACE: str = get_env_var("HASH_STORE_NAMESPACE",str, config_logger)
-UID_STORE_NAMESPACE: str = get_env_var("UID_STORE_NAMESPACE",str, config_logger)
+HASH_STORE_NAMESPACE: str = get_env_var("HASH_STORE_NAMESPACE", str, config_logger)
+UID_STORE_NAMESPACE: str = get_env_var("UID_STORE_NAMESPACE", str, config_logger)
 TEST_MODE: bool = False
 
 IS_BENCHMARK: bool = get_env_var(
@@ -91,19 +69,19 @@ IS_BENCHMARK: bool = get_env_var(
     config_logger,
     default=False,
 )
-BENCHMARK_OUTPUT_STREAM: str = get_env_var("BENCHMARK_OUTPUT_STREAM",str, config_logger)
+BENCHMARK_OUTPUT_STREAM: str = get_env_var(
+    "BENCHMARK_OUTPUT_STREAM", str, config_logger
+)
 
 env_variables: List[EnvVariable] = [
     EnvVariable("IS_BENCHMARK", IS_BENCHMARK),
     EnvVariable("BENCHMARK_OUTPUT_STREAM", BENCHMARK_OUTPUT_STREAM),
     EnvVariable("LOG_MODE", LOG_MODE),
-    
     EnvVariable("POSTGRES_HOST", POSTGRES_HOST),
     EnvVariable("POSTGRES_PORT", POSTGRES_PORT),
     EnvVariable("POSTGRES_DB", POSTGRES_DB),
     EnvVariable("POSTGRES_USER", POSTGRES_USER),
     EnvVariable("POSTGRES_PASSWORD", POSTGRES_PASSWORD),
-    
     EnvVariable("INPUT_STREAMS", INPUT_STREAMS),
     EnvVariable("OUTPUT_STREAM", OUTPUT_STREAM),
     EnvVariable("FAILURE_OUTPUT_STREAM", FAILURE_OUTPUT_STREAM),
@@ -111,20 +89,18 @@ env_variables: List[EnvVariable] = [
     EnvVariable("CONSUMER_NAME", CONSUMER_NAME),
     EnvVariable("HASH_STORE_NAMESPACE", HASH_STORE_NAMESPACE),
     EnvVariable("UID_STORE_NAMESPACE", UID_STORE_NAMESPACE),
-    
     EnvVariable("BATCH_SIZE", BATCH_SIZE),
     EnvVariable("MAX_WORKERS", MAX_WORKERS),
     EnvVariable("RETRIEVAL_RETRY_FAILURE_MODE", RETRY_FAILURE_MODE),
-    
     EnvVariable("DUMMY_NLP_MODE", DUMMY_NLP_MODE),
     EnvVariable("DUMMY_SEED_MODE", DUMMY_SEED_MODE),
-    
-    
 ]
 
 input_streams = INPUT_STREAMS
-output_streams = [FAILURE_OUTPUT_STREAM, HASH_STORE_NAMESPACE, BENCHMARK_OUTPUT_STREAM if IS_BENCHMARK else OUTPUT_STREAM]
+output_streams = [
+    FAILURE_OUTPUT_STREAM,
+    HASH_STORE_NAMESPACE,
+    BENCHMARK_OUTPUT_STREAM if IS_BENCHMARK else OUTPUT_STREAM,
+]
 
 print_env(Config(env_variables, input_streams, output_streams), config_logger)
-
-

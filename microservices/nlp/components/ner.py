@@ -1,17 +1,23 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from transformers import (AutoModelForTokenClassification, AutoTokenizer,
-                          pipeline)
+from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
-from common.models.api.redis_models import (Article, Entity, NLPOptions,
-                                            SentenceScore, StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    Entity,
+    NLPOptions,
+    SentenceScore,
+    StreamMessage,
+)
 from microservices.nlp.components.device import DeviceConfig
 from microservices.nlp.config import NER_BATCH_SIZE, NER_MODEL
+
 # Local imports
 from microservices.nlp.models.base import ArticleProcessor
 
 logger = logging.getLogger(__name__)
+
 
 class EntityRecognizer(ArticleProcessor):
     """
@@ -21,14 +27,18 @@ class EntityRecognizer(ArticleProcessor):
     into result.entities_in_article.
     """
 
-    def __init__(self, device_config: DeviceConfig, model_manager: Optional[Any] = None):
+    def __init__(
+        self, device_config: DeviceConfig, model_manager: Optional[Any] = None
+    ):
         self.model_name = NER_MODEL
         self.device_id = device_config.device_id
         self.device = device_config.device
 
-        logger.info(f"EntityRecognizer: Loading '{self.model_name}' "
-                    f"on {device_config.device.upper()} "
-                    f"(fp16={device_config.use_fp16})...")
+        logger.info(
+            f"EntityRecognizer: Loading '{self.model_name}' "
+            f"on {device_config.device.upper()} "
+            f"(fp16={device_config.use_fp16})..."
+        )
         try:
             if model_manager is not None:
                 from common.model_manager.registry import ModelState
@@ -67,8 +77,13 @@ class EntityRecognizer(ArticleProcessor):
             logger.error(f"EntityRecognizer: Failed to load model: {e}")
             raise
 
-    def run(self, article: Article, message: StreamMessage, options: NLPOptions,
-            sentences: List[SentenceScore]) -> None:
+    def run(
+        self,
+        article: Article,
+        message: StreamMessage,
+        options: NLPOptions,
+        sentences: List[SentenceScore],
+    ) -> None:
         """
         Runs NER over all sentences provided by the Preprocessor.
         Updates result.entities_in_article with unique entities found.
@@ -114,7 +129,10 @@ class EntityRecognizer(ArticleProcessor):
 
                     key = (text.lower(), label)
                     # Keep the entity occurrence with the highest confidence score
-                    if key not in unique_entities or score > unique_entities[key]["score"]:
+                    if (
+                        key not in unique_entities
+                        or score > unique_entities[key]["score"]
+                    ):
                         e_obj = Entity(
                             entity_text=text,
                             type_of_entity=label,
@@ -125,8 +143,12 @@ class EntityRecognizer(ArticleProcessor):
 
             # Map results to the NLPResult object
             result = message.create_nlp_result()
-            result.entities_in_article = [v["entity_obj"] for v in unique_entities.values()]
-            logger.info(f"EntityRecognizer: Found {len(result.entities_in_article)} unique entities.")
+            result.entities_in_article = [
+                v["entity_obj"] for v in unique_entities.values()
+            ]
+            logger.info(
+                f"EntityRecognizer: Found {len(result.entities_in_article)} unique entities."
+            )
             message.set_nlp_result(result)
 
         except Exception as e:

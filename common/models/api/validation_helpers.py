@@ -2,22 +2,26 @@ import json
 import re
 from typing import List
 
-from common.models.api.redis_models import (Message, MessagePayload,
-                                            StreamMessage)
+from common.models.api.redis_models import Message, MessagePayload, StreamMessage
 
 HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
+
 
 def contains_html(text: str) -> bool:
     return bool(text and HTML_TAG_PATTERN.search(text))
 
 
 # --- Validation helpers ---
-def validate_fields(payload: MessagePayload, required_fields: List[str], stage: str) -> None:
+def validate_fields(
+    payload: MessagePayload, required_fields: List[str], stage: str
+) -> None:
     """
     Generic validator to ensure required fields are present in MessagePayload.
     Raises ValueError if any required field is missing or None.
     """
-    missing = [f for f in required_fields if getattr(payload, f, None) in (None, "", [])]
+    missing = [
+        f for f in required_fields if getattr(payload, f, None) in (None, "", [])
+    ]
     if missing:
         raise ValueError(f"[{stage} Validation Failed] Missing fields: {missing}")
 
@@ -35,14 +39,18 @@ def validate_after_ingestor(message: Message) -> None:
         errors.append("Title too short or missing")
 
     if errors:
-        raise ValueError(f"[Ingestor Validation Failed] {len(errors)} issues:\n - " + "\n - ".join(errors))
+        raise ValueError(
+            f"[Ingestor Validation Failed] {len(errors)} issues:\n - "
+            + "\n - ".join(errors)
+        )
 
 
-
-def validate_after_webscraper(stream_message: StreamMessage, message: Message = None) -> None:
+def validate_after_webscraper(
+    stream_message: StreamMessage, message: Message = None
+) -> None:
     if not message and not stream_message:
         raise ValueError("Nothing passed to validate_after_webscraper")
-    
+
     if not message:
         message = stream_message.data
 
@@ -67,26 +75,24 @@ def validate_after_webscraper(stream_message: StreamMessage, message: Message = 
         errors.append("Title contains HTML tags")
 
     if errors:
-        raise ValueError(f"[WebScraper Validation Failed] {len(errors)} issues:\n - " + "\n - ".join(errors))
+        raise ValueError(
+            f"[WebScraper Validation Failed] {len(errors)} issues:\n - "
+            + "\n - ".join(errors)
+        )
 
 
-
-def validate_after_nlp(stream_message: StreamMessage, message: Message=None) -> None:
+def validate_after_nlp(stream_message: StreamMessage, message: Message = None) -> None:
     """
     Validate that NLP stage has produced well-formed claims, entities, and bias profile.
     Raises ValueError if any required field is missing or malformed.
     """
     if not message and not stream_message:
-        raise("Nothing passed to validate_after_webscraper")
-    
+        raise ("Nothing passed to validate_after_webscraper")
+
     if not message:
         message = stream_message.data
 
-    required = [
-        "claims_in_article",
-        "entities_in_article",
-        "bias_profile"
-    ]
+    required = ["claims_in_article", "entities_in_article", "bias_profile"]
     validate_fields(message.payload, required, "NLP")
 
     payload = message.payload
@@ -99,12 +105,21 @@ def validate_after_nlp(stream_message: StreamMessage, message: Message=None) -> 
             continue
         if claim.confidence is None:
             errors.append(f"Claim[{idx}] missing confidence")
-        if not isinstance(claim.source_sentence_indices, list) or not claim.source_sentence_indices:
+        if (
+            not isinstance(claim.source_sentence_indices, list)
+            or not claim.source_sentence_indices
+        ):
             errors.append(f"Claim[{idx}] missing source_sentence_indices")
-        if not claim.decontextualised_claim_text or not isinstance(claim.decontextualised_claim_text, str):
+        if not claim.decontextualised_claim_text or not isinstance(
+            claim.decontextualised_claim_text, str
+        ):
             errors.append(f"Claim[{idx}] missing decontextualised_claim_text")
-        if claim.decontextualised_claim_embedding is None or not isinstance(claim.decontextualised_claim_embedding, list):
-            errors.append(f"Claim[{idx}] missing or invalid decontextualised_claim_embedding")
+        if claim.decontextualised_claim_embedding is None or not isinstance(
+            claim.decontextualised_claim_embedding, list
+        ):
+            errors.append(
+                f"Claim[{idx}] missing or invalid decontextualised_claim_embedding"
+            )
 
     # --- Entities ---
     for idx, entity in enumerate(payload.entities_in_article or []):
@@ -136,10 +151,14 @@ def validate_after_nlp(stream_message: StreamMessage, message: Message=None) -> 
             errors.append("BiasProfile missing sentiment_analysis_confidence")
 
     if errors:
-        raise ValueError(f"[NLP Validation Failed] {len(errors)} issues:\n - " + "\n - ".join(errors))
+        raise ValueError(
+            f"[NLP Validation Failed] {len(errors)} issues:\n - " + "\n - ".join(errors)
+        )
 
 
-def validate_after_retrieval(stream_message: StreamMessage, message: Message = None) -> None:
+def validate_after_retrieval(
+    stream_message: StreamMessage, message: Message = None
+) -> None:
     if not message and not stream_message:
         raise ValueError("Nothing passed to validate_after_retrieval")
     if not message:
@@ -158,9 +177,11 @@ def validate_after_retrieval(stream_message: StreamMessage, message: Message = N
         errors.append("related_articles missing or not a list")
 
     if errors:
-        raise ValueError(f"[Retrieval Validation Failed] {len(errors)} issues:\n - " + "\n - ".join(errors))
+        raise ValueError(
+            f"[Retrieval Validation Failed] {len(errors)} issues:\n - "
+            + "\n - ".join(errors)
+        )
 
-    
 
 def get_pretty_print_message(message: Message, text_snippet_len: int = 10) -> str:
     """
@@ -188,9 +209,7 @@ def get_pretty_print_message(message: Message, text_snippet_len: int = 10) -> st
 
 
 def get_pretty_print_stream_message(
-    stream_message: StreamMessage,
-    snippet_len: int = 50,
-    list_snippet_len: int = 3
+    stream_message: StreamMessage, snippet_len: int = 50, list_snippet_len: int = 3
 ) -> str:
     """
     Pretty prints a StreamMessage object for inspection.
@@ -209,55 +228,68 @@ def get_pretty_print_stream_message(
     for field in ("parsed_text", "raw_html"):
         if payload.get(field):
             text = str(payload[field])
-            payload[field] = text[:snippet_len] + "..." if len(text) > snippet_len else text
+            payload[field] = (
+                text[:snippet_len] + "..." if len(text) > snippet_len else text
+            )
 
     # Helper to summarize lists
     def summarize_list(items, formatter, label):
         total_count = len(items)
         summarized = [formatter(item) for item in items[:list_snippet_len]]
         if total_count > list_snippet_len:
-            summarized.append({"note": f"... {total_count - list_snippet_len} more {label} omitted"})
+            summarized.append(
+                {"note": f"... {total_count - list_snippet_len} more {label} omitted"}
+            )
         return summarized, total_count
 
     # Sentences
     if payload.get("sentences"):
+
         def fmt_sentence(s):
             return {
                 "index": s.get("index"),
-                "text_snippet": s.get("text", "")[:snippet_len] + (
-                    "..." if len(s.get("text", "")) > snippet_len else ""
-                ),
+                "text_snippet": s.get("text", "")[:snippet_len]
+                + ("..." if len(s.get("text", "")) > snippet_len else ""),
                 "score": s.get("score"),
                 "is_checkworthy": s.get("is_checkworthy"),
                 "entities_count": len(s.get("entities") or []),
             }
+
         payload["sentences"], payload["number_sentences_in_article"] = summarize_list(
             payload["sentences"], fmt_sentence, "sentences"
         )
 
     # Claims
     if payload.get("claims_in_article"):
+
         def fmt_claim(c):
             return {
                 "confidence": c.get("confidence"),
-                "source_sentence_indices": str(c.get("source_sentence_indices"))[:snippet_len],
-                "claim_text_snippet": str(c.get("decontextualised_claim_text"))[:snippet_len],
+                "source_sentence_indices": str(c.get("source_sentence_indices"))[
+                    :snippet_len
+                ],
+                "claim_text_snippet": str(c.get("decontextualised_claim_text"))[
+                    :snippet_len
+                ],
                 "embedding_dims": len(c.get("decontextualised_claim_embedding") or []),
                 "entities_count": len(c.get("NER_entities") or []),
             }
-        payload["claims_in_article"], payload["number_claims_in_article"] = summarize_list(
-            payload["claims_in_article"], fmt_claim, "claims"
+
+        payload["claims_in_article"], payload["number_claims_in_article"] = (
+            summarize_list(payload["claims_in_article"], fmt_claim, "claims")
         )
 
     # Entities
     if payload.get("entities_in_article"):
+
         def fmt_entity(e):
             return {
                 "entity_text": e.get("entity_text"),
                 "type": e.get("type_of_entity"),
             }
-        payload["entities_in_article"], payload["number_entities_in_article"] = summarize_list(
-            payload["entities_in_article"], fmt_entity, "entities"
+
+        payload["entities_in_article"], payload["number_entities_in_article"] = (
+            summarize_list(payload["entities_in_article"], fmt_entity, "entities")
         )
 
     msg_dict["payload"] = payload

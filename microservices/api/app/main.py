@@ -1,5 +1,3 @@
-
-
 import uvicorn
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,11 +8,12 @@ from microservices.api.app.api.v1.api import api_router
 from microservices.api.app.core.config import API_SERVICE_PORT
 from microservices.api.app.core.logger import logger
 
-CONTAINER_NAME:str = "sentinel_api_service"
-FAST_API_NAME:str = "Sentinel API Service"
-FAST_API_VERSION:str = "0.0"
+CONTAINER_NAME: str = "sentinel_api_service"
+FAST_API_NAME: str = "Sentinel API Service"
+FAST_API_VERSION: str = "0.0"
 
 app = FastAPI(title=FAST_API_NAME, version=FAST_API_VERSION)
+
 
 # Middleware to remove trailing slashes
 @app.middleware("http")
@@ -23,25 +22,30 @@ async def remove_trailing_slash(request: Request, call_next):
         request.scope["path"] = request.url.path.rstrip("/")
     return await call_next(request)
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=True
+    allow_credentials=True,
 )
+
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "database"}
 
+
 @app.get("/")
 async def root():
     """Root endpoint"""
     return {"service": "Sentinel Database Service", "version": "0.1.0"}
 
+
 app.include_router(api_router, prefix="/api/v1")
+
 
 # let any errors bubble to top!
 @app.exception_handler(Exception)

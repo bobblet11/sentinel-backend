@@ -89,7 +89,7 @@ SENTENCE_EXTRACT_TOP_K = 15
 # component-only imports (e.g. in tests) do not call exit(1) on missing vars.
 # =============================================================================
 try:
-    LOG_MODE: int = get_env_var("LOG_MODE",int, config_logger)
+    LOG_MODE: int = get_env_var("LOG_MODE", int, config_logger)
 
     INPUT_STREAMS: List[str] = [
         x.strip(" ,")
@@ -99,7 +99,9 @@ try:
     BACKGROUND_OUTPUT_STREAM: str = get_env_var(
         "BACKGROUND_OUTPUT_STREAM", str, config_logger
     )
-    FAILURE_OUTPUT_STREAM: str = get_env_var("FAILURE_OUTPUT_STREAM", str, config_logger)
+    FAILURE_OUTPUT_STREAM: str = get_env_var(
+        "FAILURE_OUTPUT_STREAM", str, config_logger
+    )
 
     GROUP_NAME: str = get_env_var("GROUP_NAME", str, config_logger)
     CONSUMER_NAME: str = get_env_var("CONSUMER_NAME", str, config_logger)
@@ -121,7 +123,9 @@ try:
 
     # Allow model overrides via env without touching code
     NER_MODEL = get_env_var("NLP_NER_MODEL", str, config_logger, NER_MODEL)
-    EMBEDDING_MODEL = get_env_var("NLP_EMBEDDING_MODEL", str, config_logger, EMBEDDING_MODEL)
+    EMBEDDING_MODEL = get_env_var(
+        "NLP_EMBEDDING_MODEL", str, config_logger, EMBEDDING_MODEL
+    )
     BIAS_POLITICAL_MODEL = get_env_var(
         "NLP_BIAS_MODEL", str, config_logger, BIAS_POLITICAL_MODEL
     )
@@ -132,7 +136,10 @@ try:
     QA_MODEL = get_env_var("NLP_QA_MODEL", str, config_logger, QA_MODEL)
     GEN_MODEL = get_env_var("NLP_GEN_MODEL", str, config_logger, GEN_MODEL)
     TOPIC_SIMILARITY_THRESHOLD = get_env_var(
-        "NLP_TOPIC_SIMILARITY_THRESHOLD", float, config_logger, TOPIC_SIMILARITY_THRESHOLD
+        "NLP_TOPIC_SIMILARITY_THRESHOLD",
+        float,
+        config_logger,
+        TOPIC_SIMILARITY_THRESHOLD,
     )
 
     # Unified device config for all NLP components
@@ -152,7 +159,6 @@ try:
 
     env_variables: List[EnvVariable] = [
         EnvVariable("LOG_MODE", LOG_MODE),
-
         EnvVariable("INPUT_STREAMS", INPUT_STREAMS),
         EnvVariable("USER_OUTPUT_STREAM", USER_OUTPUT_STREAM),
         EnvVariable("BACKGROUND_OUTPUT_STREAM", BACKGROUND_OUTPUT_STREAM),

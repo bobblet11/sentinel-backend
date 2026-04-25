@@ -19,4 +19,3 @@ def test_connection():
         print(f"Error: {e}")
     except Exception as e:
         print(f"\n❌ An unexpected error occurred: {e}")
-

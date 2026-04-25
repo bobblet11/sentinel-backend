@@ -11,15 +11,16 @@ class ParseResult:
     title: Optional[str]
     author: Optional[str]
     published_at: Optional[str]
-    
+
     def __getitem__(self, key):
         return getattr(self, key, None)
-    
+
     def __setitem__(self, key, value):
         if hasattr(self, key):
             setattr(self, key, value)
         else:
             raise KeyError(f"{key} is not a valid field")
+
 
 class BaseParser:
     """

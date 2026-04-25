@@ -4,8 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from common.models.api.redis_models import (Article, NLPOptions, NLPResult,
-                                            StreamMessage)
+from common.models.api.redis_models import Article, NLPOptions, NLPResult, StreamMessage
 from microservices.nlp.components.device import DeviceConfig
 from microservices.nlp.config import TOPIC_LABELS, TOPIC_SIMILARITY_THRESHOLD
 from microservices.nlp.models.base import ArticleProcessor
@@ -106,7 +105,13 @@ _BYLINE_RE = re.compile(
     r"\s*[-|]\s*(BBC|CBC|ABC|CBS|NBC|NPR|Reuters|AP|CNN)[^\n]*$",
     re.IGNORECASE,
 )
-_PRIVACY_TRIGGERS = ("cookie", "browsing", "consent", "privacy policy", "copy/paste the link")
+_PRIVACY_TRIGGERS = (
+    "cookie",
+    "browsing",
+    "consent",
+    "privacy policy",
+    "copy/paste the link",
+)
 
 
 def _build_doc(article: Article, result: NLPResult) -> str:
@@ -177,7 +182,9 @@ class TopicClassifier(ArticleProcessor):
 
                 if model_manager.get_state("EMBEDDING") == ModelState.READY:
                     self.model = model_manager.get("EMBEDDING")
-                    logger.info("TopicClassifier: Using EMBEDDING model from ModelManager.")
+                    logger.info(
+                        "TopicClassifier: Using EMBEDDING model from ModelManager."
+                    )
                 else:
                     logger.warning(
                         "TopicClassifier: EMBEDDING model not ready (%s) — "
@@ -192,7 +199,9 @@ class TopicClassifier(ArticleProcessor):
 
                 from microservices.nlp.config import EMBEDDING_MODEL
 
-                self.model = SentenceTransformer(EMBEDDING_MODEL, device=device_config.device)
+                self.model = SentenceTransformer(
+                    EMBEDDING_MODEL, device=device_config.device
+                )
                 logger.info("TopicClassifier: Loaded EMBEDDING model directly.")
 
             # Pre-compute normalised topic description embeddings: shape (n_topics, 768).

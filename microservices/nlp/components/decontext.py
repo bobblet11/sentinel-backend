@@ -6,20 +6,34 @@ from typing import Any, List, Optional
 import spacy
 import torch
 from rank_bm25 import BM25Okapi
-from transformers import (AutoModelForQuestionAnswering, AutoModelForSeq2SeqLM,
-                          AutoTokenizer)
+from transformers import (
+    AutoModelForQuestionAnswering,
+    AutoModelForSeq2SeqLM,
+    AutoTokenizer,
+)
 
-from common.models.api.redis_models import (Article, NLPOptions, SentenceScore,
-                                            StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    NLPOptions,
+    SentenceScore,
+    StreamMessage,
+)
 from microservices.nlp.components.device import DeviceConfig
-from microservices.nlp.config import (BERT_MAX_LENGTH, BM25_TOP_K,
-                                      DECONTEXT_GEN_BATCH_SIZE,
-                                      DECONTEXT_MAX_GEN_LENGTH,
-                                      DECONTEXT_MAX_UNITS,
-                                      DECONTEXT_QA_BATCH_SIZE,
-                                      DECONTEXT_QG_BATCH_SIZE,
-                                      DECONTEXT_REWRITE_RATIO, GEN_MODEL,
-                                      QA_MODEL, QA_SCORE_THRESHOLD, QG_MODEL)
+from microservices.nlp.config import (
+    BERT_MAX_LENGTH,
+    BM25_TOP_K,
+    DECONTEXT_GEN_BATCH_SIZE,
+    DECONTEXT_MAX_GEN_LENGTH,
+    DECONTEXT_MAX_UNITS,
+    DECONTEXT_QA_BATCH_SIZE,
+    DECONTEXT_QG_BATCH_SIZE,
+    DECONTEXT_REWRITE_RATIO,
+    GEN_MODEL,
+    QA_MODEL,
+    QA_SCORE_THRESHOLD,
+    QG_MODEL,
+)
+
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
 
@@ -68,11 +82,15 @@ class Decontextualizer(SentenceProcessor):
         flags=re.IGNORECASE,
     )
 
-    def __init__(self, device_config: DeviceConfig, nlp=None, model_manager: Optional[Any] = None):
+    def __init__(
+        self, device_config: DeviceConfig, nlp=None, model_manager: Optional[Any] = None
+    ):
         self.device = device_config.device
         self.device_id = device_config.device_id
 
-        logger.info(f"Decontextualizer: Initializing on {self.device} (fp16={device_config.use_fp16})...")
+        logger.info(
+            f"Decontextualizer: Initializing on {self.device} (fp16={device_config.use_fp16})..."
+        )
 
         if nlp is not None:
             logger.info("Decontextualizer: Using shared spaCy model.")
@@ -81,7 +99,9 @@ class Decontextualizer(SentenceProcessor):
             try:
                 self.nlp = spacy.load("en_core_web_sm")
             except OSError:
-                logger.error("Decontextualizer: Run: python -m spacy download en_core_web_sm")
+                logger.error(
+                    "Decontextualizer: Run: python -m spacy download en_core_web_sm"
+                )
                 raise
 
         # Try to pull all 6 model/tokenizer objects from ModelManager first.
@@ -89,9 +109,12 @@ class Decontextualizer(SentenceProcessor):
             from common.model_manager.registry import ModelState
 
             keys = [
-                "DECONTEXT_QG_MODEL", "DECONTEXT_QG_TOKENIZER",
-                "DECONTEXT_QA_MODEL", "DECONTEXT_QA_TOKENIZER",
-                "DECONTEXT_MODEL", "DECONTEXT_TOKENIZER",
+                "DECONTEXT_QG_MODEL",
+                "DECONTEXT_QG_TOKENIZER",
+                "DECONTEXT_QA_MODEL",
+                "DECONTEXT_QA_TOKENIZER",
+                "DECONTEXT_MODEL",
+                "DECONTEXT_TOKENIZER",
             ]
             states = {k: model_manager.get_state(k) for k in keys}
             all_ready = all(s == ModelState.READY for s in states.values())
@@ -106,7 +129,9 @@ class Decontextualizer(SentenceProcessor):
                 logger.info("Decontextualizer: All models loaded from ModelManager.")
                 return
             else:
-                not_ready = {k: v.value for k, v in states.items() if v != ModelState.READY}
+                not_ready = {
+                    k: v.value for k, v in states.items() if v != ModelState.READY
+                }
                 logger.warning(
                     "Decontextualizer: ModelManager states not all ready: %s. "
                     "Falling back to direct load.",
@@ -121,19 +146,22 @@ class Decontextualizer(SentenceProcessor):
         # Question Generation model
         self.qg_tokenizer = AutoTokenizer.from_pretrained(QG_MODEL)
         self.qg_model = AutoModelForSeq2SeqLM.from_pretrained(
-            QG_MODEL, **_load_kw,
+            QG_MODEL,
+            **_load_kw,
         ).to(self.device)
 
         # Extractive QA model
         self.qa_tokenizer = AutoTokenizer.from_pretrained(QA_MODEL)
         self.qa_model = AutoModelForQuestionAnswering.from_pretrained(
-            QA_MODEL, **_load_kw,
+            QA_MODEL,
+            **_load_kw,
         ).to(self.device)
 
         # Generative rewrite model (FLAN-T5)
         self.gen_tokenizer = AutoTokenizer.from_pretrained(GEN_MODEL)
         self.gen_model = AutoModelForSeq2SeqLM.from_pretrained(
-            GEN_MODEL, **_load_kw,
+            GEN_MODEL,
+            **_load_kw,
         ).to(self.device)
 
         logger.info("Decontextualizer: All models loaded successfully.")
@@ -158,20 +186,28 @@ class Decontextualizer(SentenceProcessor):
         if not prompts:
             return []
         total_prompts = len(prompts)
-        total_chunks  = (total_prompts + batch_size - 1) // batch_size
+        total_chunks = (total_prompts + batch_size - 1) // batch_size
         results: List[str] = []
-        for chunk_idx, chunk_start in enumerate(range(0, total_prompts, batch_size), start=1):
-            chunk     = prompts[chunk_start : chunk_start + batch_size]
+        for chunk_idx, chunk_start in enumerate(
+            range(0, total_prompts, batch_size), start=1
+        ):
+            chunk = prompts[chunk_start : chunk_start + batch_size]
             done_so_far = chunk_start + len(chunk)
             t0 = time.perf_counter()
             inputs = tokenizer(
-                chunk, return_tensors="pt", padding=True, truncation=True,
+                chunk,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
                 max_length=BERT_MAX_LENGTH,
             ).to(self.device)
             with torch.no_grad():
                 outputs = model.generate(
-                    **inputs, max_length=DECONTEXT_MAX_GEN_LENGTH, num_beams=4,
-                    repetition_penalty=2.5, early_stopping=True,
+                    **inputs,
+                    max_length=DECONTEXT_MAX_GEN_LENGTH,
+                    num_beams=4,
+                    repetition_penalty=2.5,
+                    early_stopping=True,
                 )
             results.extend(
                 self._sanitize(tokenizer.decode(o, skip_special_tokens=True))
@@ -200,9 +236,9 @@ class Decontextualizer(SentenceProcessor):
         with torch.no_grad():
             outputs = self.qa_model(**inputs)
         start_probs = torch.softmax(outputs.start_logits[0], dim=-1)
-        end_probs   = torch.softmax(outputs.end_logits[0],   dim=-1)
-        seq_len     = start_probs.size(0)
-        max_span    = 50  # cap answer span at 50 tokens
+        end_probs = torch.softmax(outputs.end_logits[0], dim=-1)
+        seq_len = start_probs.size(0)
+        max_span = 50  # cap answer span at 50 tokens
         # Build score matrix; zero-out invalid spans (end < start or too long)
         score_matrix = torch.outer(start_probs, end_probs)
         mask = torch.tril(torch.ones(seq_len, seq_len, device=self.device))
@@ -210,12 +246,12 @@ class Decontextualizer(SentenceProcessor):
         for i in range(seq_len):
             if i + max_span < seq_len:
                 score_matrix[i, i + max_span :] = 0.0
-        best_idx    = score_matrix.argmax()
-        best_start  = (best_idx // seq_len).item()
-        best_end    = (best_idx % seq_len).item()
-        best_score  = score_matrix[best_start, best_end].item()
-        answer_ids  = inputs["input_ids"][0][best_start : best_end + 1]
-        answer      = self.qa_tokenizer.decode(answer_ids, skip_special_tokens=True)
+        best_idx = score_matrix.argmax()
+        best_start = (best_idx // seq_len).item()
+        best_end = (best_idx % seq_len).item()
+        best_score = score_matrix[best_start, best_end].item()
+        answer_ids = inputs["input_ids"][0][best_start : best_end + 1]
+        answer = self.qa_tokenizer.decode(answer_ids, skip_special_tokens=True)
         return {"score": best_score, "answer": answer}
 
     def _qa_batch(self, inputs: List[dict], batch_size: int) -> List[dict]:
@@ -225,11 +261,11 @@ class Decontextualizer(SentenceProcessor):
         """
         if not inputs:
             return []
-        total        = len(inputs)
+        total = len(inputs)
         total_chunks = (total + batch_size - 1) // batch_size
         results: List[dict] = []
         for chunk_idx, chunk_start in enumerate(range(0, total, batch_size), start=1):
-            chunk       = inputs[chunk_start : chunk_start + batch_size]
+            chunk = inputs[chunk_start : chunk_start + batch_size]
             done_so_far = chunk_start + len(chunk)
             t0 = time.perf_counter()
             for inp in chunk:
@@ -256,9 +292,15 @@ class Decontextualizer(SentenceProcessor):
             if len(chunk.text.split()) < 5:
                 units.append(chunk.text)
         for token in doc:
-            if token.pos_ == "VERB" and token.dep_ in ("ROOT", "relcl", "advcl", "xcomp"):
+            if token.pos_ == "VERB" and token.dep_ in (
+                "ROOT",
+                "relcl",
+                "advcl",
+                "xcomp",
+            ):
                 phrase_tokens = [token] + [
-                    c for c in token.children
+                    c
+                    for c in token.children
                     if c.dep_ in ("dobj", "prt", "attr") and c.i < token.i + 4
                 ]
                 phrase_tokens.sort(key=lambda t: t.i)
@@ -270,7 +312,9 @@ class Decontextualizer(SentenceProcessor):
     def _bm25_retrieve(self, query: str, doc_sentences: List[str]) -> str:
         """BM25 sparse retrieval over article sentences to find the most relevant evidence."""
         if not doc_sentences:
-            logger.debug(f"Decontextualizer [BM25] No doc_sentences available for query: {query[:60]}")
+            logger.debug(
+                f"Decontextualizer [BM25] No doc_sentences available for query: {query[:60]}"
+            )
             return ""
         tokenized_corpus = [s.lower().split() for s in doc_sentences]
         bm25 = BM25Okapi(tokenized_corpus)
@@ -319,20 +363,22 @@ class Decontextualizer(SentenceProcessor):
         logger.info(f"Decontextualizer: Phase 1 — spaCy batch parse ({n} sentences)...")
         t_phase = time.perf_counter()
         texts = [self._sanitize(s.text) for s in sentences]
-        docs  = list(self.nlp.pipe(texts))
-        logger.info(f"Decontextualizer: Phase 1 done ({time.perf_counter() - t_phase:.1f}s)")
+        docs = list(self.nlp.pipe(texts))
+        logger.info(
+            f"Decontextualizer: Phase 1 done ({time.perf_counter() - t_phase:.1f}s)"
+        )
 
         # ── Phase 2: extract units; build flat QG prompt list ─────────────
-        all_qg_prompts: List[str]  = []
-        sent_qg_slices: List[tuple] = []   # (start, end) into all_qg_prompts
+        all_qg_prompts: List[str] = []
+        sent_qg_slices: List[tuple] = []  # (start, end) into all_qg_prompts
         units_per_sent: List[List[str]] = []  # for debugging
 
         for text, doc in zip(texts, docs):
             start = len(all_qg_prompts)
             if text:
-                units = [
-                    u for u in self._extract_units(doc) if len(u.split()) < 6
-                ][:DECONTEXT_MAX_UNITS]
+                units = [u for u in self._extract_units(doc) if len(u.split()) < 6][
+                    :DECONTEXT_MAX_UNITS
+                ]
                 units_per_sent.append(units)
                 all_qg_prompts.extend(f"answer: {u} context: {text}" for u in units)
                 logger.debug(
@@ -350,14 +396,19 @@ class Decontextualizer(SentenceProcessor):
         )
         t_phase = time.perf_counter()
         all_questions = self._generate_batch(
-            all_qg_prompts, self.qg_tokenizer, self.qg_model,
-            batch_size=DECONTEXT_QG_BATCH_SIZE, label="QG",
+            all_qg_prompts,
+            self.qg_tokenizer,
+            self.qg_model,
+            batch_size=DECONTEXT_QG_BATCH_SIZE,
+            label="QG",
         )
-        logger.info(f"Decontextualizer: Phase 3 done ({time.perf_counter() - t_phase:.1f}s)")
+        logger.info(
+            f"Decontextualizer: Phase 3 done ({time.perf_counter() - t_phase:.1f}s)"
+        )
 
         # ── Phase 4: BM25 retrieval → flat QA input list ──────────────────
-        all_qa_inputs: List[dict]   = []
-        sent_qa_slices: List[tuple]  = []   # (start, end) into all_qa_inputs
+        all_qa_inputs: List[dict] = []
+        sent_qa_slices: List[tuple] = []  # (start, end) into all_qa_inputs
 
         for i, (qg_start, qg_end) in enumerate(sent_qg_slices):
             qa_start = len(all_qa_inputs)
@@ -380,23 +431,25 @@ class Decontextualizer(SentenceProcessor):
             )
         else:
             all_qa_results = []
-        logger.info(f"Decontextualizer: Phase 5 done ({time.perf_counter() - t_phase:.1f}s)")
+        logger.info(
+            f"Decontextualizer: Phase 5 done ({time.perf_counter() - t_phase:.1f}s)"
+        )
 
         # ── Phase 6: build QA2D prompt list ───────────────────────────────
-        all_qa2d_prompts: List[str]   = []
-        sent_qa2d_slices: List[tuple]  = []   # (start, end) into all_qa2d_prompts
+        all_qa2d_prompts: List[str] = []
+        sent_qa2d_slices: List[tuple] = []  # (start, end) into all_qa2d_prompts
         qa_filtering_stats: List[dict] = []  # for debugging
 
-        for sent_idx, ((qg_start, qg_end), (qa_start, qa_end)) in enumerate(zip(
-            sent_qg_slices, sent_qa_slices
-        )):
+        for sent_idx, ((qg_start, qg_end), (qa_start, qa_end)) in enumerate(
+            zip(sent_qg_slices, sent_qa_slices)
+        ):
             qa2d_start = len(all_qa2d_prompts)
             passed_count = 0
             failed_count = 0
-            
-            for u_idx, (q, r) in enumerate(zip(
-                all_questions[qg_start:qg_end], all_qa_results[qa_start:qa_end]
-            )):
+
+            for u_idx, (q, r) in enumerate(
+                zip(all_questions[qg_start:qg_end], all_qa_results[qa_start:qa_end])
+            ):
                 if r["score"] > QA_SCORE_THRESHOLD:
                     all_qa2d_prompts.append(
                         f"Convert to a declarative sentence: Q: {q} A: {r['answer']}"
@@ -408,7 +461,7 @@ class Decontextualizer(SentenceProcessor):
                         f"Decontextualizer [Phase 6] Sentence {sent_idx} unit {u_idx}: "
                         f"Q: {q[:50]}... | Score {r['score']:.3f} < threshold {QA_SCORE_THRESHOLD} → FILTERED"
                     )
-            
+
             qa_filtering_stats.append({"passed": passed_count, "failed": failed_count})
             if passed_count > 0 or failed_count > 0:
                 logger.debug(
@@ -424,18 +477,26 @@ class Decontextualizer(SentenceProcessor):
         )
         t_phase = time.perf_counter()
         all_qa2d_results = self._generate_batch(
-            all_qa2d_prompts, self.gen_tokenizer, self.gen_model,
-            batch_size=DECONTEXT_GEN_BATCH_SIZE, label="QA2D",  # flan-t5-base
+            all_qa2d_prompts,
+            self.gen_tokenizer,
+            self.gen_model,
+            batch_size=DECONTEXT_GEN_BATCH_SIZE,
+            label="QA2D",  # flan-t5-base
         )
-        logger.info(f"Decontextualizer: Phase 7 done ({time.perf_counter() - t_phase:.1f}s)")
+        logger.info(
+            f"Decontextualizer: Phase 7 done ({time.perf_counter() - t_phase:.1f}s)"
+        )
 
         # ── Phase 8: build final rewrite prompt list ───────────────────────
-        all_rewrite_prompts: List[str]    = []
-        sent_rewrite_idx: List[Optional[int]] = []  # index into all_rewrite_prompts, or None
+        all_rewrite_prompts: List[str] = []
+        sent_rewrite_idx: List[Optional[int]] = (
+            []
+        )  # index into all_rewrite_prompts, or None
 
         for i, (qa2d_start, qa2d_end) in enumerate(sent_qa2d_slices):
             declarative = [
-                s for s in all_qa2d_results[qa2d_start:qa2d_end]
+                s
+                for s in all_qa2d_results[qa2d_start:qa2d_end]
                 if s and not s.rstrip().endswith("?")
             ]
             if declarative and texts[i]:
@@ -459,13 +520,29 @@ class Decontextualizer(SentenceProcessor):
         )
         t_phase = time.perf_counter()
         all_rewrites = self._generate_batch(
-            all_rewrite_prompts, self.gen_tokenizer, self.gen_model,
-            batch_size=DECONTEXT_GEN_BATCH_SIZE, label="Rewrite",  # flan-t5-base
+            all_rewrite_prompts,
+            self.gen_tokenizer,
+            self.gen_model,
+            batch_size=DECONTEXT_GEN_BATCH_SIZE,
+            label="Rewrite",  # flan-t5-base
         )
-        logger.info(f"Decontextualizer: Phase 9 done ({time.perf_counter() - t_phase:.1f}s)")
+        logger.info(
+            f"Decontextualizer: Phase 9 done ({time.perf_counter() - t_phase:.1f}s)"
+        )
 
         # ── Phase 10: apply results back to SentenceScore objects ──────────
-        _AMBIGUOUS_PRONOUNS = {"he", "she", "they", "it", "his", "her", "their", "its", "him", "them"}
+        _AMBIGUOUS_PRONOUNS = {
+            "he",
+            "she",
+            "they",
+            "it",
+            "his",
+            "her",
+            "their",
+            "its",
+            "him",
+            "them",
+        }
 
         def _has_unresolved_pronouns(original: str, rewrite: str) -> bool:
             """Return True if the rewrite still contains a pronoun that was present in the original."""
@@ -474,7 +551,14 @@ class Decontextualizer(SentenceProcessor):
             orig_pronouns = orig_words & _AMBIGUOUS_PRONOUNS
             return bool(orig_pronouns & rw_words)
 
-        rejection_summary = {"empty": 0, "unchanged": 0, "has_question": 0, "too_long": 0, "has_pronoun": 0, "accepted": 0}
+        rejection_summary = {
+            "empty": 0,
+            "unchanged": 0,
+            "has_question": 0,
+            "too_long": 0,
+            "has_pronoun": 0,
+            "accepted": 0,
+        }
 
         for i, sent_obj in enumerate(sentences):
             text = texts[i]
@@ -485,7 +569,7 @@ class Decontextualizer(SentenceProcessor):
             rw_idx = sent_rewrite_idx[i]
             if rw_idx is not None:
                 rewritten = all_rewrites[rw_idx]
-                max_len   = int(len(text) * DECONTEXT_REWRITE_RATIO)
+                max_len = int(len(text) * DECONTEXT_REWRITE_RATIO)
 
                 # Quality gate: reject if empty, unchanged, contains "?", too long, or pronouns unresolved
                 rejection_reason = None
@@ -519,7 +603,7 @@ class Decontextualizer(SentenceProcessor):
                         f"Original: {text[:50]}... → Rewritten: {rewritten[:50]}..."
                     )
                     sent_obj.original_text = text
-                    sent_obj.text          = rewritten
+                    sent_obj.text = rewritten
                     rejection_summary["accepted"] += 1
             else:
                 logger.debug(

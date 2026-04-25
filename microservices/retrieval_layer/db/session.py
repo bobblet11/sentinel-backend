@@ -4,11 +4,14 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from microservices.retrieval_layer.config import (POSTGRES_DB, POSTGRES_HOST,
-                                                  POSTGRES_PASSWORD,
-                                                  POSTGRES_PORT,
-                                                  POSTGRES_SSLMODE,
-                                                  POSTGRES_USER)
+from microservices.retrieval_layer.config import (
+    POSTGRES_DB,
+    POSTGRES_HOST,
+    POSTGRES_PASSWORD,
+    POSTGRES_PORT,
+    POSTGRES_SSLMODE,
+    POSTGRES_USER,
+)
 from microservices.retrieval_layer.db.models import Base
 
 logger = logging.getLogger(__name__)
@@ -49,28 +52,24 @@ def ensure_schema_compatibility() -> None:
             logger.info("Retrieval DB schema created from metadata.")
             return
 
-        existing_columns = {column["name"] for column in inspector.get_columns("article")}
+        existing_columns = {
+            column["name"] for column in inspector.get_columns("article")
+        }
         for column_name, statement in article_column_statements.items():
             if column_name not in existing_columns:
                 connection.execute(text(statement))
                 logger.info("Retrieval DB migration: added article.%s", column_name)
 
         # Seed the 9 predefined topic labels (idempotent).
-        connection.execute(
-            text(
-                """
+        connection.execute(text("""
                 INSERT INTO topic (name) VALUES
                     ('Politics'), ('World'), ('Technology'), ('Health'),
                     ('Science'), ('Business'), ('Entertainment'), ('Sports'), ('General')
                 ON CONFLICT (name) DO NOTHING;
-                """
-            )
-        )
+                """))
         logger.info("Retrieval DB: topic seed applied.")
 
-        connection.execute(
-            text(
-                """
+        connection.execute(text("""
                 DO $$
                 BEGIN
                     IF NOT EXISTS (
@@ -101,13 +100,12 @@ def ensure_schema_compatibility() -> None:
                     END IF;
                 END
                 $$;
-                """
-            )
-        )
+                """))
 
 
 def get_db_session() -> Session:
     return SessionLocal()
+
 
 @contextmanager
 def get_db_transaction() -> Session:

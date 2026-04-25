@@ -72,19 +72,31 @@ logging.basicConfig(
 )
 # Silence noisy third-party loggers unless --debug
 if not args.debug:
-    for noisy in ("transformers", "sentence_transformers", "torch", "filelock", "urllib3"):
+    for noisy in (
+        "transformers",
+        "sentence_transformers",
+        "torch",
+        "filelock",
+        "urllib3",
+    ):
         logging.getLogger(noisy).setLevel(logging.ERROR)
 log = logging.getLogger("test_bias_all_articles")
 
 import sentence_transformers  # noqa: E402, F401
+
 # ---------------------------------------------------------------------------
 # Project imports
 # ---------------------------------------------------------------------------
 import transformers  # noqa: E402, F401 — prime import before parallel model loading
 
-from common.models.api.redis_models import (Article, Message,  # noqa: E402
-                                            MessageHeader, MessagePayload,
-                                            NLPOptions, StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    Message,  # noqa: E402
+    MessageHeader,
+    MessagePayload,
+    NLPOptions,
+    StreamMessage,
+)
 from microservices.nlp.components.bias import BiasDetector  # noqa: E402
 from microservices.nlp.config import DEVICE_CONFIG, model_manager  # noqa: E402
 
@@ -98,6 +110,7 @@ SEP = "\u2550" * 78
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def load_article(path: Path) -> Article:
     with open(path, encoding="utf-8") as f:
@@ -193,6 +206,7 @@ def lean_label(category: str) -> str:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     article_files = sorted(ARTICLES_DIR.glob("*.json"))
     if not article_files:
@@ -231,16 +245,22 @@ def main() -> None:
                 errors.append((path.name, "bias_profile is None"))
                 continue
 
-            results.append({
-                "file": path.name,
-                "source": article.source or path.stem,
-                "title": article.title[:55] + "..." if len(article.title) > 55 else article.title,
-                "bias_category": bias_profile.bias_category,
-                "bias_confidence": bias_profile.bias_analysis_confidence,
-                "sentiment_category": bias_profile.sentiment_category,
-                "sentiment_confidence": bias_profile.sentiment_analysis_confidence,
-                "elapsed": elapsed,
-            })
+            results.append(
+                {
+                    "file": path.name,
+                    "source": article.source or path.stem,
+                    "title": (
+                        article.title[:55] + "..."
+                        if len(article.title) > 55
+                        else article.title
+                    ),
+                    "bias_category": bias_profile.bias_category,
+                    "bias_confidence": bias_profile.bias_analysis_confidence,
+                    "sentiment_category": bias_profile.sentiment_category,
+                    "sentiment_confidence": bias_profile.sentiment_analysis_confidence,
+                    "elapsed": elapsed,
+                }
+            )
 
         except Exception as exc:
             errors.append((path.name, str(exc)))
@@ -248,7 +268,9 @@ def main() -> None:
 
     # ── Print results table ──────────────────────────────────────────────────
     print(SEP)
-    print(f"{'FILE':<22} {'SOURCE':<15} {'LEAN':<10} {'CONF':>6}  {'BIAS BAR':<22} {'SENTIMENT':<12} {'S.CONF':>6}  {'TIME':>5}")
+    print(
+        f"{'FILE':<22} {'SOURCE':<15} {'LEAN':<10} {'CONF':>6}  {'BIAS BAR':<22} {'SENTIMENT':<12} {'S.CONF':>6}  {'TIME':>5}"
+    )
     print(SEP)
 
     for r in results:
@@ -279,8 +301,12 @@ def main() -> None:
             print(f"\n  File    : {r['file']}")
             print(f"  Source  : {r['source']}")
             print(f"  Title   : {r['title']}")
-            print(f"  Lean    : {lean_label(r['bias_category'])}  (conf={r['bias_confidence']:.4f})")
-            print(f"  Tone    : {r['sentiment_category']}  (conf={r['sentiment_confidence']:.4f})")
+            print(
+                f"  Lean    : {lean_label(r['bias_category'])}  (conf={r['bias_confidence']:.4f})"
+            )
+            print(
+                f"  Tone    : {r['sentiment_category']}  (conf={r['sentiment_confidence']:.4f})"
+            )
         print(SEP)
 
 

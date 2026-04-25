@@ -1,11 +1,14 @@
 from sqlalchemy.orm import Session
 
-from microservices.retrieval_layer.retrieval.embedding_retriever import \
-    retrieve_by_embedding
-from microservices.retrieval_layer.retrieval.entity_filter import \
-    find_evidence_by_entity_match
-from microservices.retrieval_layer.retrieval.keyword_filter import \
-    find_evidence_by_tfidf
+from microservices.retrieval_layer.retrieval.embedding_retriever import (
+    retrieve_by_embedding,
+)
+from microservices.retrieval_layer.retrieval.entity_filter import (
+    find_evidence_by_entity_match,
+)
+from microservices.retrieval_layer.retrieval.keyword_filter import (
+    find_evidence_by_tfidf,
+)
 from microservices.retrieval_layer.retrieval.nli import classify_claim_relation
 
 MAX_CANDIDATES_BEFORE_EMBEDDING = 100
@@ -41,7 +44,7 @@ def retrieve_candidate_claims(
         candidates[c.id] = c
 
     candidate_list = list(candidates.values())
-    
+
     # print("Entities:", entities)
     # print("Keywords:", keywords)
     # print("Candidates after symbolic:", len(candidate_list))
@@ -79,7 +82,7 @@ def retrieve_candidate_claims(
 
     # Cap before NLI
     ranked = ranked[:MAX_CANDIDATES_BEFORE_NLI]
-    
+
     # print("Ranked after embedding:", ranked)
     # for c, s in ranked:
     #     print(type(c), c)
@@ -93,16 +96,13 @@ def retrieve_candidate_claims(
     for claim_dict, score in ranked:
         try:
             label, confidence = classify_claim_relation(
-                claim_text,
-                claim_dict["decontextualised_claim"]
+                claim_text, claim_dict["decontextualised_claim"]
             )
         except Exception as e:
             print(f"Error during NLI for claim ID {claim_dict['id']}:")
             print(e)
             label, confidence = "irrelevant", 0.0
 
-        ranked_with_nli.append(
-            (claim_dict, score, label, confidence)
-        )
+        ranked_with_nli.append((claim_dict, score, label, confidence))
 
     return ranked_with_nli

@@ -1,15 +1,24 @@
 import logging
 from typing import Any, List, Optional
 
-from common.models.api.redis_models import (Article, Claim, NLPOptions,
-                                            SentenceScore, StreamMessage)
+from common.models.api.redis_models import (
+    Article,
+    Claim,
+    NLPOptions,
+    SentenceScore,
+    StreamMessage,
+)
 from microservices.nlp.components.device import DeviceConfig
-from microservices.nlp.config import (CHECKWORTHY_BATCH_SIZE,
-                                      MAX_SENTENCES_FOR_CHECKWORTHY)
+from microservices.nlp.config import (
+    CHECKWORTHY_BATCH_SIZE,
+    MAX_SENTENCES_FOR_CHECKWORTHY,
+)
+
 # Local imports
 from microservices.nlp.models.base import SentenceProcessor
 
 logger = logging.getLogger(__name__)
+
 
 class CheckWorthinessFilter(SentenceProcessor):
     """
@@ -18,7 +27,7 @@ class CheckWorthinessFilter(SentenceProcessor):
 
     Model: whispAI/ClaimBuster-DeBERTaV2
     Labels: NFS (Non-Factual) / UFS (Unimportant Factual) / CFS (Check-worthy Factual)
-    
+
     Now implements SentenceProcessor: accepts sentences list as parameter,
     modifies is_checkworthy/claim_type/confidence in-place, stores claims in result,
     and returns the sentence list.
@@ -43,6 +52,7 @@ class CheckWorthinessFilter(SentenceProcessor):
         # Load model if not provided
         if not self.classifier:
             from microservices.nlp.config import model_manager
+
             try:
                 self.classifier = model_manager.get("CHECKWORTHY")
             except Exception as e:
@@ -53,7 +63,13 @@ class CheckWorthinessFilter(SentenceProcessor):
                     e,
                 )
 
-    def run(self, article: Article, message: StreamMessage, options: NLPOptions, sentences: List[SentenceScore]) -> List[SentenceScore]:
+    def run(
+        self,
+        article: Article,
+        message: StreamMessage,
+        options: NLPOptions,
+        sentences: List[SentenceScore],
+    ) -> List[SentenceScore]:
         """
         Classifies each sentence in the provided list.
         Adds 'is_checkworthy', 'claim_type', and 'confidence' attributes to each sentence.
@@ -69,7 +85,9 @@ class CheckWorthinessFilter(SentenceProcessor):
         if len(candidate_indices) > MAX_SENTENCES_FOR_CHECKWORTHY:
             ranked = sorted(
                 candidate_indices,
-                key=lambda idx: sentences[idx].score if sentences[idx].score is not None else 0.0,
+                key=lambda idx: (
+                    sentences[idx].score if sentences[idx].score is not None else 0.0
+                ),
                 reverse=True,
             )
             candidate_indices = ranked[:MAX_SENTENCES_FOR_CHECKWORTHY]
@@ -103,7 +121,7 @@ class CheckWorthinessFilter(SentenceProcessor):
 
             count = 0
             claims_discovered = []
-            
+
             for local_idx, label_scores in enumerate(predictions):
                 i = candidate_indices[local_idx]
                 top_label = max(label_scores, key=lambda x: x["score"])["label"]
@@ -121,7 +139,7 @@ class CheckWorthinessFilter(SentenceProcessor):
 
                 if is_worthy:
                     count += 1
-                    
+
                     # Construct and store the Claim object
                     claim_obj = Claim(
                         confidence=cfs_score,
@@ -136,12 +154,14 @@ class CheckWorthinessFilter(SentenceProcessor):
             result = message.create_nlp_result()
             result.claims_in_article = claims_discovered
             message.set_nlp_result(result)
-            logger.info(f"CheckWorthiness: Identified {count} factual claims out of {len(texts)} sentences.")
+            logger.info(
+                f"CheckWorthiness: Identified {count} factual claims out of {len(texts)} sentences."
+            )
 
         except Exception as e:
             logger.error(f"CheckWorthiness analysis failed: {e}")
             # Fail gracefully: assume nothing is checkworthy so we don't crash
             for s in sentences:
                 s.is_checkworthy = False
-        
+
         return sentences

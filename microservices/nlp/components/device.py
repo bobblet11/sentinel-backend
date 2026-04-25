@@ -43,9 +43,7 @@ class DeviceConfig:
             and platform.system() == "Darwin"
             and torch.backends.mps.is_available()
         ):
-            logger.info(
-                "DeviceConfig: MPS available — using Apple GPU (fp32 only)."
-            )
+            logger.info("DeviceConfig: MPS available — using Apple GPU (fp32 only).")
             return DeviceConfig(
                 device="mps", device_id=-1, use_fp16=False, dtype=torch.float32
             )

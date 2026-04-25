@@ -17,7 +17,6 @@ URL_SPREAD = {
 }
 
 
-
 class WebScraperBenchmark(BenchmarkTemplate):
     """
     Benchmark to see if author, published_date, news_outlet is filled out by the hardcoded parsers in WebScraper.

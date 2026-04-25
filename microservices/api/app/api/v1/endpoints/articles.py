@@ -5,8 +5,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from microservices.api.app.db.session import get_db
-from microservices.api.app.models.article import (Article, NewsOutlet,
-                                                  SentimentAnalysis)
+from microservices.api.app.models.article import Article, NewsOutlet, SentimentAnalysis
 
 router = APIRouter()
 outlets_router = APIRouter()
@@ -20,7 +19,9 @@ def _article_to_dict(article: Article) -> Dict[str, Any]:
         "article_url": article.url or "",
         "news_outlet": article.outlet.name if article.outlet else "Unknown",
         "bias": sentiment.bias_category if sentiment else "Unknown",
-        "trust_score": round((sentiment.bias_analysis_confidence or 0) * 100) if sentiment else 0,
+        "trust_score": (
+            round((sentiment.bias_analysis_confidence or 0) * 100) if sentiment else 0
+        ),
         "created_at": article.publishedAt.isoformat() if article.publishedAt else None,
     }
 
