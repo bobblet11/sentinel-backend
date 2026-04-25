@@ -74,6 +74,7 @@ backups_extra/
 .claude/
 .opencode/
 stats/
+claude_docs/
 
 # Screenshots & Media
 *.png
