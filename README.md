@@ -2,7 +2,7 @@
 
 Sentinel is a real-time misinformation intelligence platform designed to help readers inspect news content at the moment of consumption. The backend of the Sentinel app combines claim extraction, bias analysis, semantic retrieval, and asynchronous microservice orchestration to turn raw articles into structured, evidence-backed outputs.
 
-This repository showcases the backend system behind that workflow: a production-oriented pipeline built with FastAPI, Redis Streams, PostgreSQL, pgvector, Docker, and transformer-based NLP components.
+This repository showcases the backend system behind that workflow: a production-oriented pipeline built with FastAPI, Redis Streams, PostgreSQL, pgvector, Docker, and transformer-based NLP components. This repo (https://github.com/PorpanTH/sentinel-frontend) contains the frontend code responsible for the browser extension and web dashboard.
 
 ## What Sentinel Does
 
