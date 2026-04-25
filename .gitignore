@@ -1,52 +1,121 @@
+# Environment & Secrets
 .env
+.env.local
+.env.*.local
+configs/.env
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Data & Logs
+logs/
+*.log
+data/postgres_data/
+data/redis_data/
+data_report/
+
+# Build & Runtime Artifacts
+.cache/
+results/
+backups/
+backups_extra/
+.worktrees/
+
+# Session & Temporary Files
+.claude/
+.opencode/
+stats/
+
+# Screenshots & Media
+*.png
+*.jpg
+*.jpeg
+microservices/web_scraper/screenshots/
+
+# Database & Backup Files
+*.sql
 scripts/topic_clustering/backup.sql
 scripts/topic_clustering/output/
-__pycache__
-**/__pycache__/
-webshareio_proxies.json
-microservices/web_scraper/proxy_sources/webshareio_proxies.json
+
+# Proxy & Sensitive Config Files
 webshareio_proxies.json
 saved_proxies.json
-/workspaces/sentinel-backend/microservices/web_scraper/screenshots
-./microservices/web_scraper/screenshots
-microservices/web_scraper/screenshots
-./logs
-logs
-.log
-**.log
-data/postgres_data
-data/redis_data
-./backups/*
-backups
-.cache
+microservices/web_scraper/proxy_sources/webshareio_proxies.json
 
-CLAUDE.md
-.claude
-claude_docs
-.github
-GEMINI.md
-AGENTS.md
-.opencode
-
-*.zip
-.zip
-backups.zip
-node_modules/
-.pem
+# Credentials & Keys
 *.pem
-results/*
+*.key
+*.pfx
+*.p12
+
+# Archives
+*.zip
+backups.zip
+
+# Large Binary Files (CI/CD tools)
+cloudflared*
+cloudflared.deb
+cloudflared.dsudo
+
+# System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Test Exports
 tests/articles_export.csv
 tests/claims_export.csv
-./backups_extra
-backups_extra
-.worktrees/
-.png
-*.png
-./scripts/stats/*
-stats
-*/backup.sql
-scripts/topic_clustering/backup.sql
-scripts/topic_clustering/output/
-cloudfared*
 
-configs
+# IDE workspace data (but keep .devcontainer)
+.vscode/settings.json
+.vscode/extensions.json
