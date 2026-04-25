@@ -47,9 +47,8 @@ On the backend, the platform performs four core tasks:
 ### Poster
 ![Alt Text](report/poster.png)
 
-### Report
-(https://drive.google.com/file/d/1MIzG_EaeoAWVHwlK8q9nzc6p9G-q8lVC/view?usp=sharing)
-
+### Technical Report
+Read technical report here (https://drive.google.com/file/d/1MIzG_EaeoAWVHwlK8q9nzc6p9G-q8lVC/view?usp=sharing)
 
 ## Running the Project
 
