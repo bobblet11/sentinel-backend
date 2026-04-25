@@ -19,7 +19,9 @@ On the backend, the platform performs four core tasks:
 - retrieve semantically related evidence from a growing news corpus
 
 ## Table of Contents
-
+- [Accompanying Publications](#accompanying-publications)
+  - [Poster](#poster)
+  - [Report](#report)
 - [Running the Project](#running-the-project)
   - [Prerequisites](#prerequisites)
   - [First-Time Setup](#first-time-setup)
@@ -44,7 +46,7 @@ On the backend, the platform performs four core tasks:
 
 ### Poster
 ![Alt Text](report/poster.png)
-
+(https://drive.google.com/file/d/1MIzG_EaeoAWVHwlK8q9nzc6p9G-q8lVC/view?usp=sharing)
 
 ### Report
 
